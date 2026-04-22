@@ -545,6 +545,12 @@ pub async fn schema_kind_counts(
 }
 
 #[tauri::command]
+pub async fn ai_chat(app: AppHandle, payload: Value) -> Result<Value, ConnectionTestErr> {
+    let res = call_sidecar(&app, "ai.chat", payload).await?;
+    Ok(res)
+}
+
+#[tauri::command]
 pub async fn connection_commit(app: AppHandle) -> Result<(), ConnectionTestErr> {
     call_sidecar(&app, "connection.commit", json!({})).await?;
     Ok(())
