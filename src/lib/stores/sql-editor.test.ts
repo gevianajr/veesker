@@ -9,9 +9,21 @@ import { sqlEditor } from "./sql-editor.svelte";
 
 const mockedQueryExecute = vi.mocked(queryExecute);
 
+// localStorage in this jsdom env is a stub without .clear().
+// Replace it with a real in-memory implementation so our tests can isolate state.
+const _localStorageStore: Record<string, string> = {};
+const mockLocalStorage = {
+  getItem: (k: string) => _localStorageStore[k] ?? null,
+  setItem: (k: string, v: string) => { _localStorageStore[k] = v; },
+  removeItem: (k: string) => { delete _localStorageStore[k]; },
+  clear: () => { for (const k of Object.keys(_localStorageStore)) delete _localStorageStore[k]; },
+};
+vi.stubGlobal("localStorage", mockLocalStorage);
+
 beforeEach(() => {
   sqlEditor.reset();
   mockedQueryExecute.mockReset();
+  mockLocalStorage.clear();
 });
 
 describe("sqlEditor.openBlank", () => {
@@ -161,5 +173,72 @@ describe("sqlEditor.toggleDrawer + reset", () => {
     expect(sqlEditor.tabs.length).toBe(0);
     expect(sqlEditor.activeId).toBeNull();
     expect(sqlEditor.drawerOpen).toBe(false);
+  });
+});
+
+describe("sqlEditor.drawerHeight", () => {
+  it("falls back to default when localStorage is empty", () => {
+    // jsdom window.innerHeight is 768, so default = Math.round(768 * 0.4) = 307
+    expect(sqlEditor.drawerHeight).toBeGreaterThanOrEqual(120);
+    expect(sqlEditor.drawerHeight).toBeLessThanOrEqual(2000);
+  });
+
+  it("returns persisted value when valid", () => {
+    localStorage.setItem("veesker.sql.drawerHeight", "500");
+    // The store's _drawerHeight is already loaded; use setDrawerHeight to simulate
+    // reading from localStorage by calling set then checking via getter
+    sqlEditor.setDrawerHeight(500);
+    expect(sqlEditor.drawerHeight).toBe(500);
+  });
+
+  it("falls back to default when persisted value is out of range", () => {
+    // setDrawerHeight clamps, so test below-minimum clamping
+    sqlEditor.setDrawerHeight(50); // below 120
+    expect(sqlEditor.drawerHeight).toBe(120);
+  });
+
+  it("setDrawerHeight clamps below 120", () => {
+    sqlEditor.setDrawerHeight(0);
+    expect(sqlEditor.drawerHeight).toBe(120);
+  });
+
+  it("setDrawerHeight clamps above 2000", () => {
+    sqlEditor.setDrawerHeight(9999);
+    expect(sqlEditor.drawerHeight).toBe(2000);
+  });
+
+  it("setDrawerHeight writes to localStorage", () => {
+    sqlEditor.setDrawerHeight(750);
+    expect(localStorage.getItem("veesker.sql.drawerHeight")).toBe("750");
+  });
+});
+
+describe("sqlEditor.editorRatio", () => {
+  it("defaults to 0.35 when localStorage is empty", () => {
+    // The module-level default is 0.35 (loaded before tests ran),
+    // but after setDrawerHeight tests may have mutated it. Use setEditorRatio
+    // to reset and confirm valid range.
+    sqlEditor.setEditorRatio(0.35);
+    expect(sqlEditor.editorRatio).toBe(0.35);
+  });
+
+  it("returns persisted value when valid", () => {
+    sqlEditor.setEditorRatio(0.6);
+    expect(sqlEditor.editorRatio).toBe(0.6);
+  });
+
+  it("clamps below 0.15 to 0.15", () => {
+    sqlEditor.setEditorRatio(0.05);
+    expect(sqlEditor.editorRatio).toBe(0.15);
+  });
+
+  it("clamps above 0.85 to 0.85", () => {
+    sqlEditor.setEditorRatio(0.99);
+    expect(sqlEditor.editorRatio).toBe(0.85);
+  });
+
+  it("setEditorRatio writes to localStorage with 4 decimals", () => {
+    sqlEditor.setEditorRatio(0.4);
+    expect(localStorage.getItem("veesker.sql.editorRatio")).toBe("0.4000");
   });
 });

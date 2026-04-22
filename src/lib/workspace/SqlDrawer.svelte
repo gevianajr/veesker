@@ -2,6 +2,81 @@
   import { sqlEditor } from "$lib/stores/sql-editor.svelte";
   import SqlEditor from "./SqlEditor.svelte";
   import ResultGrid from "./ResultGrid.svelte";
+
+  // ── Refs ────────────────────────────────────────────────────────────────────
+  let drawerEl: HTMLDivElement | undefined = $state();
+  let tabbarEl: HTMLDivElement | undefined = $state();
+
+  // ── Top drag handle (resizes drawer height) ──────────────────────────────
+  let topDragStartY = 0;
+  let topDragStartHeight = 0;
+
+  function onTopPointerDown(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLDivElement;
+    handle.setPointerCapture(e.pointerId);
+    topDragStartY = e.clientY;
+    topDragStartHeight = sqlEditor.drawerHeight;
+  }
+
+  function onTopPointerMove(e: PointerEvent) {
+    if (!(e.currentTarget as HTMLDivElement).hasPointerCapture(e.pointerId)) return;
+    const newHeight = topDragStartHeight + (topDragStartY - e.clientY);
+    const max = typeof window !== "undefined" ? window.innerHeight * 0.9 : 2000;
+    sqlEditor.setDrawerHeight(Math.max(120, Math.min(max, newHeight)));
+  }
+
+  function onTopPointerUp(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLDivElement;
+    if (handle.hasPointerCapture(e.pointerId)) {
+      handle.releasePointerCapture(e.pointerId);
+    }
+    // Final value already persisted by setDrawerHeight
+  }
+
+  function onTopKeyDown(e: KeyboardEvent) {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const max = typeof window !== "undefined" ? window.innerHeight * 0.9 : 2000;
+      sqlEditor.setDrawerHeight(Math.min(max, sqlEditor.drawerHeight + 10));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      sqlEditor.setDrawerHeight(Math.max(120, sqlEditor.drawerHeight - 10));
+    }
+  }
+
+  // ── Middle drag handle (resizes editor/grid ratio) ───────────────────────
+  function onMidPointerDown(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLDivElement;
+    handle.setPointerCapture(e.pointerId);
+  }
+
+  function onMidPointerMove(e: PointerEvent) {
+    if (!(e.currentTarget as HTMLDivElement).hasPointerCapture(e.pointerId)) return;
+    if (!drawerEl || !tabbarEl) return;
+    const drawerRect = drawerEl.getBoundingClientRect();
+    const tabbarHeight = tabbarEl.clientHeight;
+    const contentHeight = drawerRect.height - tabbarHeight - 4; // 4px = top handle
+    const offsetInContent = e.clientY - drawerRect.top - tabbarHeight - 4;
+    const ratio = offsetInContent / contentHeight;
+    sqlEditor.setEditorRatio(ratio);
+  }
+
+  function onMidPointerUp(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLDivElement;
+    if (handle.hasPointerCapture(e.pointerId)) {
+      handle.releasePointerCapture(e.pointerId);
+    }
+  }
+
+  function onMidKeyDown(e: KeyboardEvent) {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      sqlEditor.setEditorRatio(sqlEditor.editorRatio - 10 / sqlEditor.drawerHeight);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      sqlEditor.setEditorRatio(sqlEditor.editorRatio + 10 / sqlEditor.drawerHeight);
+    }
+  }
 </script>
 
 {#if !sqlEditor.drawerOpen}
@@ -14,8 +89,25 @@
     <span class="arrow">▲</span>
   </button>
 {:else}
-  <div class="drawer">
-    <div class="tabbar">
+  <!-- Top resize handle -->
+  <div
+    class="top-handle"
+    role="separator"
+    aria-orientation="horizontal"
+    tabindex="0"
+    onpointerdown={onTopPointerDown}
+    onpointermove={onTopPointerMove}
+    onpointerup={onTopPointerUp}
+    onpointercancel={onTopPointerUp}
+    onkeydown={onTopKeyDown}
+  ></div>
+
+  <div
+    class="drawer"
+    style="height: {sqlEditor.drawerHeight}px"
+    bind:this={drawerEl}
+  >
+    <div class="tabbar" bind:this={tabbarEl}>
       <div class="tabs" role="tablist">
         {#each sqlEditor.tabs as t (t.id)}
           <div
@@ -48,7 +140,7 @@
       <div class="empty">Click + to open a new query.</div>
     {:else}
       {@const tab = sqlEditor.active}
-      <div class="editor-pane">
+      <div class="editor-pane" style="flex: 0 0 {sqlEditor.editorRatio * 100}%">
         {#if tab}
           <SqlEditor
             value={tab.sql}
@@ -57,7 +149,21 @@
           />
         {/if}
       </div>
-      <div class="grid-pane">
+
+      <!-- Middle resize handle -->
+      <div
+        class="mid-handle"
+        role="separator"
+        aria-orientation="horizontal"
+        tabindex="0"
+        onpointerdown={onMidPointerDown}
+        onpointermove={onMidPointerMove}
+        onpointerup={onMidPointerUp}
+        onpointercancel={onMidPointerUp}
+        onkeydown={onMidKeyDown}
+      ></div>
+
+      <div class="grid-pane" style="flex: 1 1 auto">
         <ResultGrid {tab} />
       </div>
     {/if}
@@ -83,9 +189,26 @@
     cursor: pointer;
   }
   .strip:hover { background: #f0e8da; }
+
+  /* ── Top resize handle ─────────────────────────────────────────────────── */
+  .top-handle {
+    height: 4px;
+    width: 100%;
+    cursor: ns-resize;
+    background: transparent;
+    flex-shrink: 0;
+  }
+  .top-handle:hover {
+    background: rgba(179, 62, 31, 0.4);
+  }
+  .top-handle:focus-visible {
+    outline: 2px solid #b33e1f;
+    outline-offset: -1px;
+  }
+
+  /* ── Drawer ─────────────────────────────────────────────────────────────── */
   .drawer {
-    height: 40vh;
-    min-height: 200px;
+    min-height: 120px;
     background: #fff;
     border-top: 2px solid #b33e1f;
     display: flex;
@@ -161,13 +284,28 @@
     font-size: 12px;
   }
   .editor-pane {
-    flex: 1 1 50%;
     min-height: 80px;
     border-bottom: 1px solid rgba(26, 22, 18, 0.1);
     overflow: hidden;
   }
+
+  /* ── Middle resize handle ──────────────────────────────────────────────── */
+  .mid-handle {
+    height: 4px;
+    width: 100%;
+    cursor: ns-resize;
+    background: transparent;
+    flex-shrink: 0;
+  }
+  .mid-handle:hover {
+    background: rgba(179, 62, 31, 0.4);
+  }
+  .mid-handle:focus-visible {
+    outline: 2px solid #b33e1f;
+    outline-offset: -1px;
+  }
+
   .grid-pane {
-    flex: 1 1 50%;
     min-height: 80px;
     overflow: hidden;
   }
