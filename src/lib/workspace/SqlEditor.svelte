@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { EditorState } from "@codemirror/state";
+  import { EditorState, Prec } from "@codemirror/state";
   import { EditorView, keymap } from "@codemirror/view";
-  import { defaultKeymap } from "@codemirror/commands";
   import { sql, PLSQL } from "@codemirror/lang-sql";
   import { oneDark } from "@codemirror/theme-one-dark";
   import { basicSetup } from "codemirror";
@@ -24,13 +23,21 @@
       state: EditorState.create({
         doc: value,
         extensions: [
+          Prec.highest(
+            keymap.of([
+              {
+                key: "Mod-Enter",
+                preventDefault: true,
+                run: () => {
+                  onRun();
+                  return true;
+                },
+              },
+            ])
+          ),
           basicSetup,
           sql({ dialect: PLSQL }),
           oneDark,
-          keymap.of([
-            { key: "Mod-Enter", run: () => { onRun(); return true; } },
-            ...defaultKeymap,
-          ]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onChange(u.state.doc.toString());
           }),
