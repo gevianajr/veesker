@@ -4,6 +4,18 @@
   type Props = { tab: SqlTab | null };
   let { tab }: Props = $props();
 
+  function isNumericType(t: string): boolean {
+    const u = t.toUpperCase();
+    return (
+      u.includes("NUMBER") ||
+      u.includes("FLOAT") ||
+      u.includes("DOUBLE") ||
+      u.includes("INTEGER") ||
+      u.includes("DATE") ||
+      u.includes("TIMESTAMP")
+    );
+  }
+
   function formatCell(v: unknown): string {
     if (v === null || v === undefined) return "<NULL>";
     let s: string;
@@ -39,9 +51,11 @@
         <thead>
           <tr>
             {#each r.columns as c (c.name)}
-              <th>
-                <span class="cname">{c.name}</span>
-                <span class="ctype">{c.dataType}</span>
+              <th class:numeric={isNumericType(c.dataType)}>
+                <div class="th-stack">
+                  <span class="cname">{c.name}</span>
+                  <span class="ctype">{c.dataType}</span>
+                </div>
               </th>
             {/each}
           </tr>
@@ -50,7 +64,7 @@
           {#each r.rows as row, i (i)}
             <tr>
               {#each row as cell, j (j)}
-                <td class:null-cell={cell === null}>{formatCell(cell)}</td>
+                <td class:numeric={isNumericType(r.columns[j].dataType)} class:null-cell={cell === null}>{formatCell(cell)}</td>
               {/each}
             </tr>
           {/each}
@@ -110,17 +124,23 @@
     letter-spacing: 0.05em;
     color: rgba(26, 22, 18, 0.7);
     white-space: nowrap;
+    min-width: 80px;
   }
-  thead .cname {
+  .th-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .cname {
     font-family: "Space Grotesk", sans-serif;
     font-weight: 600;
   }
-  thead .ctype {
-    margin-left: 0.4rem;
-    opacity: 0.55;
+  .ctype {
+    opacity: 0.5;
     font-family: "JetBrains Mono", monospace;
     font-size: 9.5px;
   }
+  thead th.numeric .th-stack { align-items: flex-end; }
   tbody td {
     padding: 0.3rem 0.6rem;
     border-right: 1px solid rgba(26, 22, 18, 0.04);
@@ -129,7 +149,9 @@
     font-size: 11.5px;
     white-space: nowrap;
     vertical-align: top;
+    min-width: 80px;
   }
+  tbody td.numeric { text-align: right; }
   tbody tr:nth-child(even) { background: rgba(26, 22, 18, 0.02); }
   td.null-cell {
     color: rgba(26, 22, 18, 0.4);
