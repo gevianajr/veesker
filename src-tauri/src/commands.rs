@@ -181,6 +181,8 @@ pub struct ColumnDef {
     pub is_pk: bool,
     pub data_default: Option<String>,
     pub comments: Option<String>,
+    #[serde(default)]
+    pub is_vector: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
