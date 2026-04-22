@@ -8,6 +8,7 @@
     "build": "bun build src/index.ts --compile --minify --outfile ../src-tauri/binaries/veesker-sidecar"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "oracledb": "^6.6.0"
   },
   "devDependencies": {

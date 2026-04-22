@@ -138,3 +138,28 @@ export async function connectionRollback(): Promise<Result<void>> {
     return { ok: false, error: err as WorkspaceError };
   }
 }
+
+export type AiMessage = { role: "user" | "assistant"; content: string };
+export type AiContext = {
+  currentSchema?: string;
+  selectedOwner?: string;
+  selectedName?: string;
+  selectedKind?: string;
+  activeSql?: string;
+};
+export type AiChatResult = { content: string; toolsUsed: string[] };
+
+export async function aiChat(
+  apiKey: string,
+  messages: AiMessage[],
+  context: AiContext,
+): Promise<Result<AiChatResult>> {
+  try {
+    const res = await invoke<AiChatResult>("ai_chat", {
+      payload: { apiKey, messages, context },
+    });
+    return { ok: true, data: res };
+  } catch (err) {
+    return { ok: false, error: err as WorkspaceError };
+  }
+}

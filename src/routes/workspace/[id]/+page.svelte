@@ -7,6 +7,7 @@
   import ObjectDetails from "$lib/workspace/ObjectDetails.svelte";
   import SqlDrawer from "$lib/workspace/SqlDrawer.svelte";
   import CommandPalette from "$lib/workspace/CommandPalette.svelte";
+  import SheepChat from "$lib/workspace/SheepChat.svelte";
   import { sqlEditor } from "$lib/stores/sql-editor.svelte";
   import {
     workspaceOpen,
@@ -40,6 +41,7 @@
   let fatal    = $state<string | null>(null);
   let sessionLost = $state(false);
   let showPalette = $state(false);
+  let showChat = $state(false);
   let detailError = $state<string | null>(null);
   let dataflow = $state<DataFlowResult | null>(null);
   let dataflowLoading = $state(false);
@@ -254,6 +256,13 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      showChat = !showChat;
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -346,6 +355,8 @@
       schema={info.currentSchema}
       serverVersion={info.serverVersion}
       hasPendingTx={sqlEditor.pendingTx}
+      chatOpen={showChat}
+      onToggleChat={() => showChat = !showChat}
       onDisconnect={onDisconnect}
     />
     <div class="body">
@@ -378,6 +389,18 @@
           else if (res.error.code === SESSION_LOST) sessionLost = true;
         }}
       />
+      {#if showChat}
+        <SheepChat
+          context={{
+            currentSchema: info.currentSchema,
+            selectedOwner: selected?.owner,
+            selectedName: selected?.name,
+            selectedKind: selected?.kind,
+            activeSql: sqlEditor.active?.sql ?? undefined,
+          }}
+          onClose={() => showChat = false}
+        />
+      {/if}
     </div>
     <SqlDrawer />
   </div>
