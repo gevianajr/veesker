@@ -15,6 +15,41 @@ let _activeId = $state<string | null>(null);
 let _drawerOpen = $state(false);
 let _queryCounter = $state(0);
 
+// ── Drawer height ────────────────────────────────────────────────────────────
+
+function loadDrawerHeight(): number {
+  if (typeof window === "undefined") return 360;
+  try {
+    const raw = localStorage.getItem("veesker.sql.drawerHeight");
+    if (raw !== null) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n >= 120 && n <= 2000) return n;
+    }
+  } catch {
+    // Safari private mode or restricted environment
+  }
+  return Math.round(window.innerHeight * 0.4);
+}
+
+function loadEditorRatio(): number {
+  if (typeof window === "undefined") return 0.35;
+  try {
+    const raw = localStorage.getItem("veesker.sql.editorRatio");
+    if (raw !== null) {
+      const n = parseFloat(raw);
+      if (Number.isFinite(n) && n >= 0.15 && n <= 0.85) return n;
+    }
+  } catch {
+    // Safari private mode or restricted environment
+  }
+  return 0.35;
+}
+
+let _drawerHeight = $state<number>(loadDrawerHeight());
+let _editorRatio = $state<number>(loadEditorRatio());
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 function newId(): string {
   return crypto.randomUUID();
 }
@@ -51,6 +86,34 @@ export const sqlEditor = {
   get drawerOpen() { return _drawerOpen; },
   get active(): SqlTab | null {
     return _activeId === null ? null : findTab(_activeId);
+  },
+
+  // ── Drawer height ──────────────────────────────────────────────────────────
+  get drawerHeight() { return _drawerHeight; },
+  setDrawerHeight(px: number): void {
+    const clamped = Math.max(120, Math.min(2000, px));
+    _drawerHeight = clamped;
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("veesker.sql.drawerHeight", String(Math.round(clamped)));
+      }
+    } catch {
+      // Safari private mode or restricted environment
+    }
+  },
+
+  // ── Editor ratio ───────────────────────────────────────────────────────────
+  get editorRatio() { return _editorRatio; },
+  setEditorRatio(r: number): void {
+    const clamped = Math.max(0.15, Math.min(0.85, r));
+    _editorRatio = clamped;
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("veesker.sql.editorRatio", clamped.toFixed(4));
+      }
+    } catch {
+      // Safari private mode or restricted environment
+    }
   },
 
   openBlank(): void {
