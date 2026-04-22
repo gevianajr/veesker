@@ -441,11 +441,13 @@ async function executeSingleStatement(
   // Oracle SQL APIs accept BEGIN...END without the trailing semicolon, so strip it.
   const sqlToSend = PLSQL_ANON_RE.test(sql) ? sql.replace(/;\s*$/, "") : sql;
   try {
-    r = await conn.execute(
-      sqlToSend,
-      [],
-      isPlsql ? {} : { maxRows: 100, outFormat: oracledb.OUT_FORMAT_ARRAY }
-    );
+    if (isPlsql) {
+      // Don't pass a bind array for PL/SQL: thin mode scans the statement body for
+      // :name patterns and misidentifies :old/:new trigger references as bind variables.
+      r = await conn.execute(sqlToSend);
+    } else {
+      r = await conn.execute(sqlToSend, [], { maxRows: 100, outFormat: oracledb.OUT_FORMAT_ARRAY });
+    }
   } catch (execErr) {
     if (_running?.requestId === requestId && _running.cancelled && isCancelError(execErr)) {
       throw new RpcCodedError(QUERY_CANCELLED, "Cancelled by user");
