@@ -9,6 +9,9 @@ import {
   tableDescribe,
   queryExecute,
   queryCancel,
+  compileErrors,
+  objectDdl,
+  objectsListPlsql,
 } from "./oracle";
 
 const handlers: HandlerMap = {
@@ -20,6 +23,9 @@ const handlers: HandlerMap = {
   "table.describe": (params) => tableDescribe(params as any),
   "query.execute": (params) => queryExecute(params as any),
   "query.cancel": (params) => queryCancel(params as any),
+  "compile.errors": (params) => compileErrors(params as any),
+  "object.ddl": (params) => objectDdl(params as any),
+  "objects.list.plsql": (params) => objectsListPlsql(params as any),
   ping: async () => ({ pong: true }),
 };
 
