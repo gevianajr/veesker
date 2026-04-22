@@ -52,6 +52,7 @@ pub fn run() {
             commands::objects_list_plsql,
             commands::objects_search,
             commands::schema_kind_counts,
+            commands::ai_chat,
             commands::connection_commit,
             commands::connection_rollback,
         ])

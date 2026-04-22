@@ -9,9 +9,11 @@
     schema: string;
     serverVersion: string;
     hasPendingTx?: boolean;
+    chatOpen?: boolean;
+    onToggleChat?: () => void;
     onDisconnect: () => void;
   };
-  let { connectionName, userLabel, schema, serverVersion, hasPendingTx = false, onDisconnect }: Props = $props();
+  let { connectionName, userLabel, schema, serverVersion, hasPendingTx = false, chatOpen = false, onToggleChat, onDisconnect }: Props = $props();
 
   // Shorten version: "Oracle AI Database 26ai Free Release 23.26.1.0.0 – ..." → "23.26.1.0.0"
   const shortVersion = $derived(() => {
@@ -52,6 +54,16 @@
 
   <!-- Right: actions -->
   <div class="bar-right">
+    <button
+      class="action-btn ai-btn"
+      class:active={chatOpen}
+      aria-label="Toggle AI assistant (⌘I)"
+      title="Toggle AI assistant (⌘I)"
+      onclick={onToggleChat}
+    >
+      <img src="/veesker-sheep.png" class="ai-btn-sheep" alt="" aria-hidden="true" />
+      AI
+    </button>
     <button
       class="action-btn sql-btn"
       class:active={sqlEditor.drawerOpen}
@@ -204,6 +216,18 @@
     color: rgba(255,255,255,0.9);
     border-color: rgba(255,255,255,0.18);
   }
+  .ai-btn-sheep {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .ai-btn.active {
+    background: rgba(179,62,31,0.25);
+    border-color: rgba(179,62,31,0.5);
+    color: #f5a08a;
+  }
+  .ai-btn.active:hover { background: rgba(179,62,31,0.35); }
   .sql-btn.active {
     background: #b33e1f;
     border-color: #b33e1f;
