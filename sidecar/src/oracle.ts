@@ -572,3 +572,69 @@ export async function queryCancel(p: { requestId: string }): Promise<QueryCancel
   }
   return { cancelled: true, requestId: p.requestId };
 }
+
+export type PlsqlKind = "PROCEDURE" | "FUNCTION" | "PACKAGE" | "PACKAGE BODY" | "TRIGGER" | "TYPE" | "TYPE BODY";
+export type CompileErrorRow = { line: number; position: number; text: string };
+export type ObjectRefWithStatus = { name: string; status: string };
+
+export async function compileErrors(p: {
+  objectType: string;
+  objectName: string;
+}): Promise<{ errors: CompileErrorRow[] }> {
+  return withActiveSession(async (conn) => {
+    const res = await conn.execute<{ LINE: number; POSITION: number; TEXT: string }>(
+      `SELECT line, position, text
+         FROM user_errors
+        WHERE name = UPPER(:name)
+          AND type = UPPER(:type)
+        ORDER BY sequence`,
+      { name: p.objectName, type: p.objectType },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    return {
+      errors: (res.rows ?? []).map((r) => ({
+        line: r.LINE,
+        position: r.POSITION,
+        text: r.TEXT,
+      })),
+    };
+  });
+}
+
+export async function objectDdl(p: {
+  owner: string;
+  objectType: string;
+  objectName: string;
+}): Promise<{ ddl: string }> {
+  return withActiveSession(async (conn) => {
+    const res = await conn.execute<[string]>(
+      `SELECT DBMS_METADATA.GET_DDL(UPPER(:type), UPPER(:name), UPPER(:owner)) FROM dual`,
+      { type: p.objectType, name: p.objectName, owner: p.owner },
+      {
+        outFormat: oracledb.OUT_FORMAT_ARRAY,
+        fetchTypeHandler: (meta: any) =>
+          meta.dbType === oracledb.DB_TYPE_CLOB ? { type: oracledb.STRING } : undefined,
+      }
+    );
+    return { ddl: (res.rows?.[0]?.[0] as string) ?? "" };
+  });
+}
+
+export async function objectsListPlsql(p: {
+  owner: string;
+  kind: string;
+}): Promise<{ objects: ObjectRefWithStatus[] }> {
+  return withActiveSession(async (conn) => {
+    const res = await conn.execute<{ NAME: string; STATUS: string }>(
+      `SELECT object_name AS NAME, status AS STATUS
+         FROM all_objects
+        WHERE owner = :owner AND object_type = :kind
+        ORDER BY object_name`,
+      { owner: p.owner, kind: p.kind },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    return {
+      objects: (res.rows ?? []).map((r) => ({ name: r.NAME, status: r.STATUS })),
+    };
+  });
+}
