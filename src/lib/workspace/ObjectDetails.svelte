@@ -91,6 +91,8 @@
   let searchText     = $state("");
   let searchResult   = $state<Loadable<VectorSearchResult>>({ kind: "idle" });
   let showEmbedCfg   = $state(false);
+  let showConfigBar  = $state(true);
+  let expandedRow    = $state<number | null>(null);
 
   $effect(() => {
     void selected;
@@ -125,6 +127,8 @@
   async function runVectorSearch() {
     if (!selected || !searchText.trim() || !vectorColName) return;
     searchResult = { kind: "loading" };
+    expandedRow = null;
+    showConfigBar = false;
     persistEmbed();
     const res = await vectorSearch(
       { provider: embedProvider, model: embedModel, baseUrl: embedBaseUrl || undefined, apiKey: embedApiKey || undefined },
@@ -719,69 +723,82 @@
         {@const vectorCols = details.kind === "ok" ? details.value.columns.filter(c => c.isVector) : []}
         <div class="vec-panel">
 
-          <!-- Provider config bar -->
-          <div class="vec-config-bar">
-            <div class="vec-config-left">
-              <span class="vec-label">Column</span>
-              <select class="vec-select" bind:value={vectorColName}>
-                {#each vectorCols as vc}
-                  <option value={vc.name}>⬡ {vc.name}</option>
-                {/each}
-              </select>
-              <span class="vec-label">Distance</span>
-              <select class="vec-select" bind:value={embedDistance}>
-                {#each DISTANCE_OPTIONS as d}
-                  <option value={d}>{d}</option>
-                {/each}
-              </select>
-              <span class="vec-label">Limit</span>
-              <input class="vec-limit" type="number" min="1" max="100" bind:value={embedLimit} />
-            </div>
-            <button class="vec-cfg-btn" class:active={showEmbedCfg} onclick={() => showEmbedCfg = !showEmbedCfg} title="Embedding provider settings">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <!-- Config toggle strip -->
+          <div class="vec-config-strip">
+            <button class="vec-config-toggle" class:active={showConfigBar} onclick={() => { showConfigBar = !showConfigBar; showEmbedCfg = false; }} title="Search settings">
+              <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
                 <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1.2"/>
                 <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.6 2.6l.85.85M9.55 9.55l.85.85M2.6 10.4l.85-.85M9.55 3.45l.85-.85" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
               </svg>
-              {PROVIDER_LABELS[embedProvider]}
+              {#if showConfigBar}Hide settings{:else}{PROVIDER_LABELS[embedProvider]} · {embedDistance} · {vectorColName || "…"}{/if}
             </button>
           </div>
 
-          <!-- Embedding provider config (collapsible) -->
-          {#if showEmbedCfg}
-            <div class="vec-embed-cfg">
-              <div class="vec-cfg-row">
-                <span class="vec-label">Provider</span>
-                <select class="vec-select" bind:value={embedProvider}>
-                  {#each Object.entries(PROVIDER_LABELS) as [val, label]}
-                    <option value={val}>{label}</option>
+          <!-- Provider config bar (collapsible) -->
+          {#if showConfigBar}
+            <div class="vec-config-bar">
+              <div class="vec-config-left">
+                <span class="vec-label">Column</span>
+                <select class="vec-select" bind:value={vectorColName}>
+                  {#each vectorCols as vc}
+                    <option value={vc.name}>⬡ {vc.name}</option>
                   {/each}
                 </select>
-                <span class="vec-label">Model</span>
-                <input class="vec-model-input" type="text" bind:value={embedModel} placeholder={PROVIDER_DEFAULTS[embedProvider].model} />
+                <span class="vec-label">Distance</span>
+                <select class="vec-select" bind:value={embedDistance}>
+                  {#each DISTANCE_OPTIONS as d}
+                    <option value={d}>{d}</option>
+                  {/each}
+                </select>
+                <span class="vec-label">Limit</span>
+                <input class="vec-limit" type="number" min="1" max="100" bind:value={embedLimit} />
               </div>
-              {#if embedProvider === "ollama" || embedProvider === "custom"}
-                <div class="vec-cfg-row">
-                  <span class="vec-label">Base URL</span>
-                  <input class="vec-url-input" type="text" bind:value={embedBaseUrl} placeholder={PROVIDER_DEFAULTS[embedProvider].baseUrl ?? "http://…"} />
-                </div>
-              {/if}
-              {#if embedProvider === "openai" || embedProvider === "voyage"}
-                <div class="vec-cfg-row">
-                  <span class="vec-label">API Key</span>
-                  <input class="vec-url-input" type="password" bind:value={embedApiKey} placeholder="sk-…" />
-                </div>
-              {/if}
+              <button class="vec-cfg-btn" class:active={showEmbedCfg} onclick={() => showEmbedCfg = !showEmbedCfg} title="Embedding provider settings">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1.2"/>
+                  <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.6 2.6l.85.85M9.55 9.55l.85.85M2.6 10.4l.85-.85M9.55 3.45l.85-.85" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                </svg>
+                {PROVIDER_LABELS[embedProvider]}
+              </button>
             </div>
+
+            <!-- Embedding provider config (collapsible) -->
+            {#if showEmbedCfg}
+              <div class="vec-embed-cfg">
+                <div class="vec-cfg-row">
+                  <span class="vec-label">Provider</span>
+                  <select class="vec-select" bind:value={embedProvider}>
+                    {#each Object.entries(PROVIDER_LABELS) as [val, label]}
+                      <option value={val}>{label}</option>
+                    {/each}
+                  </select>
+                  <span class="vec-label">Model</span>
+                  <input class="vec-model-input" type="text" bind:value={embedModel} placeholder={PROVIDER_DEFAULTS[embedProvider].model} />
+                </div>
+                {#if embedProvider === "ollama" || embedProvider === "custom"}
+                  <div class="vec-cfg-row">
+                    <span class="vec-label">Base URL</span>
+                    <input class="vec-url-input" type="text" bind:value={embedBaseUrl} placeholder={PROVIDER_DEFAULTS[embedProvider].baseUrl ?? "http://…"} />
+                  </div>
+                {/if}
+                {#if embedProvider === "openai" || embedProvider === "voyage"}
+                  <div class="vec-cfg-row">
+                    <span class="vec-label">API Key</span>
+                    <input class="vec-url-input" type="password" bind:value={embedApiKey} placeholder="sk-…" />
+                  </div>
+                {/if}
+              </div>
+            {/if}
           {/if}
 
           <!-- Search input -->
           <div class="vec-search-row">
             <textarea
               class="vec-search-input"
-              placeholder="Describe what you're looking for…"
+              placeholder="Describe what you're looking for… (Enter or ⌘↵ to search)"
               rows={2}
               bind:value={searchText}
-              onkeydown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void runVectorSearch(); } }}
+              onkeydown={(e) => { if (e.key === "Enter" && (e.metaKey || !e.shiftKey)) { e.preventDefault(); void runVectorSearch(); } }}
             ></textarea>
             <button
               class="vec-search-btn"
@@ -810,10 +827,10 @@
               {@const scoreCol = searchResult.value.columns.findIndex(c => c.name === "VD_SCORE")}
               {@const dataCols = searchResult.value.columns.filter(c => c.name !== "VD_SCORE")}
               {#if searchResult.value.rows.length === 0}
-                <div class="empty-section">No similar rows found.</div>
+                <div class="vec-empty-results">No similar rows found for this query.</div>
               {:else}
                 <div class="col-table-wrap">
-                  <table class="col-table">
+                  <table class="col-table vec-result-table">
                     <thead>
                       <tr>
                         <th class="score-th">Score</th>
@@ -823,17 +840,42 @@
                     <tbody>
                       {#each searchResult.value.rows as row, i}
                         {@const score = scoreCol >= 0 ? Number((row as any[])[scoreCol]) : null}
+                        {@const similarity = score != null ? (1 - score) : 0}
                         {@const dataVals = (row as any[]).filter((_, idx) => idx !== scoreCol)}
-                        <tr>
-                          <td>
-                            <span class="score-badge" style="--s:{score != null ? Math.round((1 - score) * 100) : 0}">
-                              {score != null ? (1 - score).toFixed(3) : "—"}
-                            </span>
+                        <tr
+                          class="vec-result-row"
+                          class:vec-row-expanded={expandedRow === i}
+                          onclick={() => expandedRow = expandedRow === i ? null : i}
+                          title="Click to expand"
+                        >
+                          <td class="score-cell">
+                            <div class="score-bar-wrap">
+                              <div class="score-bar" style="width:{Math.round(similarity * 100)}%"></div>
+                              <span class="score-num">{similarity.toFixed(3)}</span>
+                            </div>
                           </td>
-                          {#each dataVals as v}
-                            <td class="mono" title={String(v ?? "")}>{String(v ?? "")}</td>
+                          {#each dataVals as v, ci}
+                            <td class="mono vec-result-cell" class:vec-cell-expanded={expandedRow === i}>{String(v ?? "")}</td>
                           {/each}
                         </tr>
+                        {#if expandedRow === i}
+                          <tr class="vec-detail-row">
+                            <td colspan={dataCols.length + 1}>
+                              <div class="vec-detail-grid">
+                                <div class="vec-detail-item">
+                                  <span class="vec-detail-label">Score</span>
+                                  <span class="vec-detail-value mono">{similarity.toFixed(6)}</span>
+                                </div>
+                                {#each dataCols as col, ci}
+                                  <div class="vec-detail-item" class:vec-detail-full={String(dataVals[ci] ?? "").length > 60}>
+                                    <span class="vec-detail-label">{col.name}</span>
+                                    <span class="vec-detail-value">{String(dataVals[ci] ?? "")}</span>
+                                  </div>
+                                {/each}
+                              </div>
+                            </td>
+                          </tr>
+                        {/if}
                       {/each}
                     </tbody>
                   </table>
@@ -1192,6 +1234,31 @@
     height: 100%;
     overflow: hidden;
   }
+  .vec-config-strip {
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    border-bottom: 1px solid rgba(26,22,18,0.06);
+    flex-shrink: 0;
+  }
+  .vec-config-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 10.5px;
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 500;
+    color: rgba(26,22,18,0.4);
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: color 0.1s;
+  }
+  .vec-config-toggle:hover, .vec-config-toggle.active {
+    color: #7c3aed;
+  }
   .vec-config-bar {
     display: flex;
     align-items: center;
@@ -1344,17 +1411,88 @@
     flex: 1;
     overflow-y: auto;
   }
-  .score-th { width: 70px; }
-  .score-badge {
-    display: inline-block;
+  .score-th { width: 80px; }
+  .vec-result-table tbody tr { cursor: pointer; }
+  .vec-result-row:hover td { background: rgba(124,58,237,0.04); }
+  .vec-row-expanded td { background: rgba(124,58,237,0.06) !important; }
+  .score-cell { padding: 6px 8px !important; }
+  .score-bar-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 20px;
+    background: rgba(124,58,237,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    min-width: 64px;
+  }
+  .score-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: rgba(124,58,237,0.18);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+  }
+  .score-num {
+    position: relative;
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
     font-weight: 600;
     color: #7c3aed;
-    background: rgba(124,58,237,0.08);
-    border: 1px solid rgba(124,58,237,0.2);
-    border-radius: 4px;
-    padding: 1px 6px;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+  .vec-result-cell {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vec-cell-expanded {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+  .vec-detail-row td {
+    padding: 0 !important;
+    border-bottom: 1px solid rgba(124,58,237,0.15) !important;
+  }
+  .vec-detail-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0.6rem 0.75rem;
+    background: rgba(124,58,237,0.03);
+  }
+  .vec-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.35rem 0.6rem;
+    min-width: 120px;
+    flex: 0 0 auto;
+  }
+  .vec-detail-full {
+    flex: 1 1 100%;
+  }
+  .vec-detail-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(26,22,18,0.35);
+  }
+  .vec-detail-value {
+    font-size: 12px;
+    color: rgba(26,22,18,0.85);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .vec-empty-results {
+    padding: 1.5rem 1rem;
+    font-size: 12px;
+    color: rgba(26,22,18,0.35);
+    text-align: center;
   }
   .vec-index-hint {
     display: flex;
