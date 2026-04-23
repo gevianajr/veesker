@@ -364,6 +364,7 @@
     user-select: none;
   }
   .card:hover {
+    background: var(--row-hover);
     border-color: var(--border-strong);
     box-shadow: 0 2px 10px rgba(26, 22, 18, 0.07);
     transform: translateY(-1px);

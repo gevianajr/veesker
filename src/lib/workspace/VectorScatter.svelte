@@ -99,10 +99,10 @@
   <div class="scatter-wrap">
     <svg width="100%" height={H} viewBox="0 0 {W} {H}" class="scatter-svg" preserveAspectRatio="xMidYMid meet">
       <!-- Grid -->
-      <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="rgba(26,22,18,0.08)" stroke-width="1"/>
-      <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="rgba(26,22,18,0.08)" stroke-width="1"/>
-      <text x={W / 2} y={H - 6} font-size="9" fill="rgba(26,22,18,0.3)" text-anchor="middle" font-family="JetBrains Mono, monospace">PC1</text>
-      <text x={8} y={H / 2} font-size="9" fill="rgba(26,22,18,0.3)" text-anchor="middle" font-family="JetBrains Mono, monospace" transform="rotate(-90,8,{H/2})">PC2</text>
+      <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} style="stroke: var(--border)" stroke-width="1"/>
+      <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} style="stroke: var(--border)" stroke-width="1"/>
+      <text x={W / 2} y={H - 6} font-size="9" style="fill: var(--text-muted)" text-anchor="middle" font-family="JetBrains Mono, monospace">PC1</text>
+      <text x={8} y={H / 2} font-size="9" style="fill: var(--text-muted)" text-anchor="middle" font-family="JetBrains Mono, monospace" transform="rotate(-90,8,{H/2})">PC2</text>
 
       <!-- Query point -->
       {#if points.query}
@@ -116,9 +116,8 @@
           cx={dot.x} cy={dot.y} r={hoveredIdx === i ? 7 : 5}
           fill={simColor(dot.sim)}
           fill-opacity="0.85"
-          stroke={hoveredIdx === i ? "rgba(26,22,18,0.6)" : "rgba(26,22,18,0.15)"}
           stroke-width={hoveredIdx === i ? 1.5 : 1}
-          style="cursor:pointer;transition:r 0.1s"
+          style={hoveredIdx === i ? "cursor:pointer;transition:r 0.1s;stroke: var(--border-strong)" : "cursor:pointer;transition:r 0.1s;stroke: var(--border)"}
           onmouseenter={() => hoveredIdx = i}
           onmouseleave={() => hoveredIdx = null}
           role="img"
