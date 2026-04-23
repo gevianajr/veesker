@@ -364,6 +364,12 @@
       sqlEditor.toggleDrawer();
       return;
     }
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+      e.preventDefault();
+      if (!sqlEditor.drawerOpen) sqlEditor.toggleDrawer();
+      sqlEditor.toggleEditorExpanded();
+      return;
+    }
     // Cmd+W (or Ctrl+W) closes the active SQL tab when the drawer is open
     // and a tab is focused. Falls through to the OS / window when no tab.
     if (
@@ -431,7 +437,7 @@
       onDisconnect={onDisconnect}
       onSwitchConnection={onSwitchConnection}
     />
-    <div class="body">
+    <div class="body" class:body-collapsed={sqlEditor.editorExpanded}>
       <div class="panel-wrap" style="width: {schemaWidth}px; min-width: 160px; max-width: 480px;">
         <SchemaTree
           {schemas}
@@ -530,6 +536,12 @@
     min-height: 0;
     background: #faf7f2;
     overflow: hidden;
+    transition: flex 0.18s ease;
+  }
+  .body-collapsed {
+    flex: 0 0 0px !important;
+    overflow: hidden;
+    min-height: 0 !important;
   }
   .panel-wrap {
     flex-shrink: 0;
