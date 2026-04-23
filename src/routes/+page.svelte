@@ -182,8 +182,8 @@
 <style>
   :global(body) {
     margin: 0;
-    background: #f6f1e8;
-    color: #1a1612;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     font-family: "Inter", -apple-system, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -241,12 +241,12 @@
     letter-spacing: 0.01em;
     margin: 0;
     line-height: 1;
-    color: #1a1612;
+    color: var(--text-primary);
   }
   .tagline {
     font-family: "Space Grotesk", sans-serif;
     font-size: 12px;
-    color: rgba(26, 22, 18, 0.45);
+    color: var(--text-muted);
     margin: 0;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -256,8 +256,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    background: #1a1612;
-    color: #f6f1e8;
+    background: var(--text-primary);
+    color: var(--bg-surface);
     border: none;
     border-radius: 8px;
     padding: 0.65rem 1.1rem;
@@ -277,7 +277,7 @@
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgba(26, 22, 18, 0.4);
+    color: var(--text-muted);
     margin-bottom: 0.6rem;
   }
 
@@ -290,14 +290,14 @@
   }
   .spinner {
     width: 14px; height: 14px;
-    border: 2px solid rgba(26, 22, 18, 0.12);
-    border-top-color: #1a1612;
+    border: 2px solid var(--border);
+    border-top-color: var(--text-primary);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .muted { color: rgba(26, 22, 18, 0.5); font-size: 13px; }
+  .muted { color: var(--text-secondary); font-size: 13px; }
 
   /* ── Alert ───────────────────────────────────────────────── */
   .alert {
@@ -320,22 +320,22 @@
     text-align: center;
     gap: 0.6rem;
     padding: 4rem 2rem;
-    color: rgba(26, 22, 18, 0.5);
+    color: var(--text-secondary);
   }
   .empty-icon {
-    color: rgba(26, 22, 18, 0.3);
+    color: var(--text-muted);
     margin-bottom: 0.5rem;
   }
   .empty-title {
     font-family: "Space Grotesk", sans-serif;
     font-size: 16px;
     font-weight: 500;
-    color: rgba(26, 22, 18, 0.65);
+    color: var(--text-primary);
     margin: 0;
   }
   .empty-sub {
     font-size: 13px;
-    color: rgba(26, 22, 18, 0.4);
+    color: var(--text-secondary);
     margin: 0 0 0.75rem;
     max-width: 280px;
     line-height: 1.5;
@@ -356,15 +356,15 @@
     align-items: center;
     gap: 1rem;
     padding: 1rem 1.1rem;
-    background: #fff;
-    border: 1px solid rgba(26, 22, 18, 0.1);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-strong);
     border-radius: 10px;
     cursor: pointer;
     transition: border-color 0.12s, box-shadow 0.12s, transform 0.1s;
     user-select: none;
   }
   .card:hover {
-    border-color: rgba(26, 22, 18, 0.22);
+    border-color: var(--border-strong);
     box-shadow: 0 2px 10px rgba(26, 22, 18, 0.07);
     transform: translateY(-1px);
   }
@@ -382,8 +382,8 @@
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    background: rgba(26, 22, 18, 0.06);
-    color: rgba(26, 22, 18, 0.55);
+    background: var(--row-hover);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -415,7 +415,7 @@
     font-family: "Space Grotesk", sans-serif;
     font-weight: 500;
     font-size: 15px;
-    color: #1a1612;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -425,7 +425,7 @@
     align-items: center;
     gap: 0.3rem;
     font-size: 11.5px;
-    color: rgba(26, 22, 18, 0.5);
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
   }
@@ -460,20 +460,20 @@
     align-items: center;
     gap: 0.3rem;
     background: transparent;
-    border: 1px solid rgba(26, 22, 18, 0.12);
+    border: 1px solid var(--border);
     border-radius: 5px;
     padding: 0.3rem 0.55rem;
     font-family: "Space Grotesk", sans-serif;
     font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    color: rgba(26, 22, 18, 0.6);
+    color: var(--text-secondary);
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .action-btn.edit:hover {
-    background: rgba(26, 22, 18, 0.06);
-    color: #1a1612;
-    border-color: rgba(26, 22, 18, 0.2);
+    background: var(--row-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
   }
   .action-btn.delete {
     border-color: transparent;
@@ -486,7 +486,7 @@
   }
   .open-arrow {
     font-size: 15px;
-    color: rgba(26, 22, 18, 0.25);
+    color: var(--text-muted);
     margin-left: 0.25rem;
     transition: color 0.12s, transform 0.12s;
     line-height: 1;
