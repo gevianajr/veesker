@@ -1635,26 +1635,26 @@
     align-items: center;
     gap: 0.25rem;
     font-size: 10px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(26,22,18,0.35);
     cursor: pointer;
     user-select: none;
   }
   .vec-vec-toggle input { display: none; }
-  .vec-vec-toggle:has(input:checked) { color: rgba(179,62,31,0.9); }
-  .vec-vec-toggle:hover { color: rgba(255,255,255,0.65); }
+  .vec-vec-toggle:has(input:checked) { color: #7c3aed; }
+  .vec-vec-toggle:hover { color: rgba(26,22,18,0.65); }
 
   /* ── View tabs (Table / Scatter) ─────────────────────────────── */
   .vec-view-tabs {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(26,22,18,0.07);
     flex-shrink: 0;
   }
   .vec-view-tab {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: rgba(255,255,255,0.35);
+    color: rgba(26,22,18,0.4);
     font-family: "Space Grotesk", sans-serif;
     font-size: 11px;
     font-weight: 500;
@@ -1665,8 +1665,8 @@
     gap: 0.35rem;
     transition: color 0.1s;
   }
-  .vec-view-tab:hover { color: rgba(255,255,255,0.65); }
-  .vec-view-tab.active { color: rgba(255,255,255,0.85); border-bottom-color: #b33e1f; }
+  .vec-view-tab:hover { color: rgba(26,22,18,0.7); }
+  .vec-view-tab.active { color: #1a1612; border-bottom-color: #7c3aed; }
 
   /* ── Index section ───────────────────────────────────────────── */
   .vec-index-section {
@@ -1684,9 +1684,9 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.45);
+    background: rgba(26,22,18,0.04);
+    border: 1px solid rgba(26,22,18,0.12);
+    color: rgba(26,22,18,0.5);
     font-family: "Space Grotesk", sans-serif;
     font-size: 10.5px;
     font-weight: 500;
@@ -1696,13 +1696,13 @@
     transition: all 0.1s;
   }
   .vec-create-idx-btn:hover, .vec-create-idx-btn.active {
-    background: rgba(179,62,31,0.15);
-    border-color: rgba(179,62,31,0.4);
-    color: rgba(255,255,255,0.75);
+    background: rgba(179,62,31,0.08);
+    border-color: rgba(179,62,31,0.3);
+    color: #b33e1f;
   }
   .vec-create-form {
-    background: rgba(0,0,0,0.12);
-    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(26,22,18,0.03);
+    border: 1px solid rgba(26,22,18,0.08);
     border-radius: 5px;
     padding: 0.5rem 0.6rem;
     display: flex;
@@ -1719,35 +1719,35 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.3rem 0.4rem;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(26,22,18,0.02);
+    border: 1px solid rgba(26,22,18,0.07);
     border-radius: 4px;
     font-size: 11px;
   }
-  .vec-index-icon { color: rgba(167,139,250,0.7); font-size: 12px; }
-  .vec-index-name { color: rgba(255,255,255,0.8); font-weight: 500; font-family: "JetBrains Mono", monospace; }
-  .vec-index-meta { color: rgba(255,255,255,0.3); font-size: 10px; flex: 1; }
+  .vec-index-icon { color: #7c3aed; font-size: 12px; }
+  .vec-index-name { color: #1a1612; font-weight: 500; font-family: "JetBrains Mono", monospace; }
+  .vec-index-meta { color: rgba(26,22,18,0.4); font-size: 10px; flex: 1; }
   .vec-drop-btn {
     background: none;
     border: none;
-    color: rgba(255,255,255,0.2);
+    color: rgba(26,22,18,0.25);
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
     padding: 0 2px;
     border-radius: 3px;
   }
-  .vec-drop-btn:hover { color: rgba(179,62,31,0.9); background: rgba(179,62,31,0.1); }
+  .vec-drop-btn:hover { color: #b33e1f; background: rgba(179,62,31,0.08); }
   .vec-index-empty {
     font-size: 11px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(26,22,18,0.4);
     padding: 0.25rem 0;
     line-height: 1.4;
   }
 
   /* ── Generate embeddings panel ──────────────────────────────── */
   .vec-gen-strip {
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(26,22,18,0.06);
     flex-shrink: 0;
   }
   .vec-gen-toggle {
@@ -1756,7 +1756,7 @@
     gap: 0.4rem;
     background: none;
     border: none;
-    color: rgba(255,255,255,0.45);
+    color: rgba(26,22,18,0.45);
     font-family: "Space Grotesk", sans-serif;
     font-size: 11px;
     font-weight: 500;
@@ -1766,26 +1766,26 @@
     text-align: left;
     transition: color 0.12s;
   }
-  .vec-gen-toggle:hover, .vec-gen-toggle.active { color: rgba(255,255,255,0.75); }
+  .vec-gen-toggle:hover, .vec-gen-toggle.active { color: rgba(26,22,18,0.75); }
   .gen-running-badge {
-    background: rgba(179,62,31,0.3);
-    color: #f5a08a;
+    background: rgba(179,62,31,0.12);
+    color: #b33e1f;
     font-size: 9.5px;
     padding: 1px 5px;
     border-radius: 8px;
     margin-left: 2px;
   }
   .gen-done-badge {
-    background: rgba(76,175,80,0.2);
-    color: #81c784;
+    background: rgba(39,174,96,0.1);
+    color: #27ae60;
     font-size: 9.5px;
     padding: 1px 5px;
     border-radius: 8px;
     margin-left: 2px;
   }
   .vec-gen-panel {
-    background: rgba(0,0,0,0.15);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(26,22,18,0.03);
+    border-bottom: 1px solid rgba(26,22,18,0.06);
     padding: 0.5rem 0.7rem;
     display: flex;
     flex-direction: column;
@@ -1794,7 +1794,7 @@
   }
   .vec-label-hint {
     font-size: 10px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(26,22,18,0.4);
     flex: 1;
   }
   .vec-gen-start-btn {
@@ -1822,7 +1822,7 @@
   .gen-progress-bar-wrap {
     flex: 1;
     height: 4px;
-    background: rgba(255,255,255,0.08);
+    background: rgba(26,22,18,0.08);
     border-radius: 2px;
     overflow: hidden;
   }
@@ -1834,14 +1834,14 @@
   }
   .gen-progress-label {
     font-size: 10.5px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(26,22,18,0.5);
     white-space: nowrap;
     flex-shrink: 0;
   }
   .vec-gen-stop-btn {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
-    color: rgba(255,255,255,0.55);
+    background: rgba(26,22,18,0.05);
+    border: 1px solid rgba(26,22,18,0.12);
+    color: rgba(26,22,18,0.55);
     font-family: "Space Grotesk", sans-serif;
     font-size: 10px;
     padding: 0.2rem 0.5rem;
@@ -1849,25 +1849,25 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .vec-gen-stop-btn:hover { color: rgba(255,255,255,0.85); }
+  .vec-gen-stop-btn:hover { color: rgba(26,22,18,0.85); }
   .vec-gen-done {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     font-size: 11px;
-    color: rgba(255,255,255,0.65);
+    color: rgba(26,22,18,0.65);
   }
   .vec-gen-again-btn {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.45);
+    background: rgba(26,22,18,0.04);
+    border: 1px solid rgba(26,22,18,0.1);
+    color: rgba(26,22,18,0.45);
     font-size: 10px;
     padding: 0.15rem 0.5rem;
     border-radius: 4px;
     cursor: pointer;
     margin-left: auto;
   }
-  .vec-gen-again-btn:hover { color: rgba(255,255,255,0.75); }
+  .vec-gen-again-btn:hover { color: rgba(26,22,18,0.75); }
 
   .vec-search-row {
     display: flex;
