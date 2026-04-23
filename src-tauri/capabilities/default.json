@@ -19,7 +19,14 @@
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-exists",
-    { "identifier": "fs:scope", "allow": [{ "path": "$HOME/**" }] },
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOWNLOAD/**" }
+      ]
+    },
     "dialog:allow-save",
     "dialog:allow-open"
   ]
