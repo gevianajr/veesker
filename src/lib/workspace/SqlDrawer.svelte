@@ -99,22 +99,25 @@
     <span class="arrow">▲</span>
   </button>
 {:else}
-  <!-- Top resize handle -->
-  <div
-    class="top-handle"
-    role="separator"
-    aria-orientation="horizontal"
-    tabindex="0"
-    onpointerdown={onTopPointerDown}
-    onpointermove={onTopPointerMove}
-    onpointerup={onTopPointerUp}
-    onpointercancel={onTopPointerUp}
-    onkeydown={onTopKeyDown}
-  ></div>
+  <!-- Top resize handle (hidden when expanded) -->
+  {#if !sqlEditor.editorExpanded}
+    <div
+      class="top-handle"
+      role="separator"
+      aria-orientation="horizontal"
+      tabindex="0"
+      onpointerdown={onTopPointerDown}
+      onpointermove={onTopPointerMove}
+      onpointerup={onTopPointerUp}
+      onpointercancel={onTopPointerUp}
+      onkeydown={onTopKeyDown}
+    ></div>
+  {/if}
 
   <div
     class="drawer"
-    style="height: {sqlEditor.drawerHeight}px"
+    class:drawer-expanded={sqlEditor.editorExpanded}
+    style={sqlEditor.editorExpanded ? "" : `height: ${sqlEditor.drawerHeight}px`}
     bind:this={drawerEl}
   >
     <div class="tabbar" bind:this={tabbarEl}>
@@ -240,9 +243,25 @@
         </button>
       </div>
       <button
+        class="expand-btn"
+        aria-label={sqlEditor.editorExpanded ? "Restore editor" : "Expand editor (⌘⇧E)"}
+        title={sqlEditor.editorExpanded ? "Restore (⌘⇧E)" : "Expand (⌘⇧E)"}
+        onclick={() => sqlEditor.toggleEditorExpanded()}
+      >
+        {#if sqlEditor.editorExpanded}
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M5 1H1v4M8 1h4v4M5 12H1V8M8 12h4V8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {:else}
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M1 5V1h4M12 5V1H8M1 8v4h4M12 8v4H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {/if}
+      </button>
+      <button
         class="collapse"
         aria-label="Collapse drawer"
-        onclick={() => sqlEditor.toggleDrawer()}
+        onclick={() => { if (sqlEditor.editorExpanded) sqlEditor.toggleEditorExpanded(); sqlEditor.toggleDrawer(); }}
       >▼</button>
     </div>
 
@@ -358,6 +377,11 @@
     overflow: hidden;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
   }
+  .drawer-expanded {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
   .tabbar {
     display: flex;
     align-items: stretch;
@@ -470,6 +494,21 @@
     transition: background 0.1s, color 0.1s;
   }
   .plus:hover, .collapse:hover, .history-toggle:hover {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.8);
+  }
+  .expand-btn {
+    background: transparent;
+    border: none;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    padding: 0 0.65rem;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background 0.1s, color 0.1s;
+  }
+  .expand-btn:hover {
     background: rgba(255,255,255,0.06);
     color: rgba(255,255,255,0.8);
   }
