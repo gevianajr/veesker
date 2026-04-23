@@ -120,3 +120,45 @@ The Tauri `close-requested` window event is intercepted. Instead of quitting, a 
 - Native toast notifications (can be added later)
 - Animated "pulsing" icon during connecting (static blue icon instead)
 - Windows autostart on login
+
+---
+
+## Cross-Platform Notes (Windows + macOS)
+
+### Cargo.toml
+The `tray-icon` feature must be enabled for both platforms:
+```toml
+tauri = { version = "2", features = ["tray-icon"] }
+```
+
+### Icon format
+- **Windows:** PNG 32x32 works natively for the tray.
+- **macOS:** The tray uses a **template image** — a monochrome PNG (16x16 or 32x32 @2x) that macOS colorizes automatically for light/dark mode. The status dot overlay (color indicator) should be a separate composited layer, **not** baked into the template image. Recommended approach: ship `tray-idle-template.png` (monochrome sheep) + colored dot PNGs per state, then composite at runtime using the `image` crate, or ship pre-composited PNGs and skip template mode for simplicity.
+- **Simplest cross-platform approach:** Use pre-composited 32x32 PNGs for all 4 states on both platforms. Skip macOS template images. The sheep will not auto-invert for Dark Mode but this is acceptable for v1.
+
+### Sidecar binary
+On macOS, the sidecar must be compiled for the correct target before `tauri build`:
+```bash
+cd sidecar
+bun build src/index.ts --compile --minify \
+  --outfile ../src-tauri/binaries/veesker-sidecar-aarch64-apple-darwin
+# or x86_64-apple-darwin for Intel Macs
+cd ..
+```
+Check your target with: `rustc -vV | grep host`
+
+### Code signing
+`tauri.conf.json` already has `"signingIdentity": "-"` (ad-hoc signing). For distribution via Mac App Store, a real Developer ID is required — out of scope for now.
+
+### `close-requested` dialog on macOS
+On macOS, the native dialog uses `NSAlert`. Tauri's `dialog` plugin handles this cross-platform — no platform-specific code needed.
+
+### Menu item labels
+Keep menu item strings in English (as per project conventions). macOS renders them in the system font automatically.
+
+### Build checklist for macOS
+1. Install Rust target: `rustup target add aarch64-apple-darwin` (or `x86_64-apple-darwin`)
+2. Compile sidecar binary for macOS target (see above)
+3. Run `bun install` from repo root
+4. Run `bun run tauri build`
+5. App bundle is output to `src-tauri/target/release/bundle/macos/Veesker.app`
