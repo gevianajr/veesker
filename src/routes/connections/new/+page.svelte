@@ -44,8 +44,8 @@
 <style>
   :global(body) {
     margin: 0;
-    background: #f6f1e8;
-    color: #1a1612;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     font-family: "Inter", -apple-system, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }

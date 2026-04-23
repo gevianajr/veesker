@@ -158,14 +158,14 @@
     align-items: stretch;
     gap: 0.3rem;
     padding: 0.5rem 0.75rem;
-    background: #faf7f2;
+    background: var(--bg-surface);
     position: relative;
     z-index: 1;
     min-height: 340px;
   }
   .scatter-svg { display: block; width: 100%; }
   .scatter-loading {
-    color: rgba(26,22,18,0.35);
+    color: var(--text-muted);
     font-size: 11px;
     padding: 2rem 1rem;
     text-align: center;
@@ -175,7 +175,7 @@
     align-items: center;
     gap: 0.3rem;
     font-size: 10px;
-    color: rgba(26,22,18,0.4);
+    color: var(--text-muted);
     font-family: "JetBrains Mono", monospace;
   }
   .legend-dot {
@@ -185,12 +185,12 @@
     border-radius: 50%;
   }
   .dot-tip {
-    background: rgba(255,252,245,0.97);
-    border: 1px solid rgba(26,22,18,0.12);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border);
     border-radius: 5px;
     padding: 5px 7px;
     font-size: 10px;
-    color: rgba(26,22,18,0.8);
+    color: var(--text-primary);
     font-family: "Inter", sans-serif;
     pointer-events: none;
     max-width: 160px;
@@ -207,10 +207,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 9.5px;
-    color: rgba(26,22,18,0.65);
+    color: var(--text-secondary);
   }
   .tip-col {
-    color: rgba(26,22,18,0.35);
+    color: var(--text-muted);
     margin-right: 3px;
   }
 </style>
