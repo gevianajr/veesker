@@ -73,6 +73,25 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * Strip SQL comments then verify the statement is read-only.
+ * Blocks leading comments before DML, WITH...DELETE/INSERT, and any
+ * explicit DML/DDL keyword regardless of position.
+ */
+function isReadOnlySql(raw: string): boolean {
+  const stripped = raw
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const first = /^(\w+)/i.exec(stripped)?.[1]?.toUpperCase();
+  if (first !== "SELECT" && first !== "WITH") return false;
+
+  const dangerous = /\b(INSERT|UPDATE|DELETE|MERGE|CREATE|DROP|ALTER|TRUNCATE|RENAME|GRANT|REVOKE|EXECUTE|EXEC|CALL|BEGIN|DECLARE|COMMIT|ROLLBACK|UPSERT|REPLACE)\b/i;
+  return !dangerous.test(stripped);
+}
+
 async function executeTool(name: string, input: Record<string, string>): Promise<string> {
   switch (name) {
     case "describe_object": {
@@ -81,8 +100,8 @@ async function executeTool(name: string, input: Record<string, string>): Promise
     }
     case "run_query": {
       const sql = input.sql.trim();
-      if (!/^(SELECT|WITH)\s/i.test(sql)) {
-        return "Error: only SELECT or WITH queries are permitted";
+      if (!isReadOnlySql(sql)) {
+        return "Error: only read-only SELECT or WITH queries are permitted";
       }
       const res = await queryExecute({ sql: sql.endsWith(";") ? sql.slice(0, -1) : sql });
       if ("results" in res) {
