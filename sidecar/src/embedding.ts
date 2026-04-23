@@ -8,6 +8,29 @@ export type EmbedParams = {
   apiKey?: string;  // openai / voyage
 };
 
+const BLOCKED_HOSTS = new Set([
+  "169.254.169.254",           // AWS/Azure/GCP link-local metadata
+  "metadata.google.internal",  // GCP metadata
+  "metadata.internal",
+  "instance-data",
+]);
+
+function validateEmbedUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid embed URL: ${JSON.stringify(url)}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Embed URL must use http or https (got ${parsed.protocol})`);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (BLOCKED_HOSTS.has(host)) {
+    throw new Error(`Embed URL targets a blocked host: ${host}`);
+  }
+}
+
 export async function embedText(params: EmbedParams): Promise<number[]> {
   switch (params.provider) {
     case "ollama":  return embedOllama(params);
@@ -20,6 +43,7 @@ export async function embedText(params: EmbedParams): Promise<number[]> {
 
 async function embedOllama(p: EmbedParams): Promise<number[]> {
   const base = (p.baseUrl ?? "http://localhost:11434").replace(/\/$/, "");
+  if (p.baseUrl) validateEmbedUrl(base);
   const res = await fetch(`${base}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,6 +87,7 @@ async function embedVoyage(p: EmbedParams): Promise<number[]> {
 
 async function embedCustom(p: EmbedParams): Promise<number[]> {
   if (!p.baseUrl) throw new Error("Custom provider URL required");
+  validateEmbedUrl(p.baseUrl);
   const res = await fetch(p.baseUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
