@@ -6,8 +6,8 @@
   };
   let { result }: Props = $props();
 
-  const W = 520;
-  const H = 300;
+  const W = 600;
+  const H = 320;
   const PAD = 36;
 
   // 2-PC power-iteration PCA on the result vectors
@@ -97,7 +97,7 @@
   <div class="scatter-loading">No vector data — enable "Include vectors" before searching</div>
 {:else}
   <div class="scatter-wrap">
-    <svg width={W} height={H} viewBox="0 0 {W} {H}" class="scatter-svg">
+    <svg width="100%" height={H} viewBox="0 0 {W} {H}" class="scatter-svg" preserveAspectRatio="xMidYMid meet">
       <!-- Grid -->
       <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="rgba(26,22,18,0.08)" stroke-width="1"/>
       <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="rgba(26,22,18,0.08)" stroke-width="1"/>
@@ -151,11 +151,15 @@
   .scatter-wrap {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: 0.3rem;
-    padding: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    background: #faf7f2;
+    position: relative;
+    z-index: 1;
+    min-height: 340px;
   }
-  .scatter-svg { display: block; max-width: 100%; }
+  .scatter-svg { display: block; width: 100%; }
   .scatter-loading {
     color: rgba(26,22,18,0.35);
     font-size: 11px;

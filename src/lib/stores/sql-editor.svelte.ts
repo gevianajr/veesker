@@ -71,6 +71,7 @@ let _drawerOpen = $state(false);
 let _queryCounter = $state(0);
 let _connectionId: string | null = null;
 let _pendingTx = $state(false);
+let _editorExpanded = $state(false);
 
 // ── Drawer height ────────────────────────────────────────────────────────────
 
@@ -206,6 +207,10 @@ export const sqlEditor = {
   setConnectionId(id: string | null): void { _connectionId = id; },
   get pendingTx() { return _pendingTx; },
   clearPendingTx(): void { _pendingTx = false; },
+
+  // ── Editor expanded (fullscreen mode) ─────────────────────────────────────
+  get editorExpanded() { return _editorExpanded; },
+  toggleEditorExpanded(): void { _editorExpanded = !_editorExpanded; },
 
   // ── Drawer height ──────────────────────────────────────────────────────────
   get drawerHeight() { return _drawerHeight; },
