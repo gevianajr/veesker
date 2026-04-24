@@ -437,10 +437,11 @@
   onMount(() => {
     void bootstrap();
     window.addEventListener("keydown", onKeydown);
-    return () => {
+    return async () => {
       window.removeEventListener("keydown", onKeydown);
       sqlEditor.reset();
-      void workspaceClose();
+      if (debugStore.status !== 'idle') await debugStore.stop();
+      await workspaceClose();
     };
   });
 </script>

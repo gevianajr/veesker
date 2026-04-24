@@ -310,8 +310,8 @@
   }
   .tw-close:hover { color: var(--text-primary); }
   .tw-error {
-    background: rgba(179, 62, 31, 0.12); border-bottom: 1px solid rgba(179,62,31,0.3);
-    color: #c0392b; font-size: 12px; padding: 6px 12px;
+    background: var(--bg-surface-alt); border-bottom: 1px solid rgba(179,62,31,0.3);
+    color: var(--text-danger, #e74c3c); font-size: 12px; padding: 6px 12px;
   }
   .tw-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .tw-editor-wrap { flex: 1; overflow: auto; min-height: 0; }

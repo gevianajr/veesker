@@ -190,7 +190,8 @@ class DebugStore {
   }
 
   private _buildBindsForExecution(): Record<string, unknown> {
-    // TODO: wrap DATE binds with TO_DATE in the generated block
+    // datetime-local inputs produce ISO strings; TO_DATE wrapping belongs in the generated
+    // anonymous block but requires a sidecar-side change — deferred
     const result: Record<string, unknown> = {};
     for (const v of this.bindVars) {
       if (!v.enabled) continue;
