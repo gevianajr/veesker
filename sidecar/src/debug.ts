@@ -130,10 +130,12 @@ export type DebugOpenParams = {
   packageName?: string | null;
 };
 
+export type MemberRef = { name: string; type: "PROCEDURE" | "FUNCTION" };
+
 export type DebugOpenResult = {
   script: string;
   params: ParamDef[];
-  memberList?: string[];
+  memberList?: MemberRef[];
 };
 
 export async function debugOpen(p: DebugOpenParams): Promise<DebugOpenResult> {
@@ -176,18 +178,25 @@ export async function debugOpen(p: DebugOpenParams): Promise<DebugOpenResult> {
       params
     );
 
-    let memberList: string[] | undefined;
+    let memberList: MemberRef[] | undefined;
     if (p.objectType.toUpperCase() === "PACKAGE") {
-      const membRes = await conn.execute<{ OBJECT_NAME: string }>(
-        `SELECT DISTINCT object_name
+      const membRes = await conn.execute<{ OBJECT_NAME: string; MEMBER_TYPE: string }>(
+        `SELECT object_name,
+                CASE WHEN MAX(CASE WHEN position = 0 THEN 1 ELSE 0 END) > 0
+                     THEN 'FUNCTION' ELSE 'PROCEDURE' END AS member_type
            FROM all_arguments
           WHERE owner        = UPPER(:owner)
             AND package_name = UPPER(:packageName)
+            AND object_name IS NOT NULL
+          GROUP BY object_name
           ORDER BY object_name`,
         { owner: p.owner, packageName: p.objectName },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
-      memberList = (membRes.rows ?? []).map((r) => r.OBJECT_NAME);
+      memberList = (membRes.rows ?? []).map((r) => ({
+        name: r.OBJECT_NAME,
+        type: r.MEMBER_TYPE as "PROCEDURE" | "FUNCTION",
+      }));
     }
 
     return { script, params, memberList };

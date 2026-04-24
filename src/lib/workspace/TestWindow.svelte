@@ -203,16 +203,17 @@
             class="tw-member-select"
             onchange={async (e) => {
               const name = (e.target as HTMLSelectElement).value;
+              const member = debugStore.memberList.find((m) => m.name === name);
               await debugStore.open(
                 debugStore.owner,
                 name,
-                debugStore.objectType,
+                member?.type ?? "PROCEDURE",
                 debugStore.objectName,
               );
             }}
           >
             {#each debugStore.memberList as m}
-              <option value={m} selected={m === debugStore.objectName}>{m}</option>
+              <option value={m.name} selected={m.name === debugStore.objectName}>{m.name}</option>
             {/each}
           </select>
         {:else}

@@ -4,6 +4,7 @@ import type {
   StackFrame,
   VarValue,
   DebugBreakpointRef,
+  MemberRef,
 } from "$lib/workspace";
 import {
   debugOpenRpc,
@@ -61,7 +62,7 @@ class DebugStore {
   objectName = $state("");
   objectType = $state("");
   packageName = $state<string | null>(null);
-  memberList = $state<string[]>([]);
+  memberList = $state<MemberRef[]>([]);
 
   script = $state("");
   params = $state<ParamDef[]>([]);

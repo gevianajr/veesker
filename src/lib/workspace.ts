@@ -363,10 +363,12 @@ export type PauseInfo = {
   errorMessage?: string;
 };
 
+export type MemberRef = { name: string; type: "PROCEDURE" | "FUNCTION" };
+
 export type DebugOpenResult = {
   script: string;
   params: ParamDef[];
-  memberList?: string[];
+  memberList?: MemberRef[];
 };
 
 export const debugOpenRpc = (
