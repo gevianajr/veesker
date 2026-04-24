@@ -43,6 +43,7 @@ export async function connectionTest(
           user: params.username,
           password: params.password,
           connectString: `${params.host}:${params.port}/${params.serviceName}`,
+          connectTimeout: 10,
         })
       : await oracledb.getConnection({
           user: params.username,
@@ -51,6 +52,7 @@ export async function connectionTest(
           configDir: params.walletDir,
           walletLocation: params.walletDir,
           walletPassword: params.walletPassword,
+          connectTimeout: 10,
         });
   try {
     const result = await conn.execute<{ V: string }>(
@@ -95,6 +97,7 @@ async function buildConnection(p: OpenSessionParams): Promise<oracledb.Connectio
       user: p.username,
       password: p.password,
       connectString: `${p.host}:${p.port}/${p.serviceName}`,
+      connectTimeout: 15,
     });
   }
   return await oracledb.getConnection({
@@ -104,6 +107,7 @@ async function buildConnection(p: OpenSessionParams): Promise<oracledb.Connectio
     configDir: p.walletDir,
     walletLocation: p.walletDir,
     walletPassword: p.walletPassword,
+    connectTimeout: 15,
   });
 }
 
@@ -421,7 +425,8 @@ async function drainDbmsOutput(conn: oracledb.Connection): Promise<string[] | nu
       lines.push(ob.LINE ?? "");
     }
     return lines;
-  } catch {
+  } catch (e) {
+    console.error("[drainDbmsOutput]", e);
     return null;
   }
 }
@@ -1354,7 +1359,7 @@ export type ExplainNode = {
 
 export async function explainPlan(p: { sql: string }): Promise<{ nodes: ExplainNode[] }> {
   return withActiveSession(async (conn) => {
-    const sid = `V${Date.now()}${Math.random().toString(36).slice(2, 7)}`.slice(0, 30);
+    const sid = `V${crypto.randomUUID().replace(/-/g, "").slice(0, 29)}`;
     // EXPLAIN PLAN requires STATEMENT_ID as a string literal — Oracle does not accept a bind variable here (ORA-01780).
     // sid is generated internally so direct interpolation is safe.
     await conn.execute(`EXPLAIN PLAN SET STATEMENT_ID = '${sid}' FOR ${p.sql}`);

@@ -317,10 +317,11 @@ export const sqlEditor = {
   },
 
   async openPreview(owner: string, name: string, pkCols?: string[]): Promise<void> {
+    const qi = (s: string) => `"${s.replace(/"/g, '""')}"`;
     const orderBy = pkCols && pkCols.length > 0
-      ? ` ORDER BY ${pkCols.map(c => `"${c}"`).join(", ")}`
+      ? ` ORDER BY ${pkCols.map(qi).join(", ")}`
       : "";
-    const sql = `SELECT * FROM "${owner}"."${name}"${orderBy} FETCH FIRST 200 ROWS ONLY`;
+    const sql = `SELECT * FROM ${qi(owner)}.${qi(name)}${orderBy} FETCH FIRST 200 ROWS ONLY`;
     const tab = makeTab(`${owner}.${name}`, sql);
     _tabs.push(tab);
     _activeId = tab.id;
@@ -696,7 +697,7 @@ export const sqlEditor = {
     const tab = this.active;
     if (tab === null) return;
     const defaultName = tab.filePath
-      ? tab.filePath.split("/").pop()!.replace(/\.sql$/i, "")
+      ? tab.filePath.split(/[\\/]/).pop()!.replace(/\.sql$/i, "")
       : tab.title;
     const sqlToSave = tab.sql;
     const tabId = tab.id;
@@ -706,7 +707,7 @@ export const sqlEditor = {
       const liveTab = findTab(tabId);
       if (liveTab === null) return;
       liveTab.filePath = path;
-      const base = path.split("/").pop() ?? path;
+      const base = path.split(/[\\/]/).pop() ?? path;
       liveTab.title = base.replace(/\.sql$/i, "");
       liveTab.savedContent = sqlToSave;
       liveTab.isDirty = liveTab.sql !== sqlToSave;
@@ -719,7 +720,7 @@ export const sqlEditor = {
     try {
       const result = await openFile();
       if (result === null) return;
-      const base = result.path.split("/").pop() ?? result.path;
+      const base = result.path.split(/[\\/]/).pop() ?? result.path;
       const title = base.replace(/\.sql$/i, "");
       const tab = makeTab(title, result.content);
       tab.filePath = result.path;

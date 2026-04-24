@@ -155,20 +155,19 @@ async function aiChatViaCli(params: AiChatParams): Promise<AiChatResult> {
     `${m.role === "user" ? "Human" : "Assistant"}: ${m.content}`
   ).join("\n\n");
 
-  // Embed system context + history into the prompt (claude CLI has no --system flag)
-  const fullPrompt = [
+  const stdinPayload = [
     system,
     history ? `\n\n${history}\n\nHuman: ${lastUser}` : lastUser,
   ].join("\n\n");
 
-  const proc = Bun.spawn(
-    ["claude", "-p", fullPrompt],
-    { stdout: "pipe", stderr: "pipe" }
-  );
+  const proc = Bun.spawn(["claude", "-p", "-"], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  proc.stdin.write(stdinPayload);
+  proc.stdin.end();
 
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+  const timeout = AbortSignal.timeout(120_000);
+  const [stdout, stderr] = await Promise.race([
+    Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]),
+    new Promise<never>((_, reject) => timeout.addEventListener("abort", () => reject(new Error("claude CLI timed out after 120s")))),
   ]);
   await proc.exited;
 

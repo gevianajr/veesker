@@ -63,8 +63,12 @@
   let activeWsTab = $state<"schema" | "dashboard">("schema");
 
   // ── Panel resize (persisted) ─────────────────────────────────────────────────
-  let schemaWidth = $state(Number(localStorage.getItem("veesker_schema_w") ?? 256));
-  let chatWidth   = $state(Number(localStorage.getItem("veesker_chat_w") ?? 340));
+  function loadPanelWidth(key: string, def: number): number {
+    const n = Number(localStorage.getItem(key));
+    return Number.isFinite(n) && n > 0 ? n : def;
+  }
+  let schemaWidth = $state(loadPanelWidth("veesker_schema_w", 256));
+  let chatWidth   = $state(loadPanelWidth("veesker_chat_w", 340));
 
   function makeHorizResizer(
     getStart: () => number,

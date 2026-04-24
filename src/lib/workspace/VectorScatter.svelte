@@ -86,9 +86,9 @@
   let hoveredIdx = $state<number | null>(null);
 
   function simColor(sim: number): string {
-    // green (high) → orange → red (low)
-    const r = Math.round(sim > 0.5 ? 179 + (1 - sim) * 2 * 76 : 255);
-    const g = Math.round(sim > 0.5 ? 175 : sim * 2 * 175);
+    const s = Math.max(0, Math.min(1, sim));
+    const r = Math.round(s > 0.5 ? 179 + (1 - s) * 2 * 76 : 255);
+    const g = Math.round(s > 0.5 ? 175 : s * 2 * 175);
     return `rgb(${r},${g},50)`;
   }
 </script>
