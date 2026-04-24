@@ -61,7 +61,7 @@
   }
   .cs-interactive { cursor: pointer; }
   .cs-interactive:hover { background: rgba(255,255,255,0.04); }
-  .cs-active { border-left-color: #f1c40f; background: rgba(241,196,15,0.06); }
+  .cs-active { border-left-color: #f1c40f; background: var(--highlight-active, rgba(241,196,15,0.06)); }
   .cs-arrow { color: #f1c40f; width: 12px; flex-shrink: 0; }
   .cs-arrow-dim { color: transparent; }
   .cs-obj { color: var(--text-primary); }

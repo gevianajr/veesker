@@ -1,4 +1,5 @@
 import type oracledb from "oracledb";
+import type { OpenSessionParams } from "./oracle";
 import { RpcCodedError, NO_ACTIVE_SESSION } from "./errors";
 
 let currentSession: oracledb.Connection | null = null;
@@ -32,15 +33,12 @@ export function getCurrentSchema(): string | null {
   return currentSchema;
 }
 
-let _sessionParams: unknown = null;
+let _sessionParams: OpenSessionParams | null = null;
 
-export function setSessionParams(p: unknown): void {
+export function setSessionParams(p: OpenSessionParams): void {
   _sessionParams = p;
 }
 
-export function getSessionParams(): unknown {
-  if (!_sessionParams) {
-    throw new RpcCodedError(NO_ACTIVE_SESSION, "No session params stored");
-  }
+export function getSessionParams(): OpenSessionParams | null {
   return _sessionParams;
 }
