@@ -211,6 +211,7 @@ function pushHistory(sql: string, r: TabResult): void {
 function askConfirm(sql: string): true | Promise<boolean> {
   const ops = detectDestructive(sql);
   if (ops.length === 0) return true;
+  if (_pendingConfirm !== null) return Promise.resolve(false);
   return new Promise<boolean>((resolve) => {
     _pendingConfirm = { sql, ops, resolve };
   });
@@ -511,8 +512,8 @@ export const sqlEditor = {
 
       tab.results = tabResults;
       tab.activeResultId = chooseActiveResultId(tabResults);
-      for (const tr of tabResults) {
-        pushHistory(tr.sqlPreview, tr);
+      for (let i = 0; i < tabResults.length; i++) {
+        pushHistory(res.data.results[i].sql, tabResults[i]);
       }
 
       // Post-execution compile check for CREATE statements
