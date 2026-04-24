@@ -40,7 +40,7 @@
     function depth(id: number): number {
       let d = 0;
       let cur: number | null = id;
-      while (true) {
+      while (d < 200) {
         const p = parentMap.get(cur);
         if (p === undefined || p === null) break;
         cur = p;

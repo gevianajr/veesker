@@ -23,10 +23,12 @@
   }: Props = $props();
 
   // Shorten version: "Oracle AI Database 26ai Free Release 23.26.1.0.0 – ..." → "23.26.1.0.0"
-  const shortVersion = $derived(() => {
-    const m = serverVersion.match(/(\d+\.\d+[\d.]*)/);
-    return m ? m[1] : serverVersion.split(" ").slice(0, 3).join(" ");
-  });
+  const shortVersion = $derived(
+    (() => {
+      const m = serverVersion.match(/(\d+\.\d+[\d.]*)/);
+      return m ? m[1] : serverVersion.split(" ").slice(0, 3).join(" ");
+    })()
+  );
 </script>
 
 <div class="bar">
@@ -56,7 +58,7 @@
       <line x1="6" y1="3" x2="6" y2="6.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
       <circle cx="6" cy="8" r="0.6" fill="currentColor"/>
     </svg>
-    <span class="meta version" title={serverVersion}>{shortVersion()}</span>
+    <span class="meta version" title={serverVersion}>{shortVersion}</span>
   </div>
 
   <!-- Right: actions -->
