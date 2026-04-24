@@ -39,7 +39,7 @@
 
 <div class="toolbar">
   <button class="btn" title="Run (F8)" disabled={!idle} onclick={onRun}>▶</button>
-  <button class="btn btn-debug" title="Debug (F9)" disabled={!idle} onclick={onDebug}>⏸</button>
+  <button class="btn btn-debug" title="Debug (F9)" disabled={!idle} onclick={onDebug}>🐛</button>
   <div class="sep"></div>
   <button class="btn" title="Step Into (F7)" disabled={!paused} onclick={onStepInto}>↓</button>
   <button class="btn" title="Step Over (F10)" disabled={!paused} onclick={onStepOver}>↷</button>
