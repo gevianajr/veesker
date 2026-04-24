@@ -13,11 +13,19 @@
     const firstSql   = dashboardState.charts[0]?.sql ?? "";
     const cover = document.createElement("div");
     cover.className = "pdf-cover";
-    cover.innerHTML = `
-      <h1>${firstTitle}</h1>
-      <p class="pdf-date">${new Date().toISOString().slice(0, 10)}</p>
-      ${firstSql ? `<pre class="pdf-sql">${firstSql}</pre>` : ""}
-    `;
+    const coverH1 = document.createElement("h1");
+    coverH1.textContent = firstTitle;
+    cover.appendChild(coverH1);
+    const dateP = document.createElement("p");
+    dateP.className = "pdf-date";
+    dateP.textContent = new Date().toISOString().slice(0, 10);
+    cover.appendChild(dateP);
+    if (firstSql) {
+      const pre = document.createElement("pre");
+      pre.className = "pdf-sql";
+      pre.textContent = firstSql;
+      cover.appendChild(pre);
+    }
     root.appendChild(cover);
 
     for (const chart of dashboardState.charts) {
@@ -39,11 +47,26 @@
       if (chart.columns.length > 0 && chart.rows.length > 0) {
         const table = document.createElement("table");
         table.className = "pdf-table";
-        const thead = `<tr>${chart.columns.map((c) => `<th>${c.name}</th>`).join("")}</tr>`;
-        const tbody = chart.rows.slice(0, 50).map(
-          (row) => `<tr>${(row as unknown[]).map((cell) => `<td>${cell ?? "NULL"}</td>`).join("")}</tr>`
-        ).join("");
-        table.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
+        const thead = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        for (const col of chart.columns) {
+          const th = document.createElement("th");
+          th.textContent = col.name;
+          headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        for (const row of chart.rows.slice(0, 50)) {
+          const tr = document.createElement("tr");
+          for (const cell of row as unknown[]) {
+            const td = document.createElement("td");
+            td.textContent = cell == null ? "NULL" : String(cell);
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
         section.appendChild(table);
       }
 
