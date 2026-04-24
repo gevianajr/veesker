@@ -49,8 +49,8 @@ pub fn extract_to(zip_path: &Path, dest_dir: &Path) -> Result<(), WalletError> {
     let mut archive = zip::ZipArchive::new(file)?;
 
     let names: Vec<String> = (0..archive.len())
-        .map(|i| archive.by_index(i).unwrap().name().to_string())
-        .collect();
+        .map(|i| archive.by_index(i).map(|e| e.name().to_string()))
+        .collect::<Result<_, _>>()?;
     for required in REQUIRED_FILES {
         if !names.iter().any(|n| n == *required) {
             return Err(WalletError::MissingFile(required));

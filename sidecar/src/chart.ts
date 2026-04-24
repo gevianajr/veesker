@@ -27,7 +27,14 @@ type ConfigureParams = {
   rows: unknown[][];
 };
 
+const MAX_SESSIONS = 64;
 const sessions = new Map<string, ChartConfig>();
+
+function evictOldestSession() {
+  if (sessions.size >= MAX_SESSIONS) {
+    sessions.delete(sessions.keys().next().value!);
+  }
+}
 
 function emptyConfig(): ChartConfig {
   return { type: null, xColumn: null, yColumns: [], aggregation: "none", title: null };
@@ -113,6 +120,7 @@ export async function chartConfigure(p: ConfigureParams): Promise<ChartConfigure
   if (patch.aggregation !== undefined && patch.aggregation !== null) config.aggregation = patch.aggregation;
   if (patch.title !== undefined && patch.title !== null) config.title = patch.title;
 
+  if (!sessions.has(p.sessionId)) evictOldestSession();
   sessions.set(p.sessionId, config);
 
   const previewData = buildPreview(config, p.columns, p.rows);
