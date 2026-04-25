@@ -22,7 +22,7 @@
   }
 
   function openCommercialPolicy() {
-    void openUrl("https://github.com/geeviana/veesker/blob/main/COMMERCIAL_USE.md");
+    void openUrl("https://github.com/gevianajr/veesker/blob/main/COMMERCIAL_USE.md");
   }
 
   const installedAuth = $derived(listAuthProviders());
@@ -156,7 +156,7 @@
       <section>
         <h3>About</h3>
         <ul class="about">
-          <li>Veesker is <strong>fully open source</strong> under <button class="link" onclick={() => void openUrl('https://github.com/geeviana/veesker/blob/main/LICENSE')}>Apache License 2.0</button></li>
+          <li>Veesker is <strong>fully open source</strong> under <button class="link" onclick={() => void openUrl('https://github.com/gevianajr/veesker/blob/main/LICENSE')}>Apache License 2.0</button></li>
           <li>No telemetry, no usage tracking, no license server check</li>
           <li>All features are available in all tiers — no feature gating</li>
           <li>Compliance with the commercial policy is honor-based + EULA</li>
