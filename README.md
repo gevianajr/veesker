@@ -4,15 +4,23 @@
 
 # Veesker
 
-The Oracle 23ai studio built for vectors, SQL, and AI.
+**The Oracle 23ai studio built for SQL, AI, vectors, and APIs.**
 
-Veesker is a native desktop IDE for Oracle 23ai with a built-in vector search studio, a multi-statement SQL editor, and an AI assistant with live database access. It connects via the Oracle Thin driver — no Oracle Instant Client or JDBC jar required, on any machine.
+A native desktop IDE for Oracle 23ai that combines a multi-statement SQL editor, an AI assistant with live database access, a vector search studio, a PL/SQL debugger, and a no-code REST API builder — all in one app, no Oracle client required.
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-E85D3C.svg)](LICENSE) [![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)](https://tauri.app) [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev) [![Oracle 23ai](https://img.shields.io/badge/Oracle-23ai-F80000?logo=oracle&logoColor=white)](https://oracle.com) [![Early Access](https://img.shields.io/badge/status-early%20access-orange.svg)]()
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-E85D3C.svg)](LICENSE) [![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)](https://tauri.app) [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev) [![Oracle 23ai](https://img.shields.io/badge/Oracle-23ai-F80000?logo=oracle&logoColor=white)](https://oracle.com) [![Pre-release](https://img.shields.io/badge/status-pre--release-orange.svg)]()
 
-[veesker.dev](https://veesker.dev)
+[veesker.dev](https://veesker.dev) · [Install](#install) · [Features](#features) · [Build from source](#build-from-source) · [License & disclaimer](#license--disclaimer)
 
 </div>
+
+---
+
+## ⚠️ Important — Read before using
+
+Veesker is **pre-release open-source software** distributed AS IS. There are no guarantees about correctness, security, availability, or fitness for any purpose. **Do not use Veesker against production databases without first validating it in a non-production environment.** See [TERMS_OF_USE.md](TERMS_OF_USE.md) and [LICENSE](LICENSE) for the full disclaimer.
+
+If you need warranty, SLA, or commercial support, that requires a separate signed agreement — the open-source build never has one.
 
 ---
 
@@ -22,28 +30,62 @@ Veesker is a native desktop IDE for Oracle 23ai with a built-in vector search st
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/home.png" width="460" alt="Connections home screen" /><br/>
-      <sub>Connections home</sub>
+      <img src="docs/screenshots/connection-list.png" width="460" alt="Connection home" /><br/>
+      <sub>Connections home — manage Oracle 23ai connections</sub>
     </td>
     <td align="center">
-      <img src="docs/screenshots/schema-browser.png" width="460" alt="Schema browser with expanded object tree" /><br/>
-      <sub>Schema browser</sub>
+      <img src="docs/screenshots/workspace-schema-tree.png" width="460" alt="Workspace and schema tree" /><br/>
+      <sub>Workspace — schema tree with all object kinds</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/vector-search.png" width="460" alt="Vectors tab with scatter plot" /><br/>
-      <sub>Vector search studio with 2D scatter plot</sub>
+      <img src="docs/screenshots/table-columns.png" width="460" alt="Table columns" /><br/>
+      <sub>Table inspector — columns, types, nullability</sub>
     </td>
     <td align="center">
-      <img src="docs/screenshots/ai-assistant.png" width="460" alt="AI assistant panel alongside the Employees table" /><br/>
-      <sub>AI assistant — Veesker 🐑 queries your database live</sub>
+      <img src="docs/screenshots/table-graph.png" width="460" alt="DataFlow graph" /><br/>
+      <sub>DataFlow — upstream/downstream dependencies via FK & code refs</sub>
     </td>
   </tr>
   <tr>
-    <td align="center" colspan="2">
-      <img src="docs/screenshots/dataflow.png" width="460" alt="DataFlow dependency graph with FK edges" /><br/>
-      <sub>DataFlow — upstream/downstream dependencies and foreign keys</sub>
+    <td align="center">
+      <img src="docs/screenshots/sql-drawer-results.png" width="460" alt="SQL editor with results" /><br/>
+      <sub>Multi-statement SQL editor with results grid</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/sql-editor-ai-explain.png" width="460" alt="AI explain query" /><br/>
+      <sub>Sheep AI — explain queries, suggest fixes, generate SQL</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/plsql-procedure-editor.png" width="460" alt="PL/SQL procedure editor" /><br/>
+      <sub>PL/SQL editor — compile, save, view DDL</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/plsql-debugger.png" width="460" alt="PL/SQL debugger" /><br/>
+      <sub>PL/SQL Debugger — breakpoints, step-in/over/out, watch variables</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/vras-builder.png" width="460" alt="VRAS API builder" /><br/>
+      <sub>VRAS — visual REST endpoint builder for Oracle ORDS</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/vras-sheep-ai.png" width="460" alt="VRAS Sheep AI" /><br/>
+      <sub>VRAS — describe an endpoint in natural language, AI fills the form</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/sql-history.png" width="460" alt="Query history" /><br/>
+      <sub>Per-connection query history with timing & row counts</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/help-onboarding.png" width="460" alt="Onboarding & help" /><br/>
+      <sub>In-app guided onboarding & help center</sub>
     </td>
   </tr>
 </table>
@@ -54,15 +96,16 @@ Veesker is a native desktop IDE for Oracle 23ai with a built-in vector search st
 ## What it is / What it isn't
 
 **What it is:**
-- A native desktop Oracle 23ai studio with a vector search studio and AI assistant built in, not bolted on
-- Zero Oracle client install — connects directly to Oracle via the Thin driver (pure TypeScript, no native libraries)
-- First-class vector search: generate embeddings with Ollama/OpenAI/Voyage, manage HNSW/IVF indexes, run semantic queries, and inspect results with a 2D scatter visualization
-- An AI assistant that runs live SELECT queries against your schema to answer questions — not autocomplete, actual database access
+- A native desktop Oracle 23ai studio combining SQL editing, schema browsing, vector search, AI assistance, PL/SQL debugging, and REST API generation in a single app
+- Zero Oracle client install — connects directly via the Thin driver (pure TypeScript, no native libraries, no JDBC jar)
+- An AI assistant with live database access — Sheep can run SELECT queries against your schema to answer questions, not just autocomplete based on training data
+- An open-core project — the IDE is Apache 2.0, with the option for separate corporate features under commercial license
 
 **What it isn't:**
 - Not a generic multi-database client — DBeaver handles that better
-- Not cloud or SaaS — your credentials and database queries never leave your machine
-- Not a replacement for SQL Developer on Oracle 11g/12c — Veesker targets 23ai and its vector-native capabilities specifically
+- Not cloud or SaaS — credentials, query history, and database content stay on your machine
+- Not a replacement for SQL Developer on Oracle 11g/12c — Veesker targets 23ai and its vector-native + ORDS capabilities specifically
+- Not a production-grade tool with warranty — see [terms & disclaimers](#license--disclaimer)
 
 ---
 
@@ -70,332 +113,244 @@ Veesker is a native desktop IDE for Oracle 23ai with a built-in vector search st
 
 ### Connections & Authentication
 
-- **Basic auth:** host / port / service name + username / password
-- **Oracle Wallet (mTLS):** ZIP upload, automatic connect alias detection, wallet password support — full support for Oracle Autonomous Database
-- **Secure credential storage:** OS keychain via Rust `keyring` crate — macOS Keychain, Windows Credential Manager, Linux Secret Service; secrets never touch disk as plaintext
-- **Connection test before save:** validates credentials, returns Oracle server version
-- **Multiple named connections** persisted in local SQLite with creation and update timestamps
-- Full connection CRUD from the home screen
+- **Basic auth** — host / port / service name + username / password
+- **Oracle Wallet (mTLS)** — ZIP upload with automatic connect-alias detection and wallet password support; full Autonomous Database compatibility
+- **OS keychain integration** — passwords stored via Windows Credential Manager / macOS Keychain / Linux Secret Service via the Rust `keyring` crate
+- **Connection switcher** — fast jump between connections without re-authenticating
+- **Multi-PDB support** — switch service names per connection
+
+### Schema browser
+
+- **All object kinds** — Tables, Views, Sequences, Procedures, Functions, Packages, Triggers, Types, REST Modules
+- **Per-schema vector indicator** — schemas containing tables with VECTOR columns are flagged
+- **Smart filtering** — toggle visibility per kind, hide system schemas, full-text search across all objects
+- **Object kind counts** — at a glance, see how much is in each schema
+- **System schema toggle** — show/hide ANONYMOUS, SYS, MDSYS, etc.
+
+### Table inspector
+
+- **Columns tab** — name, type, nullability, default, comments, primary-key flag, vector indicator
+- **Indexes tab** — name, unique flag, columns covered
+- **Related tab** — outgoing & incoming foreign keys, dependent objects, constraints, grants
+- **DataFlow graph** — visual dependency map showing upstream sources, downstream consumers, FK relationships, and triggers (PL/SQL bodies are scanned for table refs)
+- **Quick actions** — preview data (SELECT * with PK ordering, FETCH FIRST 200), exact COUNT, view DDL, navigate to any related object
+
+### SQL editor
+
+- **Multi-statement execution** — full PL/SQL-aware splitter handles strings, comments, q-quoted literals, and `BEGIN..END;` blocks separated by `/`
+- **Per-statement results** — each statement gets its own result tab with status (ok/error/cancelled), elapsed time, and row count
+- **Cancel running queries** — `Cmd/Ctrl + .` aborts the in-flight statement (server-side `connection.break()`)
+- **Run-at-cursor / Run-selection / Run-all** — three execution modes with sensible defaults
+- **Sortable & resizable result grid** — virtual-scrolling for large result sets (no UI freeze on millions of rows)
+- **Query history** — per-connection SQLite-backed history with elapsed time, row count, error code; click to reload into the editor
+- **File I/O** — Save / Save As / Open `.sql` files with file-modified indicator on the tab
+- **Multiple tabs** — keep separate working contexts open simultaneously
+- **DML safety** — destructive operations (DELETE, UPDATE, DROP, TRUNCATE) trigger a confirmation modal showing impact
+- **EXPLAIN PLAN** — visualization of execution plan tree with cost & cardinality
+- **Compile errors inline** — for `CREATE PROCEDURE/FUNCTION/PACKAGE`, errors appear in the gutter at the failing line
+- **CodeMirror 6** — syntax highlighting, minimap, autocomplete with the schema's actual table/view names
+
+### AI Assistant — Sheep 🐑
+
+- **Live database access** — Sheep runs SELECT queries against your real schema to answer questions, then explains the results
+- **Context-aware** — the assistant knows the current schema, currently selected object, and can use the live connection
+- **Explain & analyze** — highlight any SQL → "Explain with AI" → Sheep walks through it line by line
+- **Generate SQL** — describe what you want in natural language, get a SQL draft to review and run
+- **Markdown rendering** — code blocks, inline code, bold, syntax-highlighted
+- **API key in OS keychain** — Anthropic API key stored locally via `keyring`; falls back to `ANTHROPIC_API_KEY` env var
+
+### Vector search studio
+
+- **Embedding providers** — Ollama (local), OpenAI, Voyage, custom OpenAI-compatible endpoints
+- **HNSW & IVF indexes** — create, drop, parameterize accuracy/distance metric (Cosine, Euclidean, Dot, Manhattan)
+- **Similarity search UI** — text input → embeddings → live similarity results sorted by distance
+- **2D scatter plot** — PCA-projected vector space, color-coded by cluster, click points to see source rows
+- **Embed batch operations** — bulk-embed pending rows in your tables with progress tracking
+
+### PL/SQL features
+
+- **PL/SQL editor** — full CRUD on procedures, functions, packages, triggers, and types with syntax highlighting
+- **Compile** — explicit compile button with inline error display
+- **Procedure execution modal** — auto-generated form for IN/OUT params, including REF CURSOR results displayed as a result grid
+- **PL/SQL Debugger** — Test Window-style debugger:
+  - Breakpoints (gutter click or Ctrl+B)
+  - Step Into / Step Over / Step Out / Continue
+  - Watch variables panel
+  - Call stack with current line highlight
+  - Output capture (DBMS_OUTPUT)
+  - SYS_REFCURSOR result extraction
+
+### VRAS — Veesker REST API Studio
+
+A no-code REST API builder using Oracle ORDS:
+
+- **Auto-CRUD on tables/views** — 1-click `ORDS.ENABLE_OBJECT` with operation selection (GET/POST/PUT/DELETE/GET-by-id)
+- **Custom SQL endpoints** — write a parameterized SELECT/DML, define route + method, deploy as ORDS handler
+- **Procedure endpoints** — pick any PL/SQL procedure or function, params auto-introspected, JSON serialization via APEX_JSON (handles SYS_REFCURSOR natively)
+- **Sheep AI integration** — describe the endpoint in natural language, AI fills the form
+- **OAuth 2.0 client management** — create OAuth clients with `client_credentials` grant, role assignment, revoke; secret shown once for safe-keeping
+- **Inline HTTP test panel** — send GET/POST/PUT/DELETE requests with auto-injected Bearer tokens, JSON pretty-printed response, status code coloring
+- **Module browser** — read existing ORDS modules from `USER_ORDS_*` views, view templates, handlers, and source code
+- **Export as SQL** — reverse-engineer any deployed module into a recreatable PL/SQL block (great for promoting between environments)
+- **Bootstrap detection** — auto-detects whether ORDS is installed, schema is enabled, user has admin privilege, and base URL is configured; guided modal with one-click "Habilitar agora" when applicable
+
+### Workspace UX
+
+- **Dark / light mode** with smooth transitions
+- **Customizable panels** — resize schema tree and AI panel, persisted
+- **System tray integration** — minimize to tray, status badges per connection state
+- **Command palette** — Ctrl+K for fast navigation
+- **Help center & onboarding** — in-app guided tour for new users
+- **Auto-update** — Tauri-native updater with Ed25519-signed releases via GitHub Releases
+- **Audit trail** — every SQL execution logged to `audit/<date>.jsonl` for compliance
+
+### Cross-platform
+
+- **Windows** — NSIS installer + MSI, runs on Windows 10 (with WebView2) and Windows 11 native
+- **macOS** — `.dmg` and `.app`, Apple Silicon and Intel; ad-hoc signing for local builds
+- **Linux** — supported via Tauri build (not yet packaged for releases)
 
 ---
 
-### SQL Editor & Execution
+## Install
 
-- **CodeMirror 6** with Oracle PL/SQL syntax highlighting and One Dark theme
-- **Multi-tab per connection**, open tab state persisted in localStorage across sessions
-- **Cursor-aware execution (⌘Enter):** detects the statement under the caret and runs only that one
-- **Selection execution:** runs only the highlighted text
-- **Run all (⌘⇧Enter / F5):** passes the full buffer through the SQL splitter — handles `;`, `/` on its own line for PL/SQL blocks, Q-quoted strings, and line/block comments correctly
-- **In-flight query cancellation** via ⌘. or the UI cancel button
-- **File handling:** open, save, save-as via the system dialog, with dirty state indicator (●)
-- **Inline compile error markers** rendered as CodeMirror diagnostics with gutter icons
-- **Concurrency guard:** a second query is blocked while one is already running on the shared connection
+### Windows
 
----
+Download the latest installer from the [Releases page](https://github.com/geeviana/veesker/releases) and run `Veesker_<version>_x64-setup.exe`.
 
-### Results & DBMS_OUTPUT
+> The installer is currently unsigned during the pre-release period. Windows SmartScreen will show "Windows protected your PC" — click **More info** → **Run anyway**. Code signing via Azure Trusted Signing or SignPath Foundation is in progress.
 
-- Multi-statement result tabs — one tab per executed statement, each with its own status, rows, and timing
-- Per-statement status: `ok` / `error` / `cancelled` / `running`
-- DBMS_OUTPUT captured per statement (up to 10,000 lines), rendered alongside the result
-- PL/SQL compile errors fetched from `user_errors` and shown inline after execution
-- **Result grid:** column resizing (drag handles), 3-state column sorting, smooth scroll
-- **CSV and JSON export** with system-save dialog
-- NULL rendered as `<NULL>`, dates as ISO 8601, TypedArrays (from VECTOR columns) as plain arrays
+### macOS
+
+Download the `.dmg` from the [Releases page](https://github.com/geeviana/veesker/releases) and drag Veesker into Applications.
+
+> Apple Silicon and Intel are both supported. The app is ad-hoc signed during pre-release; on first launch you may need to **Right-click → Open** to bypass Gatekeeper.
+
+### Linux
+
+Build from source — see below. Packaged Linux releases are not yet available.
 
 ---
 
-### Schema Navigation
+## Build from source
 
-- Resizable schema tree panel (160–480px), current schema highlighted with `●`
-- Eight object kinds: TABLE, VIEW, SEQUENCE, PROCEDURE, FUNCTION, PACKAGE, TRIGGER, TYPE
-- Object count per kind per schema, loaded on first expand
-- Real-time text search filter across schema name and object name (debounced)
-- PL/SQL object status badges: VALID / INVALID
-- VECTOR column detection at schema scan time, surfaced in the Vectors tab
-
----
-
-### Object Details (center panel)
-
-| Tab | What it shows |
-|---|---|
-| **Columns** | Name, type (with precision/scale), nullable, PK, default value, comments, VECTOR column flag |
-| **Indexes** | Name, uniqueness, column list |
-| **Related** | Triggers, FK outgoing/incoming, dependents, check constraints, grants |
-| **Dataflow** | Bezier graph of upstream/downstream code dependencies, FK parents/children, triggers |
-| **Vectors** | Embedding generation, semantic search, scatter plot, vector index management |
-
-Additional actions: DDL viewer (opens CREATE statement in the editor), on-demand row count, table preview with PK-ordered SELECT, back navigation with session history.
-
----
-
-### Vector Search Studio
-
-> Vector search is not a roadmap item — it ships in the current build. Veesker is the only native Oracle IDE with a built-in embedding, indexing, and search studio for Oracle 23ai `VECTOR` columns.
-
-**Embedding providers:**
-
-| Provider | Mode | Model default |
-|---|---|---|
-| Ollama | Local, no key required | `nomic-embed-text` |
-| OpenAI | API key | `text-embedding-3-small` |
-| Voyage AI | API key | `voyage-3-lite` |
-| Custom | Any POST-compatible endpoint | — |
-
-**Operations:**
-- Detect pending rows (rows where the VECTOR column is NULL)
-- Batch embedding with live progress counter (embedded / total / errors), cancellable at any point
-- Semantic similarity search with COSINE, EUCLIDEAN, or DOT distance
-- Optional: include raw vectors in results for visualization
-- 2D scatter plot via PCA (60-iteration power iteration, deterministic seed) — result points color-coded by similarity score (green → orange → red), query vector plotted separately as `Q`
-- Re-search CTA when scatter was opened without vectors included
-
-**Vector index management:**
-- List existing vector indexes for any table
-- Create HNSW or IVF index with configurable metric and accuracy target
-- Drop index with confirmation dialog
-
----
-
-### Veesker AI 🐑 — AI Assistant
-
-The AI panel (⌘I) runs a cyberpunk sheep named Veesker. Powered by Claude via the Anthropic API — key stored in the OS keychain, or read from the `ANTHROPIC_API_KEY` environment variable.
-
-**Live database tools (read-only):**
-
-| Tool | What it does |
-|---|---|
-| `describe_object` | Returns columns, indexes, constraints, and statistics for any table or view |
-| `run_query` | Executes a SELECT or WITH query and returns up to 50 rows |
-| `get_ddl` | Returns the full DDL for any Oracle object |
-| `list_objects` | Lists objects of a given kind within a schema |
-
-The AI uses these tools autonomously to answer questions — it will describe a table, run a quick SELECT to verify an assumption, and cite real column names rather than guessing.
-
-**Safety:**
-- SQL guard strips comments, then rejects any statement containing INSERT / UPDATE / DELETE / CREATE / DROP / ALTER / EXEC / BEGIN / COMMIT / ROLLBACK — the AI cannot mutate the database
-- Prompt-injection mitigation: triple-backtick sequences inside the active SQL are sanitized before being sent to the model, preventing code-fence escapes in the system prompt
-- Context-aware: knows the current schema, selected object, and active SQL in the editor
-- Full multi-turn conversation history
-- Markdown rendering: fenced code blocks with language hints, inline code, bold, and line breaks
-
----
-
-### Transactions & Session Management
-
-- Commit and Rollback buttons in the status bar and SQL drawer (disabled when no pending transaction)
-- TX badge in the status bar (yellow) when uncommitted DML has been executed
-- DBMS_OUTPUT auto-enabled for multi-statement execution runs
-- Lost-session detection — handles ORA-03113, ORA-03114, NJS-003, NJS-500, DPI-1010 with automatic session cleanup and a reconnect prompt
-
----
-
-### Query History
-
-- Per-connection history persisted in local SQLite
-- Full-text search across SQL text, debounced at 200ms
-- Infinite-scroll pagination (50 entries per page)
-- Per-entry display: SQL preview, success/failure indicator, row count, elapsed time, error code if applicable, relative timestamp
-- Click any entry to open it in the editor
-
----
-
-## Security
-
-Veesker is designed for enterprise use — the following controls are active in the shipped build.
-
-- **Strict Content Security Policy** on the WebView: inline scripts blocked, frames blocked (`frame-src 'none'`), plugin embeds blocked (`object-src 'none'`), `connect-src` restricted to Anthropic's API and `localhost:1420` (dev server only)
-- **Sidecar process isolation:** the Oracle driver runs in a separate Bun process; if it crashes, the UI stays responsive; if it were compromised, it cannot read the keychain directly
-- **Credentials never on disk:** every secret — Oracle passwords, wallet password, Anthropic API key — lives exclusively in the OS keychain via the Rust `keyring` crate
-- **Oracle identifier validation:** every object name interpolated into a SQL string passes through `[A-Za-z0-9_$#]{1,128}` — mitigates injection on metadata DDL where bind parameters are not available (e.g., `CREATE INDEX ... ON owner.table`)
-- **Embedding URL validation:** custom endpoint URLs are validated to block cloud-metadata addresses (`169.254.x.x`, GCP, Azure) to prevent SSRF from the custom provider feature
-- **AI read-only enforcement:** the `run_query` tool strips comments before checking for DML/DDL keywords — the AI tools cannot mutate data regardless of what the conversation history contains
-- **Prompt injection mitigation:** triple-backtick sequences inside the active SQL are sanitized before being embedded in the system prompt
-- **Concurrency guard:** `queryExecute` throws immediately if another query is in flight on the same connection, preventing race conditions on the shared Oracle session
-
----
-
-## Stack
-
-| Layer | Technology |
-|---|---|
-| Desktop shell | [Tauri 2](https://tauri.app) (Rust) |
-| Frontend | [SvelteKit](https://kit.svelte.dev) + Svelte 5 runes + TypeScript |
-| SQL editor | [CodeMirror 6](https://codemirror.net) |
-| Oracle driver | [`node-oracledb`](https://node-oracledb.readthedocs.io) Thin mode via Bun sidecar |
-| AI | [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) / Claude API / Claude Code fallback |
-| Embeddings | Ollama, OpenAI, Voyage AI, custom endpoints |
-| App state | SQLite (bundled via Rust `rusqlite`) |
-| Credentials | OS keychain (Rust `keyring` — Apple native, Windows native, Linux Secret Service) |
-| Vector visualization | Custom 2D PCA — power iteration, 60 iterations |
-
-The Oracle driver runs in a **Bun sidecar** — a TypeScript process compiled to a single standalone binary per platform that communicates with the Tauri Rust shell via JSON-RPC over stdin/stdout. This keeps `node-oracledb` Thin mode working inside a Rust-native app while adding zero Oracle Instant Client requirement for the end user. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design rationale.
-
----
-
-## Platform Support
-
-| Platform | Status |
-|---|---|
-| macOS (Apple Silicon) | ✅ Supported |
-| macOS (Intel) | ✅ Supported |
-| Windows | 🟡 In progress |
-| Linux | 🟡 In progress |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- [Bun](https://bun.sh) ≥ 1.1
-- [Rust](https://rustup.rs) stable toolchain
-- Tauri platform prerequisites → [guide](https://tauri.app/start/prerequisites/)
-- Oracle Database 23ai (local Docker or remote)
-
-### Dev mode
+See [CLAUDE.md](CLAUDE.md) for the full development setup. Quick version:
 
 ```bash
+# Prerequisites: Bun ≥ 1.1, Rust stable, MSVC (Win) or Xcode CLT (macOS)
+
+# Clone & install
 git clone https://github.com/geeviana/veesker.git
 cd veesker
 bun install
 cd sidecar && bun install && cd ..
-bun run tauri dev
-```
 
-The first screen is the connections home, where you can create a new connection with the **New connection** button. Basic auth (host/port/service) and Oracle Wallet are both supported.
-
-### Production build
-
-```bash
-# Compile the sidecar binary for the current platform
-cd sidecar && bun build src/index.ts --compile --minify \
-  --outfile ../src-tauri/binaries/veesker-sidecar-$(rustc -vV | sed -n 's|host: ||p')
+# Compile sidecar binary (path differs by OS)
+cd sidecar
+bun build src/index.ts --compile --minify \
+  --outfile ../src-tauri/binaries/veesker-sidecar-x86_64-pc-windows-msvc.exe
 cd ..
 
-# Build the Tauri app
+# Run dev mode (Vite + Tauri shell + sidecar live reload)
+bun run tauri dev
+
+# Or build a production installer
 bun run tauri build
 ```
 
----
+Outputs land in `src-tauri/target/release/bundle/`.
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| ⌘K | Command palette — search all objects |
-| ⌘I | Toggle AI assistant |
-| ⌘J | Toggle SQL drawer |
-| ⌘Enter | Run SQL at cursor |
-| ⌘⇧Enter / F5 | Run all statements |
-| ⌘. | Cancel running query |
-| ⌘N | New tab |
-| ⌘W | Close active tab |
-| ⌘O | Open SQL file |
-| ⌘S | Save |
-| ⌘⇧S | Save As |
-| ⌘⇧E | Expand editor mode |
+For auto-update setup, see [docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md).
+For Windows code signing, see [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 ---
 
-## Roadmap
-
-**Shipped (v0.x):**
-- [x] Oracle Thin-mode connection with Basic + Wallet auth
-- [x] SQL editor with multi-statement execution and PL/SQL splitter
-- [x] Schema browser across 8 object kinds
-- [x] Vector Search Studio with multi-provider embeddings
-- [x] HNSW / IVF index management
-- [x] 2D scatter visualization via PCA
-- [x] AI assistant with live database tools
-- [x] Query history with full-text search
-- [x] DataFlow dependency graphs
-- [x] DBMS_OUTPUT capture
-
-**Next (v1.0):**
-- [ ] Windows and Linux builds
-- [ ] RAG pipeline builder (PDF → chunk → embed → store → retrieve → generate)
-- [ ] OpenAI / Ollama providers for the AI assistant (currently Claude-only)
-- [ ] Collaborative workspaces (read-only shared schema views)
-- [ ] SQL formatter with PL/SQL block awareness
-
-**Exploring:**
-- [ ] Oracle APEX workspace integration
-- [ ] Oracle EBS schema presets
-- [ ] Fine-tuning playground for embedding models
-
----
-
-## Project Structure
+## Architecture
 
 ```
-veesker/
-├── src/                          # SvelteKit frontend
-│   ├── routes/
-│   │   ├── +page.svelte          # Connections home
-│   │   ├── connections/          # New / edit connection forms
-│   │   └── workspace/[id]/       # Main IDE workspace
-│   └── lib/
-│       ├── workspace/            # UI components
-│       │   ├── StatusBar.svelte
-│       │   ├── SchemaTree.svelte
-│       │   ├── ObjectDetails.svelte
-│       │   ├── SqlDrawer.svelte
-│       │   ├── SqlEditor.svelte
-│       │   ├── ResultGrid.svelte
-│       │   ├── ExecutionLog.svelte
-│       │   ├── QueryHistory.svelte
-│       │   ├── VectorScatter.svelte
-│       │   ├── DataFlow.svelte
-│       │   ├── CommandPalette.svelte
-│       │   ├── SheepChat.svelte
-│       │   └── CompileErrors.svelte
-│       └── stores/
-│           └── sql-editor.svelte.ts  # Tab state, execution, expand mode
-├── sidecar/                      # Bun TypeScript sidecar
-│   └── src/
-│       ├── index.ts              # JSON-RPC stdin/stdout dispatcher
-│       ├── oracle.ts             # All Oracle queries and session management
-│       ├── ai.ts                 # Anthropic SDK + tool execution
-│       ├── embedding.ts          # Multi-provider embedding generation
-│       ├── state.ts              # Active session state
-│       ├── errors.ts             # RPC error codes
-│       └── handlers.ts           # RPC method registry
-├── src-tauri/                    # Tauri Rust shell
-│   ├── src/
-│   │   ├── lib.rs                # App setup, sidecar spawn, plugin registration
-│   │   └── commands.rs           # Tauri commands exposed to the frontend
-│   ├── binaries/                 # Compiled sidecar binaries (per platform)
-│   └── tauri.conf.json           # App config, CSP, bundle settings
-├── docs/
-│   └── screenshots/              # Screenshots used in README
-└── static/
-    └── veesker-sheep.png         # The mascot
+┌──────────────────────────────────────────────────────────┐
+│  Tauri 2 desktop shell (Rust)                            │
+│  └── WebView2 / WKWebView                                │
+│      └── SvelteKit 5 frontend (Svelte 5 runes)           │
+│          └── invoke() → Tauri commands → JSON-RPC stdio  │
+├──────────────────────────────────────────────────────────┤
+│  Bun sidecar (TypeScript, compiled to native binary)     │
+│  └── node-oracledb Thin driver → Oracle 23ai             │
+│  └── Anthropic SDK → Claude API                          │
+│  └── Embedding providers (Ollama / OpenAI / Voyage)      │
+└──────────────────────────────────────────────────────────┘
 ```
+
+- **Frontend:** Svelte 5 with runes (`$state`, `$derived`, `$effect`), CodeMirror 6 for SQL editing, Chart.js for the dashboard, Tauri 2 for native APIs
+- **Sidecar:** Bun-compiled TypeScript binary handles all Oracle communication via JSON-RPC over stdin/stdout
+- **Rust shell:** thin Tauri command layer delegating everything to the sidecar; persistence (SQLite for connections + history) and OS keychain integration live in Rust
+- **No CGO, no JNI, no Oracle Instant Client:** node-oracledb Thin mode is pure JavaScript
+
+---
+
+## Documentation
+
+- **[CLAUDE.md](CLAUDE.md)** — full development setup, Windows + macOS, troubleshooting
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — contribution guidelines, code conventions, PR workflow
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — Contributor Covenant 2.1
+- **[SECURITY.md](SECURITY.md)** — security disclosure policy
+- **[TERMS_OF_USE.md](TERMS_OF_USE.md)** — terms of use, warranty disclaimer, liability limitation
+- **[docs/AUTO_UPDATE.md](docs/AUTO_UPDATE.md)** — Tauri updater configuration & release process
+- **[docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)** — Azure Trusted Signing setup for Windows
+- **[docs/superpowers/specs/](docs/superpowers/specs/)** — design specs for major features (debugger, security, VRAS)
+- **[docs/superpowers/plans/](docs/superpowers/plans/)** — implementation plans for major features
+
+---
+
+## Open core model
+
+Veesker follows an **open core** model:
+
+- **Open-source core (this repository)** — Apache License 2.0, free, AS IS, no warranty
+- **Corporate / Enterprise features** — may be developed and offered separately under a commercial license, with optional SLA, support, indemnification, and warranty (only when explicitly stated in a separate signed agreement)
+
+If you are using only the public open-source build, you are using the AS IS version. **Any guarantee or commercial obligation requires a separate paid agreement.**
+
+---
+
+## License & disclaimer
+
+Veesker is released under the [Apache License 2.0](LICENSE).
+
+**No warranty.** Veesker is provided "AS IS" and "AS AVAILABLE", without warranty of any kind. The maintainer is not liable for damages arising from the use of the software, including but not limited to data loss, security incidents, downtime, or regulatory non-compliance. See [TERMS_OF_USE.md](TERMS_OF_USE.md) for the full terms.
+
+**User responsibility.** You are responsible for:
+- Validating Veesker's behavior in non-production before any production use
+- Backing up your data before connecting Veesker to a database
+- Reviewing any AI-generated SQL/PL/SQL/REST configuration before applying it
+- Ensuring your use complies with applicable laws and your organization's policies
+
+**No telemetry.** The open-source build collects no usage data. Connections, credentials, and query history stay on your machine.
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a dev environment, code style expectations, and the PR process. All contributors must sign the CLA via CLA Assistant (linked in the PR check). See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). All contributors must agree to the Apache 2.0 license terms. We use Conventional Commits and require tests for non-trivial changes.
+
+For security issues, please report privately via [SECURITY.md](SECURITY.md).
 
 ---
 
-## License
+## Acknowledgments
 
-Code is licensed under the [Apache License 2.0](LICENSE) — free to use, fork, and build on.
-
-## Trademark Policy
-
-"Veesker" and the Veesker sheep mascot are trademarks of Geraldo Ferreira Viana Júnior. The code is open source (Apache 2.0), but the name and logo are not. Forks must be renamed and must not use the Veesker sheep mascot.
-
-For commercial or promotional use of the Veesker name or mascot, contact geeviana@gmail.com.
+- [Tauri](https://tauri.app) — for making native desktop apps with web tech actually work
+- [Svelte 5](https://svelte.dev) — runes are a joy to write
+- [node-oracledb Thin mode](https://oracle.github.io/node-oracledb/) — Oracle without the Instant Client tax
+- [Anthropic Claude](https://anthropic.com) — for Sheep's brain
+- [Oracle 23ai](https://oracle.com/database/free) — for being the first Oracle that takes vectors seriously
 
 ---
 
 <div align="center">
-  <sub>Built with care (and a cyberpunk sheep) by <a href="https://github.com/geeviana">@geeviana</a></sub>
-  <br>
-  <sub><a href="ARCHITECTURE.md">Architecture</a> · <a href="https://veesker.dev">veesker.dev</a> · <a href="https://twitter.com/geevianajr">Twitter</a></sub>
+
+Made with ❤️ in São Paulo, Brazil — by [Geraldo Viana Júnior](https://github.com/geeviana)
+
+[veesker.dev](https://veesker.dev) · [GitHub](https://github.com/geeviana/veesker) · [Issues](https://github.com/geeviana/veesker/issues)
+
 </div>
