@@ -20,7 +20,7 @@ Read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing.
 ### Setup
 
 ```bash
-git clone https://github.com/geeviana/veesker.git
+git clone https://github.com/gevianajr/veesker.git
 cd veesker
 
 # Install frontend dependencies
