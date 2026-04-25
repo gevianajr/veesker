@@ -220,6 +220,7 @@ pub fn run() {
             commands::ords_modules_list,
             commands::ords_module_get,
             commands::ords_enable_schema,
+            commands::ords_module_export_sql,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

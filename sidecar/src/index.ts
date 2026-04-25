@@ -33,7 +33,7 @@ import {
 } from "./oracle";
 import { aiChat } from "./ai";
 import { chartConfigure, chartReset } from "./chart";
-import { ordsDetect, ordsModulesList, ordsModuleGet, ordsEnableSchema } from "./ords";
+import { ordsDetect, ordsModulesList, ordsModuleGet, ordsEnableSchema, ordsModuleExportSql } from "./ords";
 import {
   debugOpen,
   debugGetSource,
@@ -90,6 +90,7 @@ const handlers: HandlerMap = {
   "ords.modules.list":  (params) => ordsModulesList(params as any),
   "ords.module.get":    (params) => ordsModuleGet(params as any),
   "ords.enable_schema": (params) => ordsEnableSchema(params as any),
+  "ords.module.export_sql": (params) => ordsModuleExportSql(params as any),
   "debug.open":              (params) => debugOpen(params as any),
   "debug.get_source":        (params) => debugGetSource(params as any),
   "debug.start":             (params) => debugStart(params as any),
