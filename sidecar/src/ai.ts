@@ -239,3 +239,77 @@ export async function aiChat(params: AiChatParams): Promise<AiChatResult> {
 
   return { content: text, toolsUsed };
 }
+
+const ENDPOINT_SYSTEM_PROMPT = `You are an Oracle ORDS expert helping a developer design a REST endpoint.
+
+Given the user's description and the available database objects, suggest the best endpoint configuration.
+
+Output ONLY valid JSON matching this schema (no markdown, no prose):
+{
+  "type": "auto-crud" | "custom-sql" | "procedure",
+  "reasoning": string,
+  "sourceObjectName": string?,
+  "sourceObjectKind": "TABLE" | "VIEW" | "PROCEDURE" | "FUNCTION"?,
+  "sourceSql": string?,
+  "routePattern": string?,
+  "method": "GET" | "POST" | "PUT" | "DELETE"?,
+  "moduleName": string?,
+  "basePath": string?,
+  "authMode": "none" | "role" | "oauth"?
+}
+
+Rules:
+- "auto-crud" requires sourceObjectName + sourceObjectKind ("TABLE" | "VIEW")
+- "custom-sql" requires sourceSql + routePattern + method (use :name for path params and bind variables in SQL)
+- "procedure" requires sourceObjectName + sourceObjectKind ("PROCEDURE" | "FUNCTION") + routePattern + method (POST for procedures by default, GET for functions)
+- Always suggest moduleName as kebab-case "<topic>-api"
+- basePath should match the topic (e.g., "/sales/" for sales)
+- Default authMode is "none" unless user mentions auth/protected/secured`;
+
+export async function aiSuggestEndpoint(params: {
+  apiKey: string | null;
+  description: string;
+  schemaName: string;
+  availableTables: string[];
+  availableViews: string[];
+  availableProcedures: string[];
+  availableFunctions: string[];
+}): Promise<{ suggestion: unknown }> {
+  const key = params.apiKey || process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    throw { code: -32603, message: "Anthropic API key not configured. Set it in Settings or via ANTHROPIC_API_KEY env var." };
+  }
+
+  const userContent = `Description: ${params.description}
+
+Available in schema ${params.schemaName}:
+- Tables: ${params.availableTables.slice(0, 100).join(", ") || "(none)"}
+- Views: ${params.availableViews.slice(0, 100).join(", ") || "(none)"}
+- Procedures: ${params.availableProcedures.slice(0, 100).join(", ") || "(none)"}
+- Functions: ${params.availableFunctions.slice(0, 100).join(", ") || "(none)"}
+
+Output ONLY the JSON config object.`;
+
+  const client = new Anthropic({ apiKey: key });
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    system: ENDPOINT_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userContent }],
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
+
+  let suggestion: unknown;
+  try {
+    const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "").trim();
+    suggestion = JSON.parse(cleaned);
+  } catch {
+    throw { code: -32603, message: "AI returned invalid JSON: " + text.slice(0, 200) };
+  }
+  return { suggestion };
+}
