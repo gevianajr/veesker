@@ -65,19 +65,25 @@ github.com/veesker/veesker-cloud                   Private — SaaS backend + we
 └── infra/                                          Terraform / docker-compose
 
 github.com/veesker/veesker-addons                  Private — monorepo of paid plugins
-├── ebs-pack/
-├── audit-shipper/
-├── awr-analyzer/
-├── compliance-br/
-├── azure-openai/
-├── aws-bedrock/
-├── onprem-llm/
-└── forms-converter/
+├── audit-shipper/                                  ✅ scaffolded (v0.1)
+├── ebs-pack/                                       (planned)
+├── awr-analyzer/                                   (planned)
+├── compliance-br/                                  (planned)
+├── azure-openai/                                   (planned)
+├── aws-bedrock/                                    (planned)
+├── onprem-llm/                                     (planned)
+└── forms-converter/                                (planned)
 
-github.com/veesker/veesker-marketplace              Private — public-facing marketplace
-└── (Svelte site listing add-ons, billing, license-key generation)
+github.com/veesker/veesker-cloud                   Private — SaaS backend + dashboard
+├── server/                                         Bun + Hono REST API + Postgres
+├── web/                                            SvelteKit admin dashboard
+└── infra/                                          docker-compose + deployment
 
-github.com/veesker/veesker-licenses                Private — license issuance + validation
+github.com/veesker/veesker-site                    Public — marketing landing
+├── pages: home, features, pricing, docs, contact
+└── deployed at veesker.dev
+
+github.com/veesker/veesker-marketplace              Private — billing + license issuance
 └── (lambda or small Bun service)
 ```
 
