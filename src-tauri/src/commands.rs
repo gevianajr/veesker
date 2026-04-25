@@ -604,6 +604,15 @@ pub async fn ai_chat(app: AppHandle, payload: Value) -> Result<Value, Connection
 }
 
 #[tauri::command]
+pub async fn ai_suggest_endpoint(
+    app: AppHandle,
+    params: Value,
+) -> Result<Value, ConnectionTestErr> {
+    let res = call_sidecar(&app, "ai.suggest_endpoint", params).await?;
+    Ok(res)
+}
+
+#[tauri::command]
 pub async fn vector_index_create(app: AppHandle, payload: Value) -> Result<Value, ConnectionTestErr> {
     let res = call_sidecar(&app, "vector.create_index", payload).await?;
     Ok(res)

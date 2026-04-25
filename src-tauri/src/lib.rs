@@ -192,6 +192,7 @@ pub fn run() {
             commands::vector_index_create,
             commands::vector_index_drop,
             commands::ai_chat,
+            commands::ai_suggest_endpoint,
             commands::embed_count_pending,
             commands::embed_batch,
             commands::ai_key_save,

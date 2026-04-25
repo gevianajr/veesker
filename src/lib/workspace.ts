@@ -189,6 +189,29 @@ export const ordsClientsCreate = (name: string, description: string, roles: stri
 export const ordsClientsRevoke = (name: string) =>
   call<void>("ords_clients_revoke", { name });
 
+export type AiEndpointSuggestion = {
+  type?: "auto-crud" | "custom-sql" | "procedure";
+  reasoning?: string;
+  sourceObjectName?: string;
+  sourceObjectKind?: "TABLE" | "VIEW" | "PROCEDURE" | "FUNCTION";
+  sourceSql?: string;
+  routePattern?: string;
+  method?: string;
+  moduleName?: string;
+  basePath?: string;
+  authMode?: "none" | "role" | "oauth";
+};
+
+export const aiSuggestEndpoint = (params: {
+  apiKey: string | null;
+  description: string;
+  schemaName: string;
+  availableTables: string[];
+  availableViews: string[];
+  availableProcedures: string[];
+  availableFunctions: string[];
+}) => call<{ suggestion: AiEndpointSuggestion }>("ai_suggest_endpoint", { params });
+
 export const objectsListPlsql = (owner: string, kind: string) =>
   call<ObjectRefWithStatus[]>("objects_list_plsql", { owner, kind });
 
