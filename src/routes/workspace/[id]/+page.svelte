@@ -28,6 +28,7 @@
     vectorTablesInSchema,
     ordsModulesList,
     ordsEnableSchema,
+    ordsModuleExportSql,
     SESSION_LOST,
     type WorkspaceInfo,
     type ObjectKind,
@@ -554,7 +555,15 @@
               onTest={() => { /* Wired in Phase 4 — Test Panel */ }}
               onOpenDocs={() => { /* Wired in Phase 4 — opens Swagger UI */ }}
               onAddEndpoint={() => { /* Wired in Phase 3 — opens API Builder */ }}
-              onExportSql={() => { /* Wired in Task 2.6 */ }}
+              onExportSql={async () => {
+                if (!selected) return;
+                const res = await ordsModuleExportSql(selected.owner, selected.name);
+                if (res.ok) {
+                  sqlEditor.openWithDdl(`Export: ${selected.name}`, res.data.sql);
+                } else {
+                  alert("Export failed: " + res.error.message);
+                }
+              }}
             />
           {:else}
             <ObjectDetails

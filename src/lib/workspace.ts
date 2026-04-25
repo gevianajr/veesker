@@ -147,6 +147,9 @@ export const ordsModuleGet = (owner: string, name: string) =>
 export const ordsEnableSchema = () =>
   call<void>("ords_enable_schema", {});
 
+export const ordsModuleExportSql = (owner: string, name: string) =>
+  call<{ sql: string }>("ords_module_export_sql", { owner, name });
+
 export const objectsListPlsql = (owner: string, kind: string) =>
   call<ObjectRefWithStatus[]>("objects_list_plsql", { owner, kind });
 
