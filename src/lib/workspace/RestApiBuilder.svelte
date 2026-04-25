@@ -3,6 +3,9 @@
     objectsList,
     objectsListPlsql,
     ordsRolesList,
+    aiSuggestEndpoint,
+    aiKeyGet,
+    type AiEndpointSuggestion,
   } from "$lib/workspace";
 
   type EndpointType = "auto-crud" | "custom-sql" | "procedure";
@@ -58,6 +61,59 @@
   let selectedObjectKey = $state(
     initialObject ? `${(initialKind ?? "TABLE").toUpperCase()}:${initialObject.name}` : ""
   );
+
+  let showSheepOverlay = $state(false);
+  let sheepDescription = $state("");
+  let sheepLoading = $state(false);
+  let sheepError = $state<string | null>(null);
+  let sheepSuggestion = $state<AiEndpointSuggestion | null>(null);
+
+  async function requestSuggestion() {
+    if (!sheepDescription.trim()) return;
+    sheepLoading = true;
+    sheepError = null;
+    try {
+      const apiKey = await aiKeyGet("anthropic");
+      const res = await aiSuggestEndpoint({
+        apiKey,
+        description: sheepDescription.trim(),
+        schemaName: owner,
+        availableTables: tablesList.map((t) => t.name),
+        availableViews: viewsList.map((v) => v.name),
+        availableProcedures: proceduresList.map((p) => p.name),
+        availableFunctions: functionsList.map((f) => f.name),
+      });
+      if (res.ok) sheepSuggestion = res.data.suggestion;
+      else sheepError = res.error.message;
+    } catch (e) {
+      sheepError = e instanceof Error ? e.message : String(e);
+    } finally {
+      sheepLoading = false;
+    }
+  }
+
+  function applySuggestion() {
+    if (!sheepSuggestion) return;
+    const s = sheepSuggestion;
+    if (s.type) endpointType = s.type;
+    if (s.sourceObjectName && s.sourceObjectKind) {
+      sourceObject = { owner, name: s.sourceObjectName, kind: s.sourceObjectKind };
+      selectedObjectKey = `${s.sourceObjectKind}:${s.sourceObjectName}`;
+    }
+    if (s.sourceSql) sourceSql = s.sourceSql;
+    if (s.routePattern) routePattern = s.routePattern;
+    if (s.method) method = s.method;
+    if (s.moduleName) moduleName = s.moduleName;
+    if (s.basePath) basePath = s.basePath;
+    if (s.authMode) authMode = s.authMode;
+
+    if (endpointType === "auto-crud" && tablesList.length === 0 && viewsList.length === 0) void loadTablesViews();
+    if (endpointType === "procedure" && proceduresList.length === 0 && functionsList.length === 0) void loadProcsFuncs();
+
+    showSheepOverlay = false;
+    sheepDescription = "";
+    sheepSuggestion = null;
+  }
 
   $effect(() => {
     if (endpointType === "auto-crud" && tablesList.length === 0 && viewsList.length === 0) {
@@ -167,12 +223,51 @@
     <div class="modal-head">
       <span class="title">Criar Endpoint REST</span>
       <div class="head-actions">
-        <button class="sheep-btn" disabled title="Disponível na Task 4.4">✨ Sheep</button>
+        <button class="sheep-btn" onclick={() => showSheepOverlay = true} title="Descrever em linguagem natural">✨ Sheep</button>
         <button class="close-btn" onclick={onCancel} aria-label="Close">✕</button>
       </div>
     </div>
 
     <div class="modal-body">
+      {#if showSheepOverlay}
+        <div class="sheep-overlay">
+          <div class="sheep-card">
+            <div class="sheep-head">
+              <img src="/veesker-sheep.png" class="sheep-icon" alt="" />
+              <span>Descreva o endpoint que você quer:</span>
+              <button class="close-x" onclick={() => showSheepOverlay = false} aria-label="Close">✕</button>
+            </div>
+            <textarea
+              class="sheep-input"
+              bind:value={sheepDescription}
+              rows="3"
+              placeholder="ex: API que lista funcionários ativos do departamento X..."
+            ></textarea>
+            {#if sheepError}<div class="sheep-error">{sheepError}</div>{/if}
+            {#if sheepSuggestion}
+              <div class="sheep-suggestion">
+                <strong>Sugestão:</strong> {sheepSuggestion.reasoning ?? ""}
+                <pre class="suggestion-json">{JSON.stringify(sheepSuggestion, null, 2)}</pre>
+                <div class="sheep-actions">
+                  <button class="btn" onclick={() => { sheepSuggestion = null; }}>Tentar de novo</button>
+                  <button class="btn primary" onclick={applySuggestion}>Aplicar ao form</button>
+                </div>
+              </div>
+            {:else}
+              <div class="sheep-actions">
+                <button class="btn" onclick={() => showSheepOverlay = false}>Cancelar</button>
+                <button
+                  class="btn primary"
+                  onclick={() => void requestSuggestion()}
+                  disabled={sheepLoading || !sheepDescription.trim()}
+                >
+                  {sheepLoading ? "Pensando…" : "Enviar"}
+                </button>
+              </div>
+            {/if}
+          </div>
+        </div>
+      {/if}
       <div class="row">
         <span class="label">Tipo:</span>
         <label class="radio"><input type="radio" bind:group={endpointType} value="auto-crud" /> Auto-CRUD</label>
@@ -338,6 +433,7 @@
   .modal {
     background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
     width: 720px; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column;
+    position: relative;
   }
   .modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
   .title { font-weight: 600; color: var(--text-primary); }
@@ -352,7 +448,7 @@
     cursor: pointer; padding: 4px 8px; font-size: 14px;
   }
   .close-btn:hover { color: var(--text-primary); }
-  .modal-body { padding: 16px; overflow-y: auto; flex: 1; color: var(--text-primary); font-size: 12px; }
+  .modal-body { padding: 16px; overflow-y: auto; flex: 1; color: var(--text-primary); font-size: 12px; position: relative; }
   .section { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .section h3 {
     font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
@@ -403,4 +499,37 @@
   }
   .btn.primary:hover:not(:disabled) { background: rgba(179,62,31,0.35); }
   .btn:disabled { opacity: 0.5; cursor: default; }
+  .sheep-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 60px; z-index: 10;
+  }
+  .sheep-card {
+    background: var(--bg-surface); border: 1px solid rgba(179,62,31,0.5);
+    border-radius: 8px; padding: 16px; width: 90%; max-width: 600px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .sheep-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .sheep-head span { flex: 1; font-weight: 600; color: var(--text-primary); }
+  .sheep-icon { width: 22px; height: 22px; object-fit: contain; }
+  .close-x { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 6px; }
+  .sheep-input {
+    width: 100%; box-sizing: border-box;
+    background: var(--input-bg); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 8px; border-radius: 4px;
+    font-family: "Inter", sans-serif; font-size: 12px; resize: vertical;
+  }
+  .sheep-error {
+    background: rgba(179,62,31,0.15); border: 1px solid rgba(179,62,31,0.3);
+    color: #f5a08a; padding: 6px 8px; border-radius: 4px;
+    font-size: 11px; margin-top: 8px;
+  }
+  .sheep-suggestion { margin-top: 12px; }
+  .sheep-suggestion strong { color: var(--text-primary); }
+  .suggestion-json {
+    background: var(--bg-page); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px; font-family: monospace; font-size: 10.5px;
+    max-height: 200px; overflow: auto; margin: 8px 0;
+  }
+  .sheep-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 </style>

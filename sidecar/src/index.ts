@@ -31,7 +31,7 @@ import {
   procDescribe,
   procExecute,
 } from "./oracle";
-import { aiChat } from "./ai";
+import { aiChat, aiSuggestEndpoint } from "./ai";
 import { chartConfigure, chartReset } from "./chart";
 import { ordsDetect, ordsModulesList, ordsModuleGet, ordsEnableSchema, ordsModuleExportSql, ordsRolesList, ordsGenerateSql, ordsApply, ordsClientsList, ordsClientsCreate, ordsClientsRevoke } from "./ords";
 import {
@@ -81,6 +81,7 @@ const handlers: HandlerMap = {
   "embed.count_pending": (params) => embedCountPending(params as any),
   "embed.batch": (params) => embedBatch(params as any),
   "ai.chat": (params) => aiChat(params as any),
+  "ai.suggest_endpoint": (params) => aiSuggestEndpoint(params as any),
   "explain.plan": (params) => explainPlan(params as any),
   "proc.describe": (params) => procDescribe(params as any),
   "proc.execute": (params) => procExecute(params as any),
