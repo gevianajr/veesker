@@ -69,7 +69,7 @@
 
       <p class="hint">
         This choice is honor-based — Veesker does not technically restrict features by tier. You can change it later in Settings.
-        See <button class="link" onclick={() => void openUrl('https://github.com/geeviana/veesker/blob/main/COMMERCIAL_USE.md')}>COMMERCIAL_USE.md</button> for details.
+        See <button class="link" onclick={() => void openUrl('https://github.com/gevianajr/veesker/blob/main/COMMERCIAL_USE.md')}>COMMERCIAL_USE.md</button> for details.
       </p>
     </div>
 
