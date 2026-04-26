@@ -237,7 +237,7 @@
     color: var(--text-primary); font-size: 11.5px;
     margin: 4px 0;
   }
-  .ext-group code, .about code {
+  .ext-group code {
     font-family: monospace; background: var(--bg-surface-alt);
     padding: 1px 5px; border-radius: 3px; font-size: 11px;
   }

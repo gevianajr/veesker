@@ -25,9 +25,11 @@
     {#if !collapsed}
       <ul class="ce-list">
         {#each errors as err}
-          <li class="ce-row" onclick={() => onGoto(err.line)}>
-            <span class="ce-pos">{err.line}:{err.position}</span>
-            <span class="ce-text">{err.text}</span>
+          <li class="ce-row">
+            <button class="ce-row-btn" onclick={() => onGoto(err.line)}>
+              <span class="ce-pos">{err.line}:{err.position}</span>
+              <span class="ce-text">{err.text}</span>
+            </button>
           </li>
         {/each}
       </ul>
@@ -50,8 +52,14 @@
   .ce-title { font-weight: 500; color: #7a2a14; }
   .ce-toggle { background: none; border: none; cursor: pointer; color: #7a2a14; font-size: 10px; padding: 0; }
   .ce-list { margin: 0; padding: 0 10px 6px 10px; list-style: none; display: flex; flex-direction: column; gap: 2px; }
-  .ce-row { display: flex; gap: 8px; cursor: pointer; padding: 2px 4px; border-radius: 3px; }
-  .ce-row:hover { background: rgba(179, 62, 31, 0.1); }
+  .ce-row { padding: 0; }
+  .ce-row-btn {
+    display: flex; gap: 8px; cursor: pointer;
+    padding: 2px 4px; border-radius: 3px;
+    background: none; border: none; width: 100%;
+    text-align: left; font: inherit; color: inherit;
+  }
+  .ce-row-btn:hover { background: rgba(179, 62, 31, 0.1); }
   .ce-pos { font-family: monospace; color: #7a2a14; min-width: 50px; }
   .ce-text { font-family: monospace; color: #3a1a0e; }
 </style>

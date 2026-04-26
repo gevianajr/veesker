@@ -12,6 +12,7 @@
   let connections = $state<ConnectionMeta[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let deletingId = $state<string | null>(null);
   let query = $state("");
   let authFilter = $state<"all" | "basic" | "wallet">("all");
 
@@ -43,13 +44,19 @@
 
   async function onDelete(e: MouseEvent, c: ConnectionMeta) {
     e.stopPropagation();
+    if (deletingId) return;
     if (!await ask(`Delete "${c.name}"?`, { title: "Delete connection", kind: "warning" })) return;
-    const res = await deleteConnection(c.id);
-    if (!res.ok) {
-      await message(`Delete failed: ${res.error.message}`, { title: "Error", kind: "error" });
-      return;
+    deletingId = c.id;
+    try {
+      const res = await deleteConnection(c.id);
+      if (!res.ok) {
+        await message(`Delete failed: ${res.error.message}`, { title: "Error", kind: "error" });
+        return;
+      }
+      await refresh();
+    } finally {
+      deletingId = null;
     }
-    await refresh();
   }
 
   function connLabel(c: ConnectionMeta): string {
@@ -170,14 +177,17 @@
       <button class="link-btn" onclick={() => { query = ""; authFilter = "all"; }}>Clear filters</button>
     </div>
   {:else}
-    <ul class="list">
+    <ul class="list" role="list">
       {#each filtered as c (c.id)}
+        <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
         <li
           class="card"
+          class:card-deleting={deletingId === c.id}
+          onclick={() => { if (deletingId !== c.id) goto(`/workspace/${c.id}`); }}
+          onkeydown={(e) => { if (e.key === "Enter" && deletingId !== c.id) goto(`/workspace/${c.id}`); }}
+          tabindex={deletingId === c.id ? -1 : 0}
           role="button"
-          tabindex="0"
-          onclick={() => goto(`/workspace/${c.id}`)}
-          onkeydown={(e) => { if (e.key === "Enter") goto(`/workspace/${c.id}`); }}
+          aria-disabled={deletingId === c.id}
         >
           <div class="card-icon" class:wallet={c.authType === "wallet"}>
             {#if c.authType === "wallet"}
@@ -222,11 +232,16 @@
               class="action-btn delete"
               title="Delete"
               aria-label="Delete {c.name}"
+              disabled={deletingId === c.id}
               onclick={(e) => onDelete(e, c)}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M2 3h8M5 3V2h2v1M10 3l-.6 7.5A1 1 0 018.4 11H3.6a1 1 0 01-1-.5L2 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              {#if deletingId === c.id}
+                <span class="action-spinner" aria-label="Deleting"></span>
+              {:else}
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M2 3h8M5 3V2h2v1M10 3l-.6 7.5A1 1 0 018.4 11H3.6a1 1 0 01-1-.5L2 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {/if}
             </button>
             <span class="open-arrow" aria-hidden="true">→</span>
           </div>
@@ -326,6 +341,22 @@
     white-space: nowrap;
   }
   .new-btn:hover { background: #b33e1f; }
+
+  /* ── Deleting state ──────────────────────────────────────── */
+  .card-deleting {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .card-deleting .action-btn { pointer-events: auto; }
+  .action-btn:disabled { opacity: 0.7; cursor: default; }
+  .action-spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 1.5px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+  }
 
   /* ── Filter bar ──────────────────────────────────────────── */
   .filter-bar {

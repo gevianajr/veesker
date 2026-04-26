@@ -405,8 +405,9 @@
   <!-- Settings pane -->
   {#if showSettings}
     <div class="settings-pane">
-      <label class="settings-label">Anthropic API Key</label>
+      <label class="settings-label" for="sheep-api-key">Anthropic API Key</label>
       <input
+        id="sheep-api-key"
         class="settings-input"
         type="password"
         placeholder="sk-ant-… (leave empty to use ANTHROPIC_API_KEY env var)"
