@@ -191,6 +191,7 @@ export type ConnectionSafety = {
   /** Per-statement timeout (ms). 0 / undefined = unlimited. */
   statementTimeoutMs?: number;
   warnUnsafeDml?: boolean;
+  autoPerfAnalysis?: boolean;
 };
 
 export type ConnectionTestParams =
@@ -206,6 +207,7 @@ export type ConnectionTestParams =
       readOnly?: boolean;
       statementTimeoutMs?: number;
       warnUnsafeDml?: boolean;
+      autoPerfAnalysis?: boolean;
     }
   | {
       authType: "wallet";
@@ -218,6 +220,7 @@ export type ConnectionTestParams =
       readOnly?: boolean;
       statementTimeoutMs?: number;
       warnUnsafeDml?: boolean;
+      autoPerfAnalysis?: boolean;
     };
 
 function safetyFromParams(p: ConnectionTestParams): ConnectionSafety {
@@ -226,6 +229,7 @@ function safetyFromParams(p: ConnectionTestParams): ConnectionSafety {
     readOnly: p.readOnly === true,
     statementTimeoutMs: p.statementTimeoutMs,
     warnUnsafeDml: p.warnUnsafeDml === true,
+    autoPerfAnalysis: p.autoPerfAnalysis !== false,
   };
 }
 

@@ -48,6 +48,8 @@ pub struct ConnectionRow {
     pub statement_timeout_ms: Option<u32>,
     /// when true, sidecar warns before UPDATE/DELETE without WHERE
     pub warn_unsafe_dml: bool,
+    /// when true, frontend runs background EXPLAIN PLAN + stats analysis
+    pub auto_perf_analysis: bool,
 }
 
 #[derive(Debug)]
@@ -83,7 +85,9 @@ CREATE TABLE IF NOT EXISTS connections (
     statement_timeout_ms INTEGER
                            CHECK (statement_timeout_ms IS NULL OR statement_timeout_ms >= 0),
     warn_unsafe_dml      INTEGER NOT NULL DEFAULT 0
-                           CHECK (warn_unsafe_dml IN (0, 1))
+                           CHECK (warn_unsafe_dml IN (0, 1)),
+    auto_perf_analysis   INTEGER NOT NULL DEFAULT 1
+                           CHECK (auto_perf_analysis IN (0, 1))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS connections_name_unique
     ON connections (LOWER(name));
@@ -110,13 +114,15 @@ CREATE TABLE connections_new (
     statement_timeout_ms INTEGER
                            CHECK (statement_timeout_ms IS NULL OR statement_timeout_ms >= 0),
     warn_unsafe_dml      INTEGER NOT NULL DEFAULT 0
-                           CHECK (warn_unsafe_dml IN (0, 1))
+                           CHECK (warn_unsafe_dml IN (0, 1)),
+    auto_perf_analysis   INTEGER NOT NULL DEFAULT 1
+                           CHECK (auto_perf_analysis IN (0, 1))
 );
 INSERT INTO connections_new
     (id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at,
-     env, read_only, statement_timeout_ms, warn_unsafe_dml)
+     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis)
     SELECT id, name, 'basic', host, port, service_name, NULL, username, created_at, updated_at,
-           NULL, 0, NULL, 0
+           NULL, 0, NULL, 0, 1
     FROM connections;
 DROP TABLE connections;
 ALTER TABLE connections_new RENAME TO connections;
@@ -152,6 +158,12 @@ fn add_safety_columns_if_missing(conn: &Connection) -> rusqlite::Result<()> {
                CHECK (warn_unsafe_dml IN (0, 1));",
         )?;
     }
+    if !has_column(conn, "connections", "auto_perf_analysis")? {
+        conn.execute_batch(
+            "ALTER TABLE connections ADD COLUMN auto_perf_analysis INTEGER NOT NULL DEFAULT 1 \
+               CHECK (auto_perf_analysis IN (0, 1));",
+        )?;
+    }
     Ok(())
 }
 
@@ -183,8 +195,8 @@ pub fn create(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
     let res = conn.execute(
         "INSERT INTO connections \
          (id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
-          env, read_only, statement_timeout_ms, warn_unsafe_dml) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             row.id,
             row.name,
@@ -200,6 +212,7 @@ pub fn create(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
             row.read_only as i32,
             row.statement_timeout_ms,
             row.warn_unsafe_dml as i32,
+            row.auto_perf_analysis as i32,
         ],
     );
     match res {
@@ -233,12 +246,13 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ConnectionRow> {
         read_only: row.get::<_, i64>(11)? != 0,
         statement_timeout_ms: row.get::<_, Option<i64>>(12)?.map(|n| n as u32),
         warn_unsafe_dml: row.get::<_, i64>(13)? != 0,
+        auto_perf_analysis: row.get::<_, i64>(14)? != 0,
     })
 }
 
 const SELECT_COLS: &str =
     "id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
-     env, read_only, statement_timeout_ms, warn_unsafe_dml";
+     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis";
 
 pub fn list(conn: &Connection) -> Result<Vec<ConnectionRow>, StoreError> {
     let sql = format!("SELECT {SELECT_COLS} FROM connections ORDER BY LOWER(name)");
@@ -261,7 +275,8 @@ pub fn update(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
         "UPDATE connections SET \
          name = ?, auth_type = ?, host = ?, port = ?, service_name = ?, \
          connect_alias = ?, username = ?, updated_at = ?, \
-         env = ?, read_only = ?, statement_timeout_ms = ?, warn_unsafe_dml = ? \
+         env = ?, read_only = ?, statement_timeout_ms = ?, warn_unsafe_dml = ?, \
+         auto_perf_analysis = ? \
          WHERE id = ?",
         params![
             row.name,
@@ -276,6 +291,7 @@ pub fn update(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
             row.read_only as i32,
             row.statement_timeout_ms,
             row.warn_unsafe_dml as i32,
+            row.auto_perf_analysis as i32,
             row.id
         ],
     );
@@ -329,6 +345,7 @@ mod tests {
             read_only: false,
             statement_timeout_ms: None,
             warn_unsafe_dml: false,
+            auto_perf_analysis: true,
         }
     }
 
@@ -488,6 +505,7 @@ mod tests {
             read_only: false,
             statement_timeout_ms: None,
             warn_unsafe_dml: false,
+            auto_perf_analysis: true,
         };
         create(&c, &row).unwrap();
         let got = get(&c, "w1").unwrap().unwrap();
@@ -555,6 +573,34 @@ mod tests {
         assert!(!got.read_only);
         assert_eq!(got.statement_timeout_ms, None);
         assert!(!got.warn_unsafe_dml);
+    }
+
+    #[test]
+    fn migration_adds_auto_perf_analysis_column() {
+        // V3 schema (post-safety-flags) without auto_perf_analysis.
+        let c = Connection::open_in_memory().unwrap();
+        c.execute_batch(
+            "CREATE TABLE connections (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                auth_type TEXT NOT NULL DEFAULT 'basic',
+                host TEXT, port INTEGER, service_name TEXT, connect_alias TEXT,
+                username TEXT NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                env TEXT, read_only INTEGER NOT NULL DEFAULT 0,
+                statement_timeout_ms INTEGER, warn_unsafe_dml INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE UNIQUE INDEX connections_name_unique ON connections (LOWER(name));
+            INSERT INTO connections
+                (id, name, auth_type, host, port, service_name, username, created_at, updated_at)
+                VALUES ('v3-1', 'V3', 'basic', 'h', 1521, 'svc', 'u',
+                        '2026-04-25T00:00:00Z', '2026-04-25T00:00:00Z');"
+        ).unwrap();
+
+        init_db(&c).unwrap();
+
+        let row = get(&c, "v3-1").unwrap().unwrap();
+        assert!(row.auto_perf_analysis, "default should be true");
     }
 
     #[test]

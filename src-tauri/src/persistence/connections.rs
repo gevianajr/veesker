@@ -21,6 +21,8 @@ pub struct ConnectionSafety {
     pub statement_timeout_ms: Option<u32>,
     /// when true, warn before DML without WHERE
     pub warn_unsafe_dml: bool,
+    /// when true, frontend runs background EXPLAIN PLAN + stats analysis
+    pub auto_perf_analysis: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,6 +62,7 @@ impl TryFrom<ConnectionRow> for ConnectionMeta {
             read_only: r.read_only,
             statement_timeout_ms: r.statement_timeout_ms,
             warn_unsafe_dml: r.warn_unsafe_dml,
+            auto_perf_analysis: r.auto_perf_analysis,
         };
         match r.auth_type {
             AuthType::Basic => Ok(ConnectionMeta::Basic {
@@ -103,6 +106,8 @@ pub struct ConnectionFull {
     pub wallet_password_set: Option<bool>,
 }
 
+fn default_true() -> bool { true }
+
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ConnectionSafetyInput {
@@ -110,6 +115,8 @@ pub struct ConnectionSafetyInput {
     pub read_only: bool,
     pub statement_timeout_ms: Option<u32>,
     pub warn_unsafe_dml: bool,
+    #[serde(default = "default_true")]
+    pub auto_perf_analysis: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -512,6 +519,7 @@ impl ConnectionService {
                 read_only: safety.read_only,
                 statement_timeout_ms: safety.statement_timeout_ms,
                 warn_unsafe_dml: safety.warn_unsafe_dml,
+                auto_perf_analysis: safety.auto_perf_analysis,
             }),
             Some(id) => {
                 let existing = {
@@ -538,6 +546,7 @@ impl ConnectionService {
                     read_only: safety.read_only,
                     statement_timeout_ms: safety.statement_timeout_ms,
                     warn_unsafe_dml: safety.warn_unsafe_dml,
+                    auto_perf_analysis: safety.auto_perf_analysis,
                 })
             }
         }
@@ -568,6 +577,7 @@ impl ConnectionService {
                 read_only: safety.read_only,
                 statement_timeout_ms: safety.statement_timeout_ms,
                 warn_unsafe_dml: safety.warn_unsafe_dml,
+                auto_perf_analysis: safety.auto_perf_analysis,
             }),
             Some(id) => {
                 let existing = {
@@ -594,6 +604,7 @@ impl ConnectionService {
                     read_only: safety.read_only,
                     statement_timeout_ms: safety.statement_timeout_ms,
                     warn_unsafe_dml: safety.warn_unsafe_dml,
+                    auto_perf_analysis: safety.auto_perf_analysis,
                 })
             }
         }

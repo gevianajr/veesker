@@ -11,6 +11,8 @@ export type ConnectionSafety = {
   statementTimeoutMs?: number;
   /** when true, warn before UPDATE/DELETE without WHERE */
   warnUnsafeDml: boolean;
+  /** when true, frontend runs background EXPLAIN PLAN + stats analysis */
+  autoPerfAnalysis: boolean;
 };
 
 export const DEFAULT_SAFETY: ConnectionSafety = {
@@ -18,6 +20,7 @@ export const DEFAULT_SAFETY: ConnectionSafety = {
   readOnly: false,
   statementTimeoutMs: undefined,
   warnUnsafeDml: false,
+  autoPerfAnalysis: true,
 };
 
 type SafetyFields = ConnectionSafety;
