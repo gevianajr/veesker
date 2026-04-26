@@ -53,9 +53,9 @@
       pd.labels.length === lastLabelCount &&
       pd.datasets.length === lastDatasetCount
     ) {
-      chart.data.labels = pd.labels;
+      chart.data.labels = [...pd.labels];
       for (let i = 0; i < pd.datasets.length; i++) {
-        chart.data.datasets[i].data = pd.datasets[i].data;
+        chart.data.datasets[i].data = [...pd.datasets[i].data];
       }
       chart.update("none");
       return;
@@ -76,15 +76,22 @@
     const chartType    = isDoughnut ? "doughnut" : "bar";
 
     try {
+      // Chart.js mutates the data arrays to attach internal metadata via
+      // Object.defineProperty. Svelte 5 $state proxies reject property
+      // descriptors that aren't plain {value, writable, enumerable, configurable}.
+      // Clone to plain arrays before handing them to Chart.js.
+      const plainLabels = [...pd.labels];
+      const plainDatasets = pd.datasets.map((ds) => ({ label: ds.label, data: [...ds.data] }));
+
       chart = new ChartClass(c, {
         type: type === "line" ? "line" : chartType,
         data: {
-          labels: pd.labels,
-          datasets: pd.datasets.map((ds, i) => ({
+          labels: plainLabels,
+          datasets: plainDatasets.map((ds, i) => ({
             label: ds.label,
             data: ds.data,
             backgroundColor: isDoughnut
-              ? pd.labels.map((_, j) => PALETTE[j % PALETTE.length])
+              ? plainLabels.map((_, j) => PALETTE[j % PALETTE.length])
               : PALETTE[i % PALETTE.length] + "cc",
             borderColor: PALETTE[i % PALETTE.length],
             borderWidth: 1.5,
