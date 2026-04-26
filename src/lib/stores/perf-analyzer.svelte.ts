@@ -126,6 +126,8 @@ export function createPerfAnalyzer(): PerfAnalyzer {
     const checked = isAnalyzableSql(sql);
     if (checked.kind === "skip") {
       if (checked.reason === "empty") {
+        // Empty SQL is "nothing to analyze", not a skip — surface as idle so the
+        // UI shows no analyzer state rather than a "skipped: empty" badge.
         _state = { kind: "idle" };
       } else {
         _state = { kind: "skipped", reason: checked.reason };
