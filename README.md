@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/veesker-banner.png" width="100%" alt="Veesker — The Oracle 23ai studio for SQL, AI, vectors, and APIs" />
+<img src="static/veesker-sheep.png" width="180" alt="Veesker mascot — cyberpunk sheep" />
 
 # Veesker
 
