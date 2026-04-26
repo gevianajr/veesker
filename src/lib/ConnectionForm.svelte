@@ -65,9 +65,10 @@
     return ms !== undefined && ms > 0 ? String(Math.round(ms / 1000)) : "";
   }));
   let warnUnsafeDml = $state<boolean>(untrack(() => initial.safety?.warnUnsafeDml ?? false));
+  let autoPerfAnalysis = $state<boolean>(untrack(() => initial.safety?.autoPerfAnalysis ?? true));
   let showSafety = $state<boolean>(untrack(() => {
     const s = initial.safety;
-    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml));
+    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml || s.autoPerfAnalysis === false));
   }));
   let walletPick = $state<WalletPick>(
     untrack(() =>
@@ -128,6 +129,7 @@
       readOnly,
       statementTimeoutMs,
       warnUnsafeDml,
+      autoPerfAnalysis,
     };
   }
 
@@ -283,12 +285,13 @@
     onclick={() => (showSafety = !showSafety)}
   >
     {showSafety ? "▼" : "▶"} Safety guards
-    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml}
+    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml || !autoPerfAnalysis}
       <span class="safety-summary">
         {#if env}<span class="badge badge-{env}">{env}</span>{/if}
         {#if readOnly}<span class="badge badge-ro">read-only</span>{/if}
         {#if statementTimeoutSec}<span class="badge">{statementTimeoutSec}s timeout</span>{/if}
         {#if warnUnsafeDml}<span class="badge badge-warn">warn DML</span>{/if}
+        {#if !autoPerfAnalysis}<span class="badge">no auto-perf</span>{/if}
       </span>
     {:else}
       <span class="safety-hint">all off · click to configure</span>
@@ -339,6 +342,15 @@
         <span>
           <strong>Warn on unsafe DML</strong> — show EXPLAIN PLAN + estimated rows before running
           UPDATE/DELETE without a WHERE clause.
+        </span>
+      </label>
+
+      <label class="safety-check">
+        <input type="checkbox" bind:checked={autoPerfAnalysis} />
+        <span>
+          <strong>Auto-perf analysis</strong> — background EXPLAIN PLAN + table stats
+          to surface red flags as you type. When off, the cost badge / red flags / stats
+          freshness disappear, but the "Why slow?" button keeps working on demand.
         </span>
       </label>
     </div>

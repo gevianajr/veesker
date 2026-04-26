@@ -14,6 +14,7 @@ fn merge_safety(mut base: Value, safety: Option<&ConnectionSafety>) -> Value {
             obj.insert("statementTimeoutMs".into(), Value::Number(ms.into()));
         }
         obj.insert("warnUnsafeDml".into(), Value::Bool(s.warn_unsafe_dml));
+        obj.insert("autoPerfAnalysis".into(), Value::Bool(s.auto_perf_analysis));
     }
     base
 }

@@ -27,6 +27,7 @@
       readOnly: meta.readOnly ?? false,
       statementTimeoutMs: meta.statementTimeoutMs,
       warnUnsafeDml: meta.warnUnsafeDml ?? false,
+      autoPerfAnalysis: meta.autoPerfAnalysis ?? true,
     };
     if (meta.authType === "basic") {
       initial = {
