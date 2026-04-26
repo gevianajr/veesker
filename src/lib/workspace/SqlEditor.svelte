@@ -8,6 +8,7 @@
   import { lintGutter, setDiagnostics } from "@codemirror/lint";
   import { showMinimap } from "@replit/codemirror-minimap";
   import type { CompileError } from "$lib/workspace";
+  import { costBadgeGutter, setCostBadgeEffect, type CostBadgeData } from "./CostBadgeGutter";
 
   type Props = {
     value: string;
@@ -21,8 +22,9 @@
     onExplain: (sql: string) => void;
     compileErrors?: CompileError[] | null;
     completionSchema?: Record<string, string[]>;
+    costBadge?: CostBadgeData | null;
   };
-  let { value, onChange, onRunCursor, onRunAll, onSave, onSaveAs, onExplain, compileErrors = null, completionSchema }: Props = $props();
+  let { value, onChange, onRunCursor, onRunAll, onSave, onSaveAs, onExplain, compileErrors = null, completionSchema, costBadge = null }: Props = $props();
 
   let host: HTMLDivElement | undefined = $state();
   let view: EditorView | null = null;
@@ -102,6 +104,7 @@
           sqlLangCompartment.of(sql({ dialect: PLSQL })),
           oneDark,
           lintGutter(),
+          costBadgeGutter(),
           showMinimap.of({
             create: () => ({ dom: document.createElement("div") }),
             displayText: "characters",
@@ -157,6 +160,11 @@
       ),
     });
   });
+
+  $effect(() => {
+    if (!view) return;
+    view.dispatch({ effects: setCostBadgeEffect.of(costBadge ?? null) });
+  });
 </script>
 
 <div bind:this={host} class="editor-host"></div>
@@ -175,4 +183,23 @@
   :global(.editor-host .cm-scroller) {
     overflow: auto;
   }
+  :global(.editor-host .cm-cost-badge-gutter) {
+    width: 38px;
+    min-width: 38px;
+  }
+  :global(.editor-host .cost-badge) {
+    display: inline-block;
+    font-size: 9px;
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    border-radius: 3px;
+    padding: 1px 4px;
+    line-height: 14px;
+    font-weight: 600;
+    cursor: default;
+    white-space: nowrap;
+  }
+  :global(.editor-host .cost-badge.cost-green) { background: rgba(126,201,106,0.15); color: #7ec96a; }
+  :global(.editor-host .cost-badge.cost-yellow) { background: rgba(245,190,80,0.15); color: #f5be50; }
+  :global(.editor-host .cost-badge.cost-red) { background: rgba(231,76,60,0.15); color: #e74c3c; }
+  :global(.editor-host .cost-badge.cost-unknown) { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.28); }
 </style>

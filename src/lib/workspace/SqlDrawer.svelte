@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sqlEditor, COMPILE_REGEX, runExplain, setActiveResult } from "$lib/stores/sql-editor.svelte";
+  import { createPerfAnalyzer } from "$lib/stores/perf-analyzer.svelte";
   import { flowTraceSql } from "$lib/workspace";
   import { visualFlow } from "$lib/stores/visual-flow.svelte";
   import SqlEditor from "./SqlEditor.svelte";
@@ -10,6 +11,8 @@
   import QueryHistory from "./QueryHistory.svelte";
   import CompileErrors from "./CompileErrors.svelte";
   import ExplainPlan from "./ExplainPlan.svelte";
+  import PerfBanner from "./PerfBanner.svelte";
+  import type { CostBadgeData } from "./CostBadgeGutter";
 
   type Props = {
     onCancel: () => void;
@@ -24,6 +27,71 @@
   let tabbarEl: HTMLDivElement | undefined = $state();
   let editorRef: SqlEditor | null = $state(null);
   let flowError = $state<string | null>(null);
+
+  // ── Perf analyzer ────────────────────────────────────────────────────────────
+  const perf = createPerfAnalyzer();
+  let perfEnabled = $state(true);
+
+  $effect(() => {
+    perf.setSessionBusy(!!active?.running);
+  });
+
+  $effect(() => {
+    // Reset when switching tabs; the editor update listener fires onChange
+    // for the new tab's SQL, which re-triggers scheduleAnalysis automatically.
+    sqlEditor.activeId;
+    perf.reset();
+  });
+
+  let costBadge = $derived.by<CostBadgeData | null>(() => {
+    if (perf.state.kind !== "analyzed") return null;
+    return { line: 1, cost: perf.state.plan[0]?.cost ?? null, costClass: perf.state.costClass };
+  });
+
+  function formatWhySlowMessage(): string {
+    if (perf.state.kind !== "analyzed") return "";
+    const { plan, redFlags, staleStats, sql } = perf.state;
+    const lines: string[] = [];
+    lines.push("**Performance Analysis**");
+    lines.push("");
+    const snippet = sql.slice(0, 300);
+    lines.push(`**SQL:**\n\`\`\`sql\n${snippet}${sql.length > 300 ? "\n-- (truncated)" : ""}\n\`\`\``);
+    lines.push("");
+    const root = plan[0];
+    if (root) {
+      lines.push(`**Estimated cost:** ${root.cost?.toLocaleString("en-US") ?? "unknown"}`);
+      if (root.cardinality !== null) lines.push(`**Expected rows:** ${root.cardinality.toLocaleString("en-US")}`);
+      lines.push("");
+    }
+    if (redFlags.length > 0) {
+      lines.push("**Red flags:**");
+      for (const f of redFlags) {
+        lines.push(`- [${f.id}] **${f.severity}**: ${f.message}`);
+        if (f.suggestion) lines.push(`  → ${f.suggestion}`);
+      }
+      lines.push("");
+    }
+    if (staleStats.length > 0) {
+      lines.push("**Stale statistics:**");
+      for (const s of staleStats) {
+        const age = s.ageDays !== null ? `${s.ageDays} days old` : "never analyzed";
+        lines.push(`- ${s.table}: ${age}`);
+      }
+      lines.push("");
+    }
+    lines.push("Why is this query slow? What specific optimizations would you recommend?");
+    return lines.join("\n");
+  }
+
+  function handleWhySlow() {
+    onExplainWithAI(formatWhySlowMessage());
+  }
+
+  function handleTogglePerfEnabled() {
+    perfEnabled = !perfEnabled;
+    perf.setEnabled(perfEnabled);
+    if (perfEnabled && active?.sql) perf.scheduleAnalysis(active.sql);
+  }
 
   // ── Active result ────────────────────────────────────────────────────────────
   const active = $derived(sqlEditor.active);
@@ -348,7 +416,8 @@
                 bind:this={editorRef}
                 value={tab.sql}
                 compileErrors={activeTabResult?.compileErrors ?? null}
-                onChange={(s) => sqlEditor.updateSql(tab.id, s)}
+                {costBadge}
+                onChange={(s) => { sqlEditor.updateSql(tab.id, s); perf.scheduleAnalysis(s); }}
                 onRunCursor={(selection, cursorPos, docText) => {
                   if (selection !== null) {
                     void sqlEditor.runSelection(selection);
@@ -374,6 +443,13 @@
           {#if flowError}
             <div class="flow-error">{flowError}</div>
           {/if}
+
+          <PerfBanner
+            state={perf.state}
+            onWhySlow={handleWhySlow}
+            enabled={perfEnabled}
+            onToggleEnabled={handleTogglePerfEnabled}
+          />
 
           <!-- Middle resize handle -->
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
