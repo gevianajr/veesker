@@ -55,7 +55,7 @@ If you need warranty, SLA, or commercial support, that requires a separate signe
     </td>
     <td align="center">
       <img src="docs/screenshots/sql-editor-ai-explain.png" width="460" alt="AI explain query" /><br/>
-      <sub>Sheep AI — explain queries, suggest fixes, generate SQL</sub>
+      <sub>Veesker AI — explain queries, suggest fixes, generate SQL</sub>
     </td>
   </tr>
   <tr>
@@ -162,9 +162,9 @@ If you need warranty, SLA, or commercial support, that requires a separate signe
 ### Vector search studio
 
 - **Embedding providers** — Ollama (local), OpenAI, Voyage, custom OpenAI-compatible endpoints
-- **HNSW & IVF indexes** — create, drop, parameterize accuracy/distance metric (Cosine, Euclidean, Dot, Manhattan)
+- **HNSW & IVF indexes** — create, drop, parameterize accuracy/distance metric (Cosine, Euclidean, Dot)
 - **Similarity search UI** — text input → embeddings → live similarity results sorted by distance
-- **2D scatter plot** — PCA-projected vector space, color-coded by cluster, click points to see source rows
+- **2D scatter plot** — PCA-projected vector space, color-coded by similarity score, hover to inspect source rows
 - **Embed batch operations** — bulk-embed pending rows in your tables with progress tracking
 
 ### PL/SQL features
@@ -187,7 +187,7 @@ A no-code REST API builder using Oracle ORDS:
 - **Auto-CRUD on tables/views** — 1-click `ORDS.ENABLE_OBJECT` with operation selection (GET/POST/PUT/DELETE/GET-by-id)
 - **Custom SQL endpoints** — write a parameterized SELECT/DML, define route + method, deploy as ORDS handler
 - **Procedure endpoints** — pick any PL/SQL procedure or function, params auto-introspected, JSON serialization via APEX_JSON (handles SYS_REFCURSOR natively)
-- **Sheep AI integration** — describe the endpoint in natural language, AI fills the form
+- **Veesker AI integration** — describe the endpoint in natural language, AI fills the form
 - **OAuth 2.0 client management** — create OAuth clients with `client_credentials` grant, role assignment, revoke; secret shown once for safe-keeping
 - **Inline HTTP test panel** — send GET/POST/PUT/DELETE requests with auto-injected Bearer tokens, JSON pretty-printed response, status code coloring
 - **Module browser** — read existing ORDS modules from `USER_ORDS_*` views, view templates, handlers, and source code
@@ -247,7 +247,7 @@ cd sidecar && bun install && cd ..
 
 # Compile sidecar binary (path differs by OS)
 cd sidecar
-bun build src/index.ts --compile --minify \
+bun build src/index.ts --compile --target=bun-windows-x64 \
   --outfile ../src-tauri/binaries/veesker-sidecar-x86_64-pc-windows-msvc.exe
 cd ..
 
@@ -363,8 +363,8 @@ For security issues, please report privately via [SECURITY.md](SECURITY.md).
 
 <div align="center">
 
-Made with ❤️ in São Paulo, Brazil — by [Geraldo Viana Júnior](https://github.com/geeviana)
+Built by [Geraldo Viana Jr](https://github.com/geeviana) - Brazil
 
-[veesker.cloud](https://veesker.cloud) · [GitHub](https://github.com/gevianajr/veesker) · [Issues](https://github.com/gevianajr/veesker/issues)
+[veesker.cloud](https://veesker.cloud) · [GitHub](https://github.com/gevianajr/veesker) · [Issues](https://github.com/gevianajr/veesker/issues) · [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/geraldovianajr/)
 
 </div>
