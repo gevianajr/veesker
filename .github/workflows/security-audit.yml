@@ -75,7 +75,7 @@ jobs:
           steps.audit_root.outputs.exitcode != '0' ||
           steps.audit_sidecar.outputs.exitcode != '0' ||
           steps.audit_cargo.outputs.exitcode != '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require("fs");
