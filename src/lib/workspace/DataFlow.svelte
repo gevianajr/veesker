@@ -40,8 +40,8 @@
   const hasData = $derived(leftNodes.length > 0 || rightNodes.length > 0 || result.triggers.length > 0);
 
   // SVG bezier paths
-  let wrap: HTMLElement;
-  let centerEl: HTMLElement;
+  let wrap = $state<HTMLElement | null>(null);
+  let centerEl = $state<HTMLElement | null>(null);
   let leftEls = $state<(HTMLElement | null)[]>([]);
   let rightEls = $state<(HTMLElement | null)[]>([]);
   let paths = $state<{ d: string; color: string; side: "left" | "right" }[]>([]);

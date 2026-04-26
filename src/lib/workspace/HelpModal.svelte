@@ -74,6 +74,7 @@
   role="dialog"
   aria-modal="true"
   aria-label="Veesker Documentation"
+  tabindex="-1"
   onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
   <div class="modal">

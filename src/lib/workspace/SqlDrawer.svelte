@@ -138,6 +138,8 @@
 {:else}
   <!-- Top resize handle (hidden when expanded) -->
   {#if !sqlEditor.editorExpanded}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="top-handle"
       role="separator"
@@ -374,6 +376,8 @@
           {/if}
 
           <!-- Middle resize handle -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <div
             class="mid-handle"
             role="separator"

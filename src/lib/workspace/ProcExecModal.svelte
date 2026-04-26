@@ -84,6 +84,7 @@
 </script>
 
 <dialog class="modal" open onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="modal-box"
     role="document"
