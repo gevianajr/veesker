@@ -266,12 +266,12 @@ fn git_commit(
     let tree = repo.find_tree(tree_id)?;
     let sig = git2::Signature::now("Veesker", "local")?;
     let msg = format!("[{reason}] {owner}.{}.{object_name}", object_type.replace(' ', "_"));
-    let commit_id = match repo.head() {
-        Ok(head_ref) => {
-            let parent = head_ref.peel_to_commit()?;
-            repo.commit(Some("HEAD"), &sig, &sig, &msg, &tree, &[&parent])?
-        }
-        Err(_) => repo.commit(Some("HEAD"), &sig, &sig, &msg, &tree, &[])?
+    let commit_id = if repo.is_empty()? {
+        repo.commit(Some("HEAD"), &sig, &sig, &msg, &tree, &[])?
+    } else {
+        let head_ref = repo.head()?;
+        let parent = head_ref.peel_to_commit()?;
+        repo.commit(Some("HEAD"), &sig, &sig, &msg, &tree, &[&parent])?
     };
     Ok(commit_id.to_string())
 }
@@ -404,7 +404,9 @@ pub fn get_remote(data_dir: &Path, connection_id: &str) -> Result<Option<String>
     }
 }
 
-/// Push main to origin using the stored PAT. Returns number of commits pushed.
+/// Push main to origin using the stored PAT.
+/// Returns an approximate count of new commits pushed (local_count − remote_count_before).
+/// If the pre-push remote fetch fails, returns 0 rather than an inflated count.
 pub fn push(data_dir: &Path, connection_id: &str) -> Result<u32, VersionError> {
     let root = repo_path(data_dir, connection_id);
     let repo = git2::Repository::open(&root)
@@ -422,7 +424,7 @@ pub fn push(data_dir: &Path, connection_id: &str) -> Result<u32, VersionError> {
     };
 
     let remote_count_before: u32 = count_remote_commits(&repo, "origin", &pat)
-        .unwrap_or(0);
+        .unwrap_or(u32::MAX);
 
     let mut remote = repo.find_remote("origin")?;
     let mut push_opts = git2::PushOptions::new();
