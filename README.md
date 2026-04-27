@@ -341,6 +341,19 @@ Veesker is released under the [Apache License 2.0](LICENSE).
 
 ---
 
+## Trademark policy
+
+**"Veesker"** (the name) and the **Veesker sheep mascot** (the logo) are trademarks of Geraldo Ferreira Viana Júnior. They are **not** covered by the Apache 2.0 license.
+
+Forks and derivative works:
+- **Must** be renamed — they may not use "Veesker" as the product name or in marketing materials.
+- **Must not** use the Veesker sheep mascot in any form.
+- **Must** preserve the `NOTICE` file as required by the Apache License, Version 2.0 (§ 4d).
+
+Permission to use the Veesker name or mascot in any commercial or promotional context requires a separate written agreement. Contact: [geefatec@gmail.com](mailto:geefatec@gmail.com)
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). All contributors must agree to the Apache 2.0 license terms. We use Conventional Commits and require tests for non-trivial changes.
