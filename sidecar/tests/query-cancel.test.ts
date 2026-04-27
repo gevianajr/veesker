@@ -145,3 +145,35 @@ describe("queryExecute — backward compat (no requestId)", () => {
     expect(_getRunning()).toBeNull();
   });
 });
+
+describe("integration: cancel can run concurrently with a long execute", () => {
+  test("queryCancel resolves before queryExecute completes (no deadlock)", async () => {
+    // Why: this test would deadlock if queryExecute and queryCancel were
+    // serialized through the same lock. The sidecar-side dispatch is
+    // fire-and-forget by design, and the Tauri host now releases the
+    // SidecarState Mutex before awaiting sidecar.call(). This test guards
+    // against regressing the sidecar-side property.
+    const deferred = makeDeferred();
+    const conn = fakeConn(
+      () => deferred.promise,
+      async () => {}
+    );
+    setSession(conn, "SCOTT");
+
+    const executePromise = queryExecute({ sql: "SELECT 1 FROM DUAL", requestId: "long-running" });
+
+    // Cancel must resolve immediately even though execute is awaited and unresolved.
+    const cancelStarted = Date.now();
+    const cancelResult = await queryCancel({ requestId: "long-running" });
+    const cancelElapsed = Date.now() - cancelStarted;
+
+    expect(cancelResult).toEqual({ cancelled: true, requestId: "long-running" });
+    // Should be near-instant; cap at 500ms to catch any future regression that
+    // makes cancel block on the running query.
+    expect(cancelElapsed).toBeLessThan(500);
+
+    // Now drive the execute to completion via the cancel-style rejection.
+    deferred.reject(new Error("ORA-01013: user requested cancel of current operation"));
+    await executePromise.catch(() => {});
+  });
+});

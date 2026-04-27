@@ -27,6 +27,10 @@ export type PerfStatsResult = {
 
 export type TableRef = { owner: string | null; name: string };
 
+// Two patterns: `FROM/JOIN <table>` and the comma-list shape `FROM a, b, c`.
+// Kept separate because a single regex would either need to know prior context
+// (the comma form only kicks in *after* an initial FROM) or accept much more
+// noise. The Set in extractTableNames deduplicates.
 const FROM_PATTERN =
   /\b(?:FROM|JOIN)\s+(?:([a-zA-Z_]\w*)\s*\.\s*)?([a-zA-Z_]\w*)/gi;
 

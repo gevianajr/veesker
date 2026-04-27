@@ -37,14 +37,25 @@ impl std::fmt::Display for WalletError {
 
 const REQUIRED_FILES: &[&str] = &["tnsnames.ora", "cwallet.sso"];
 
+/// Cap on a single file extracted from a wallet zip. tnsnames.ora is normally a
+/// few KB; even very large enterprise wallets stay well under 1 MB. This bounds
+/// memory exposure if a malicious zip claims a huge uncompressed size.
+const MAX_WALLET_FILE_BYTES: u64 = 1 * 1024 * 1024;
+
 pub fn read_tnsnames_from_zip(zip_path: &Path) -> Result<String, WalletError> {
     let file = fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
-    let mut entry = archive
+    let entry = archive
         .by_name("tnsnames.ora")
         .map_err(|_| WalletError::MissingFile("tnsnames.ora"))?;
+    if entry.size() > MAX_WALLET_FILE_BYTES {
+        return Err(WalletError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "tnsnames.ora exceeds 1 MB cap",
+        )));
+    }
     let mut s = String::new();
-    entry.read_to_string(&mut s)?;
+    entry.take(MAX_WALLET_FILE_BYTES).read_to_string(&mut s)?;
     Ok(s)
 }
 
@@ -71,7 +82,7 @@ pub fn extract_to(zip_path: &Path, dest_dir: &Path) -> Result<(), WalletError> {
         .unwrap_or_else(|_| dest_dir.to_path_buf());
 
     for i in 0..archive.len() {
-        let mut entry = archive.by_index(i)?;
+        let entry = archive.by_index(i)?;
         let name = entry.name().to_string();
 
         // Reject empty names, traversal, absolute paths, drive letters, and
@@ -116,8 +127,12 @@ pub fn extract_to(zip_path: &Path, dest_dir: &Path) -> Result<(), WalletError> {
         // OpenOptions::create_new() refuses to overwrite, but we already wiped the dir
         // at line 61 so the only race is a concurrent attacker — File::create truncates
         // and won't follow symlinks on Windows by default. Sufficient.
+        // Cap each file at 1 MB to bound memory/disk on a hostile wallet.
+        if entry.size() > MAX_WALLET_FILE_BYTES {
+            continue;
+        }
         let mut out = fs::File::create(&out_path)?;
-        std::io::copy(&mut entry, &mut out)?;
+        std::io::copy(&mut entry.take(MAX_WALLET_FILE_BYTES), &mut out)?;
     }
     Ok(())
 }

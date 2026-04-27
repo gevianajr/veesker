@@ -47,6 +47,16 @@
     view.focus();
   }
 
+  // Editor keyboard shortcuts (all preventDefault to override the webview's
+  // default handler for the same combo):
+  //   Mod-Enter        run statement at cursor / selection
+  //   Mod-Shift-Enter  run all statements
+  //   F5               run all statements (alias)
+  //   Mod-S            save file
+  //   Mod-Shift-S      save as
+  //   F6               explain plan for cursor / selection
+  // None of these collide with the global menu (F1=Help, Mod-N=New Connection)
+  // because the editor only handles them when focused and uses Prec.highest.
   onMount(() => {
     if (!host) return;
     view = new EditorView({

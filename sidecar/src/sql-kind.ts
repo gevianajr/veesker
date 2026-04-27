@@ -77,6 +77,17 @@ export function isReadOnlySafe(kind: SqlKind, sql?: string): boolean {
  * meaningful WHERE clause. Conservative: anything we can't parse cleanly is
  * NOT flagged as unsafe (we don't want to block legitimate work).
  *
+ * Known edge cases (not flagged — false negatives, by design):
+ *   - Oracle q'[...]' / q'{...}' raw string literals containing the substring
+ *     "WHERE". The strip below only handles single/double quoted strings;
+ *     a literal like q'[no where here]' will be treated as text, but the
+ *     substring "where" inside it could fool the WHERE search. In practice
+ *     this is rare in DELETE/UPDATE bodies — and the warning is only a
+ *     heuristic, not a hard guard.
+ *   - MERGE INTO ... is never flagged (its safety depends on the ON clause,
+ *     which is harder to validate cheaply).
+ *   - DML wrapped in PL/SQL blocks is filtered out earlier by classifySql().
+ *
  * Examples flagged:
  *   DELETE FROM employees
  *   UPDATE employees SET salary = 0
