@@ -1322,6 +1322,7 @@ pub async fn object_version_list(
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiffResult {
     pub diff: String,
 }
@@ -1403,6 +1404,7 @@ pub async fn object_version_push(
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetRemoteResult {
     pub url: Option<String>,
 }
