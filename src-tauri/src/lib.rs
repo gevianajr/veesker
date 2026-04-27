@@ -281,6 +281,14 @@ pub fn run() {
             commands::ords_clients_create,
             commands::ords_clients_revoke,
             commands::perf_stats,
+            commands::object_version_capture,
+            commands::object_version_list,
+            commands::object_version_diff,
+            commands::object_version_load,
+            commands::object_version_label,
+            commands::object_version_set_remote,
+            commands::object_version_push,
+            commands::object_version_get_remote,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
