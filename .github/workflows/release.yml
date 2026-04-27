@@ -54,10 +54,20 @@ jobs:
             sidecar-cmd: build:mac-x64
             rust-targets: x86_64-apple-darwin
             tauri-args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            sidecar-cmd: build:linux-x64
+            rust-targets: ''
+            tauri-args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux system deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - uses: oven-sh/setup-bun@v2
 
