@@ -1,0 +1,48 @@
+Veesker
+Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+
+This product was originally created and is maintained by
+Geraldo Ferreira Viana Júnior (https://github.com/gevianajr).
+
+Original project: https://github.com/gevianajr/veesker
+Author website:   https://veesker.cloud
+
+Veesker was designed starting in 2022 and first released
+publicly in 2026.
+
+----------------------------------------------------------------
+TRADEMARK NOTICE
+----------------------------------------------------------------
+
+"Veesker" (the name) and the Veesker sheep mascot (the logo)
+are trademarks of Geraldo Ferreira Viana Júnior. They are NOT
+licensed under Apache 2.0.
+
+Forks and derivative works:
+  - MUST be renamed; they may not use "Veesker" as the
+    product name or in marketing materials.
+  - MUST NOT use the Veesker sheep mascot in any form.
+  - MUST preserve this NOTICE file as required by the Apache
+    License, Version 2.0 (Section 4d).
+
+Permission to use the Veesker name or mascot in any commercial
+or promotional context requires a separate written agreement.
+Contact: geefatec@gmail.com
+
+----------------------------------------------------------------
+LICENSE
+----------------------------------------------------------------
+
+This software is licensed under the Apache License, Version 2.0
+(the "License"); you may not use this software except in
+compliance with the License. You may obtain a copy of the
+License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. See the License for the specific
+language governing permissions and limitations under the
+License.
