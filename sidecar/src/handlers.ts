@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 import { makeError, makeResult, type JsonRpcRequest, type JsonRpcResponse } from "./rpc";
 
 export type Handler = (params: any) => Promise<unknown>;

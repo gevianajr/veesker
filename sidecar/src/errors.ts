@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 // Custom JSON-RPC error codes for veesker workspace flow.
 // Picked to avoid the JSON-RPC 2.0 reserved range (-32768 .. -32000)
 // and our existing transport codes (-32000, -32001, -32002, -32003, -32700, -32601).

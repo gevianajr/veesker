@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 import type oracledb from "oracledb";
 import type { ConnectionSafety, OpenSessionParams } from "./oracle";
 import { RpcCodedError, NO_ACTIVE_SESSION } from "./errors";

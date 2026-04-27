@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 // src/lib/stores/sql-editor.svelte.ts
 import { queryExecute, queryExecuteMulti, queryCancel, type QueryResult } from "$lib/sql-query";
 import { splitSql } from "$lib/sql-splitter";

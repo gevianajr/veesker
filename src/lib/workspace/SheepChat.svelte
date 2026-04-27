@@ -1,3 +1,9 @@
+<!--
+  Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+  Licensed under the Apache License, Version 2.0
+  https://github.com/gevianajr/veesker
+-->
+
 <script lang="ts">
   import { aiChat, aiKeySave, aiKeyGet, type AiMessage, type AiContext, chartConfigureRpc, chartResetRpc, type ChartConfig, type PreviewData } from "$lib/workspace";
   import { dashboard } from "$lib/stores/dashboard.svelte";

@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 export const PROGRESS_KEY = 'veesker_help_progress';
 
 export function loadProgress(): Set<string> {

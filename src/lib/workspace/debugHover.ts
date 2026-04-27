@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 import { hoverTooltip } from "@codemirror/view";
 import { debugStore } from "$lib/stores/debug.svelte";
 import { debugGetValuesRpc } from "$lib/workspace";

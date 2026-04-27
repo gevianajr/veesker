@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 pub fn parse_aliases(content: &str) -> Vec<String> {
     let mut out = Vec::new();
     for raw in content.lines() {

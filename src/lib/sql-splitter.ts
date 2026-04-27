@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 // NOTE: This file is a deliberate copy of sidecar/src/sql-splitter.ts.
 // It is pure TypeScript with no Node/Bun dependencies, so it can run in the browser.
 // If the sidecar splitter changes, this file must be updated to match.

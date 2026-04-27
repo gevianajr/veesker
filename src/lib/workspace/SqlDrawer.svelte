@@ -1,3 +1,9 @@
+<!--
+  Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+  Licensed under the Apache License, Version 2.0
+  https://github.com/gevianajr/veesker
+-->
+
 <script lang="ts">
   import { sqlEditor, COMPILE_REGEX, runExplain, setActiveResult } from "$lib/stores/sql-editor.svelte";
   import { createPerfAnalyzer } from "$lib/stores/perf-analyzer.svelte";

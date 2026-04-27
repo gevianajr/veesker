@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 /**
  * Populates KB_ARTICLES.EMBEDDING using Ollama nomic-embed-text.
  * Usage: bun run src/scripts/populate_vectors.ts

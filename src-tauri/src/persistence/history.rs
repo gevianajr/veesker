@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 use chrono::Utc;
 use rusqlite::{params, Connection as SqliteConnection};
 use serde::{Deserialize, Serialize};

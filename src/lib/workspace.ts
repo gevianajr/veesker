@@ -1,3 +1,7 @@
+// Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+// Licensed under the Apache License, Version 2.0
+// https://github.com/gevianajr/veesker
+
 import { invoke } from "@tauri-apps/api/core";
 import type { TableStats, TableIndex } from "$lib/perf/perf-rules";
 

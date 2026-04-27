@@ -1,3 +1,9 @@
+<!--
+  Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+  Licensed under the Apache License, Version 2.0
+  https://github.com/gevianajr/veesker
+-->
+
 <script lang="ts">
   import type { TableDetails, TableRelated, ObjectKind, Loadable, DataFlowResult, VectorIndex, VectorSearchResult, EmbedConfig, EmbedProvider } from "$lib/workspace";
   import { tableCountRows, vectorIndexList, vectorSearch, vectorIndexCreate, vectorIndexDrop, embedCountPending, embedBatch, aiKeyGet, aiKeySave } from "$lib/workspace";

@@ -1,3 +1,9 @@
+<!--
+  Copyright 2022-2026 Geraldo Ferreira Viana Júnior
+  Licensed under the Apache License, Version 2.0
+  https://github.com/gevianajr/veesker
+-->
+
 <script lang="ts">
   import type { SqlTab, TabResult } from "$lib/stores/sql-editor.svelte";
   import { sqlEditor } from "$lib/stores/sql-editor.svelte";
