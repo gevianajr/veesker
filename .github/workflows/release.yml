@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 on:
   push:
@@ -58,7 +58,7 @@ jobs:
           - platform: ubuntu-22.04
             sidecar-cmd: build:linux-x64
             rust-targets: ''
-            tauri-args: ''
+            tauri-args: '--bundles deb,rpm'
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: ${{ matrix.timeout || 90 }}
