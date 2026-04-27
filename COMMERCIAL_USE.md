@@ -1,4 +1,4 @@
-# Commercial Use & Licensing
+﻿# Commercial Use & Licensing
 
 > **Status: aspirational framework.** Veesker is in early access. Until commercial subscriptions launch, the packaged app is free for all uses including commercial. This document describes the framework that will activate when billing goes live.
 
@@ -73,13 +73,13 @@ This model funds open-source development without compromising the open-source na
 
 ## How to subscribe (when billing goes live)
 
-Subscriptions are not yet active. When billing launches, plans will be available at [veesker.cloud/pricing](https://veesker.cloud/pricing) or via **geefatec@gmail.com** for an invoice/PO process.
+Subscriptions are not yet active. When billing launches, plans will be available at [veesker.cloud/pricing](https://veesker.cloud/pricing) or via **geraldovianajr@veesker.cloud** for an invoice/PO process.
 
 For early access, trial periods, custom on-prem deployments, white-label arrangements, or volume pricing, please reach out directly.
 
 ## Questions?
 
-If you're unsure whether your use requires a subscription, **contact geefatec@gmail.com**. We will give you a clear answer in writing — no traps.
+If you're unsure whether your use requires a subscription, **contact geraldovianajr@veesker.cloud**. We will give you a clear answer in writing — no traps.
 
 ## Effective date
 

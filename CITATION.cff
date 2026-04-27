@@ -1,4 +1,4 @@
-cff-version: 1.2.0
+﻿cff-version: 1.2.0
 message: "If you use Veesker in research, teaching, or commercial work, please cite it as below."
 type: software
 title: "Veesker — The Oracle 23ai studio"
@@ -6,7 +6,7 @@ abstract: "Open-source desktop IDE for Oracle 23ai. Combines a multi-statement S
 authors:
   - family-names: "Viana Júnior"
     given-names: "Geraldo Ferreira"
-    email: "geefatec@gmail.com"
+    email: "geraldovianajr@veesker.cloud"
     affiliation: "Independent"
     orcid: ""
 repository-code: "https://github.com/gevianajr/veesker"

@@ -1,10 +1,10 @@
-# Security Policy
+﻿# Security Policy
 
 ## Reporting Vulnerabilities
 
 If you discover a security issue, **do not open a public issue**.
 
-Email: **geefatec@gmail.com**
+Email: **geraldovianajr@veesker.cloud**
 
 Include:
 - Description of the issue

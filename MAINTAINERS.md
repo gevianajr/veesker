@@ -1,4 +1,4 @@
-# Veesker Maintainers
+﻿# Veesker Maintainers
 
 This document lists the active maintainers of Veesker. The original creator and architect is listed in [AUTHORS](AUTHORS). Maintainers are responsible for reviewing pull requests, triaging issues, and shipping releases.
 
@@ -8,8 +8,8 @@ This document lists the active maintainers of Veesker. The original creator and 
 
 - Original creator of Veesker (designed 2022, shipped 2026)
 - Final authority on architecture, product direction, releases, and trademark licensing
-- Reachable at [geraldo@veesker.cloud](mailto:geraldo@veesker.cloud) for project matters
-- Reachable at [geefatec@gmail.com](mailto:geefatec@gmail.com) for commercial / legal matters
+- Reachable at [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud) for project matters
+- Reachable at [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud) for commercial / legal matters
 
 ## Becoming a maintainer
 

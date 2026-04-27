@@ -1,8 +1,8 @@
-[package]
+﻿[package]
 name = "veesker"
 version = "0.2.4"
 description = "Oracle IDE for 9i through 26ai — SQL, AI, vectors, and APIs"
-authors = ["Geraldo Ferreira Viana Júnior <geefatec@gmail.com>"]
+authors = ["Geraldo Ferreira Viana Júnior <geraldovianajr@veesker.cloud>"]
 homepage = "https://veesker.cloud"
 repository = "https://github.com/gevianajr/veesker"
 license = "Apache-2.0"

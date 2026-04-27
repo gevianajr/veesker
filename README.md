@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="static/veesker-sheep.png" width="180" alt="Veesker mascot — cyberpunk sheep" />
 
@@ -141,7 +141,7 @@ I started designing Veesker in 2022 — sketching the architecture, the feature 
 - **GitHub:** [@gevianajr](https://github.com/gevianajr)
 - **LinkedIn:** [Geraldo Viana Jr](https://www.linkedin.com/in/geraldovianajr/)
 - **Website:** [veesker.cloud](https://veesker.cloud)
-- **Email:** [geraldo@veesker.cloud](mailto:geraldo@veesker.cloud)
+- **Email:** [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud)
 
 For commercial inquiries, partnerships, or trademark permission, reach out via email.
 
@@ -348,7 +348,7 @@ Veesker is fully open source under [Apache 2.0](LICENSE). The code is free forev
 
 For larger organizations that eventually want commercial-grade support and the right to use Veesker for revenue-generating work, paid plans are coming. **Until billing is active, Veesker is free for all uses**, including commercial.
 
-If your organization wants to be among the first commercial customers when subscriptions launch, or you need early support arrangements, contact me directly: [geefatec@gmail.com](mailto:geefatec@gmail.com).
+If your organization wants to be among the first commercial customers when subscriptions launch, or you need early support arrangements, contact me directly: [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud).
 
 **No telemetry. No license server. No kill-switch.** When commercial plans launch, compliance will be honor-based + EULA — same model as Docker Desktop.
 
@@ -381,7 +381,7 @@ Forks and derivative works:
 - **Must not** use the Veesker sheep mascot in any form.
 - **Must** preserve the `NOTICE` file as required by the Apache License, Version 2.0 (§ 4d).
 
-Permission to use the Veesker name or mascot in any commercial or promotional context requires a separate written agreement. Contact: [geefatec@gmail.com](mailto:geefatec@gmail.com)
+Permission to use the Veesker name or mascot in any commercial or promotional context requires a separate written agreement. Contact: [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud)
 
 ---
 

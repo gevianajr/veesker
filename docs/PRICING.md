@@ -1,4 +1,4 @@
-# Pricing
+﻿# Pricing
 
 The Veesker source code is fully open under Apache 2.0 — for everyone, forever, with no feature gating.
 
@@ -38,7 +38,7 @@ SSO, indemnification, dedicated support, on-prem options.
 
 ## Want early access to commercial support?
 
-If your organization wants to support development now or be among the first commercial customers, [reach out](mailto:geefatec@gmail.com).
+If your organization wants to support development now or be among the first commercial customers, [reach out](mailto:geraldovianajr@veesker.cloud).
 
 We are particularly interested in hearing from:
 
@@ -59,7 +59,7 @@ Niche-deep paid plugins for specific use cases will be available à la carte onc
 - **On-prem LLM gateway** — Llama / Mistral via Ollama
 - **Audit Log Shipper** — Splunk / Datadog / S3 destinations
 
-Contact [geefatec@gmail.com](mailto:geefatec@gmail.com) to express interest in any add-on.
+Contact [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud) to express interest in any add-on.
 
 ---
 
@@ -75,7 +75,7 @@ No. The app keeps working regardless. Compliance, when commercial plans launch, 
 When Veesker Cloud launches, the Enterprise tier will support self-hosted deployment. Business will use the managed cloud only.
 
 **Are open-source maintainers eligible for free Pro?**
-Yes. If you maintain a public OSS project (≥6 months active, ≥50 stars or equivalent), you will qualify for a free Pro license once subscriptions launch. [Apply here](mailto:geefatec@gmail.com?subject=OSS%20license).
+Yes. If you maintain a public OSS project (≥6 months active, ≥50 stars or equivalent), you will qualify for a free Pro license once subscriptions launch. [Apply here](mailto:geraldovianajr@veesker.cloud?subject=OSS%20license).
 
 **Government / education discount?**
 Discounted Business and Enterprise tiers are planned for public sector, federal/state universities, and registered NGOs.
@@ -90,4 +90,4 @@ No. Veesker has no kill-switch, no degraded experience, no telemetry-driven enfo
 
 ## Contact
 
-**Sales / billing / custom arrangements:** [geefatec@gmail.com](mailto:geefatec@gmail.com)
+**Sales / billing / custom arrangements:** [geraldovianajr@veesker.cloud](mailto:geraldovianajr@veesker.cloud)

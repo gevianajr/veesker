@@ -1,4 +1,4 @@
-# Veesker Enterprise — Strategy & Architecture
+﻿# Veesker Enterprise — Strategy & Architecture
 
 This document is the public reference for Veesker's enterprise roadmap. The implementation lives in a separate private repository; the open-source IDE (this repo) does not gate any feature, per the [Docker-style commercial use policy](../COMMERCIAL_USE.md).
 
@@ -278,6 +278,6 @@ If the project pivots, fails, or is acquired:
 
 ## Contact
 
-- Sales / partnership / OEM: geefatec@gmail.com
-- Add-on marketplace inquiry: geefatec@gmail.com
-- Volume / government / regulated: geefatec@gmail.com
+- Sales / partnership / OEM: geraldovianajr@veesker.cloud
+- Add-on marketplace inquiry: geraldovianajr@veesker.cloud
+- Volume / government / regulated: geraldovianajr@veesker.cloud

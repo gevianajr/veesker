@@ -1,10 +1,10 @@
-# Terms of Use
+﻿# Terms of Use
 
 **Effective date:** 2026-04-25
 
 ## 1. About Veesker
 
-Veesker is open-source software distributed under the [Apache License 2.0](LICENSE). The maintainer is Geraldo F. Viana Júnior (geefatec@gmail.com).
+Veesker is open-source software distributed under the [Apache License 2.0](LICENSE). The maintainer is Geraldo F. Viana Júnior (geraldovianajr@veesker.cloud).
 
 By downloading, installing, building, modifying, or running Veesker, you agree to these terms in addition to the Apache License 2.0.
 
@@ -98,7 +98,7 @@ The maintainer may update these Terms at any time. Material changes will be refl
 
 ## 14. Contact
 
-Geraldo F. Viana Júnior — **geefatec@gmail.com**
+Geraldo F. Viana Júnior — **geraldovianajr@veesker.cloud**
 
 ---
 
