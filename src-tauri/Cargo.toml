@@ -1,7 +1,7 @@
 [package]
 name = "veesker"
 version = "0.2.3"
-description = "The studio for Oracle 23ai vector search"
+description = "Oracle IDE for 9i through 26ai — SQL, AI, vectors, and APIs"
 authors = ["Geraldo Ferreira Viana Júnior <geefatec@gmail.com>"]
 homepage = "https://veesker.cloud"
 repository = "https://github.com/gevianajr/veesker"

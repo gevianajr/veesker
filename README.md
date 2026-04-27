@@ -4,11 +4,11 @@
 
 # Veesker
 
-**The Oracle 23ai studio built for SQL, AI, vectors, and APIs.**
+**The Oracle studio for SQL, AI, vectors, and APIs. Works with Oracle 9i through 26ai.**
 
-A native desktop IDE for Oracle 23ai that combines a multi-statement SQL editor, an AI assistant with live database access, a vector search studio, a PL/SQL debugger, and a no-code REST API builder — all in one app, no Oracle client required.
+A native desktop IDE that combines a multi-statement SQL editor, an AI assistant with live database access, a vector search studio, a PL/SQL debugger, and a no-code REST API builder — all in one app, no Oracle client required. Supports every Oracle version from 9i to 26ai, including full 23ai vector search.
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-E85D3C.svg)](LICENSE) [![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)](https://tauri.app) [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev) [![Oracle 23ai](https://img.shields.io/badge/Oracle-23ai-F80000?logo=oracle&logoColor=white)](https://oracle.com) [![Open Source](https://img.shields.io/badge/open%20source-Apache%202.0-E85D3C.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-E85D3C.svg)](LICENSE) [![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)](https://tauri.app) [![Svelte 5](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev) [![Oracle 9i–26ai](https://img.shields.io/badge/Oracle-9i%E2%80%9326ai-F80000?logo=oracle&logoColor=white)](https://oracle.com) [![Open Source](https://img.shields.io/badge/open%20source-Apache%202.0-E85D3C.svg)](LICENSE)
 
 [veesker.cloud](https://veesker.cloud) · [Install](#install) · [Features](#features) · [Build from source](#build-from-source) · [License & disclaimer](#license--disclaimer)
 
@@ -111,7 +111,7 @@ If you need warranty, SLA, or commercial support, that requires a separate signe
 **What it isn't:**
 - Not a generic multi-database client — DBeaver handles that better
 - Not cloud or SaaS — credentials, query history, and database content stay on your machine
-- Not a replacement for SQL Developer on Oracle 11g/12c — Veesker targets 23ai and its vector-native + ORDS capabilities specifically
+- Works with Oracle 9i through 26ai — legacy databases are fully supported via Thick mode auto-discovery (no manual Instant Client setup)
 - Not a production-grade tool with warranty — see [terms & disclaimers](#license--disclaimer)
 
 ---
