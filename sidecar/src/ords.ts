@@ -1,4 +1,4 @@
-import oracledb from "oracledb";
+﻿import oracledb from "oracledb";
 import { getActiveSession } from "./state";
 
 export type OrdsDetectResult = {
@@ -352,7 +352,7 @@ function sqlString(s: string): string {
   if (s === null || s === undefined) return "''";
   // Escape single quotes by doubling. Reject control characters and embedded NULs
   // that would break the SQL parser or produce surprising behavior.
-  if (/[ --]/.test(s)) {
+  if (/[\x00-\x1f\x7f]/.test(s)) {
     throw { code: -32602, message: "ORDS string contains illegal control characters" };
   }
   return `'${s.replace(/'/g, "''")}'`;
