@@ -190,6 +190,12 @@ impl Sidecar {
         })
     }
 
+    /// JSON-RPC call with no Tauri-side timeout. Long-running queries (which were
+    /// previously capped by a 120s host-side timeout, masking otherwise-successful
+    /// results) now run as long as the sidecar takes. Cancellation is handled by:
+    ///   - `query.cancel` RPC (matches by requestId, sends OCI break())
+    ///   - `statementTimeoutMs` on the Oracle session (server-side timeout)
+    ///   - sidecar process death (Terminated event clears pending senders → -32002)
     pub async fn call(&self, method: &str, params: Value) -> Result<Value, RpcError> {
         let id = Uuid::new_v4().to_string();
         let req = Request {
@@ -216,18 +222,11 @@ impl Sidecar {
             });
         }
 
-        let resp = tokio::time::timeout(std::time::Duration::from_secs(120), rx)
-            .await
-            .map_err(|_| RpcError {
-                code: -32002,
-                message: "sidecar RPC timed out after 120s".into(),
-                data: None,
-            })?
-            .map_err(|_| RpcError {
-                code: -32002,
-                message: "sidecar dropped response channel".into(),
-                data: None,
-            })?;
+        let resp = rx.await.map_err(|_| RpcError {
+            code: -32002,
+            message: "sidecar dropped response channel (process likely terminated)".into(),
+            data: None,
+        })?;
 
         if let Some(err) = resp.error {
             return Err(err);
@@ -236,33 +235,40 @@ impl Sidecar {
     }
 }
 
-pub struct SidecarState(pub Mutex<Option<Sidecar>>);
+/// Holds an `Arc<Sidecar>` once spawned. The Mutex is only contended during the
+/// brief lazy-init window — after that, callers clone the Arc out of the lock
+/// in microseconds and use it without any cross-call serialization.
+///
+/// This is the fix for the bug where holding the Mutex across `sidecar.call()`
+/// .await serialized every Tauri RPC behind any in-progress query — including
+/// `query.cancel`, which made cancel buttons completely non-functional during
+/// long queries.
+pub struct SidecarState(pub Mutex<Option<Arc<Sidecar>>>);
 
-pub async fn ensure(app: &AppHandle) -> Result<(), String> {
+/// Acquire (or lazily spawn) the sidecar and return a cloned Arc. The Mutex is
+/// dropped before the Arc is returned, so every caller can hold/use the Arc
+/// concurrently.
+pub async fn acquire(app: &AppHandle) -> Result<Arc<Sidecar>, String> {
     let state = app.state::<SidecarState>();
     let mut guard = state.0.lock().await;
     if guard.is_none() {
-        *guard = Some(Sidecar::spawn(app)?);
+        *guard = Some(Arc::new(Sidecar::spawn(app)?));
     }
-    Ok(())
+    Ok(guard.as_ref().expect("just inserted").clone())
 }
 
 /// Public helper so tray and other non-command modules can call the sidecar.
+/// Now uses the cheap-Arc-clone path, so it doesn't serialize against
+/// in-flight long-running queries.
 pub async fn call_raw(
     app: &AppHandle,
     method: &str,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, RpcError> {
-    ensure(app).await.map_err(|msg| RpcError {
+    let sc = acquire(app).await.map_err(|msg| RpcError {
         code: -32003,
         message: msg,
         data: None,
     })?;
-    let state = app.state::<SidecarState>();
-    let guard = state.0.lock().await;
-    guard
-        .as_ref()
-        .expect("sidecar ensured")
-        .call(method, params)
-        .await
+    sc.call(method, params).await
 }

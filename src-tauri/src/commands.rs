@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri::Manager;
 
-use crate::sidecar::{SidecarState, ensure};
+use crate::sidecar::acquire;
 use crate::tray::{self, ActiveConnection, TrayState};
 
 #[derive(Debug, Deserialize)]
@@ -80,16 +80,10 @@ pub async fn connection_test(
     app: AppHandle,
     config: ConnectionConfig,
 ) -> Result<ConnectionTestOk, ConnectionTestErr> {
-    if let Err(err) = ensure(&app).await {
-        return Err(ConnectionTestErr {
-            code: -32003,
-            message: err,
-        });
-    }
-
-    let state = app.state::<SidecarState>();
-    let guard = state.0.lock().await;
-    let sidecar = guard.as_ref().expect("sidecar ensured");
+    let sidecar = acquire(&app).await.map_err(|err| ConnectionTestErr {
+        code: -32003,
+        message: err,
+    })?;
 
     let params = config_to_params(config);
     let result = sidecar
@@ -252,15 +246,13 @@ async fn call_sidecar(
     method: &str,
     params: Value,
 ) -> Result<Value, ConnectionTestErr> {
-    if let Err(err) = ensure(app).await {
-        return Err(ConnectionTestErr {
-            code: -32003,
-            message: err,
-        });
-    }
-    let state = app.state::<SidecarState>();
-    let guard = state.0.lock().await;
-    let sidecar = guard.as_ref().expect("sidecar ensured");
+    // acquire() returns an Arc<Sidecar> after a brief lock. The lock is dropped
+    // before we await the call, so concurrent RPCs (e.g. query.cancel arriving
+    // while query.execute is in flight) don't serialize through us.
+    let sidecar = acquire(app).await.map_err(|err| ConnectionTestErr {
+        code: -32003,
+        message: err,
+    })?;
     sidecar
         .call(method, params)
         .await
