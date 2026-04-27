@@ -103,6 +103,8 @@
   }
 
   $effect(() => {
+    // Read reactive values synchronously so Svelte tracks them as dependencies.
+    // drawPaths() is async — Svelte only tracks reads that happen synchronously.
     void leftNodes; void rightNodes; void objectName;
     void drawPaths();
   });
