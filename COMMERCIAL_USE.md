@@ -1,5 +1,7 @@
 # Commercial Use & Licensing
 
+> **Status: aspirational framework.** Veesker is in early access. Until commercial subscriptions launch, the packaged app is free for all uses including commercial. This document describes the framework that will activate when billing goes live.
+
 Veesker is licensed under the [Apache License 2.0](LICENSE), which permits free commercial use of the source code. **However**, the maintainer offers Veesker as a packaged desktop application under a separate commercial use policy described below.
 
 This is the same model used by Docker Desktop and similar tools — the source code is fully open, but using the **packaged desktop application** in larger organizations requires a paid subscription.
@@ -69,11 +71,11 @@ Higher tiers (Business, Enterprise) include access to **Veesker Cloud** (when la
 
 This model funds open-source development without compromising the open-source nature of the project.
 
-## How to subscribe
+## How to subscribe (when billing goes live)
 
-Visit [veesker.cloud/pricing](https://veesker.cloud/pricing) (when available) or contact **geefatec@gmail.com** for an invoice/PO process.
+Subscriptions are not yet active. When billing launches, plans will be available at [veesker.cloud/pricing](https://veesker.cloud/pricing) or via **geefatec@gmail.com** for an invoice/PO process.
 
-For trial periods, custom on-prem deployments, white-label arrangements, or volume pricing, please reach out directly.
+For early access, trial periods, custom on-prem deployments, white-label arrangements, or volume pricing, please reach out directly.
 
 ## Questions?
 
@@ -81,4 +83,4 @@ If you're unsure whether your use requires a subscription, **contact geefatec@gm
 
 ## Effective date
 
-This commercial-use policy is effective from **2026-04-25**. The policy may be updated; the version in effect is the one published at the time you started or renewed your subscription. Existing subscriptions are not subject to retroactive changes.
+This commercial-use policy is effective from **2026-04-25**. The policy may be updated; the version in effect is the one published at the time you start or renew your subscription. Subscriptions, when available, will not be subject to retroactive policy changes.
