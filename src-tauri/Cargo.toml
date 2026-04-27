@@ -4,7 +4,7 @@ version = "0.2.4"
 description = "Oracle IDE for 9i through 26ai — SQL, AI, vectors, and APIs"
 authors = ["Geraldo Ferreira Viana Júnior <geraldovianajr@veesker.cloud>"]
 homepage = "https://veesker.cloud"
-repository = "https://github.com/gevianajr/veesker"
+repository = "https://github.com/veesker-cloud/veesker"
 license = "Apache-2.0"
 edition = "2024"
 

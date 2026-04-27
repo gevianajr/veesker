@@ -1,4 +1,4 @@
-# Contributing to Veesker
+﻿# Contributing to Veesker
 
 Issues, bug reports, and pull requests are welcome. This document covers how to set up the development environment, the code conventions to follow, and the process for submitting a PR.
 
@@ -20,7 +20,7 @@ Read [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing.
 ### Setup
 
 ```bash
-git clone https://github.com/gevianajr/veesker.git
+git clone https://github.com/veesker-cloud/veesker.git
 cd veesker
 
 # Install frontend dependencies

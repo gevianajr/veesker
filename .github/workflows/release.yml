@@ -128,7 +128,7 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/gevianajr/veesker-site.git" site
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/veesker-cloud/veesker-site.git" site
           cd site
           sed -i "s/const RELEASE = \"[0-9.]*\"/const RELEASE = \"${VERSION}\"/" src/routes/download/+page.svelte
           git config user.email "geraldovianajr@veesker.cloud"

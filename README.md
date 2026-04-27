@@ -254,13 +254,13 @@ A no-code REST API builder using Oracle ORDS:
 
 ### Windows
 
-Download the latest installer from the [Releases page](https://github.com/gevianajr/veesker/releases) and run `Veesker_<version>_x64-setup.exe`.
+Download the latest installer from the [Releases page](https://github.com/veesker-cloud/veesker/releases) and run `Veesker_<version>_x64-setup.exe`.
 
 > The installer is currently unsigned. Windows SmartScreen will show "Windows protected your PC" — click **More info** → **Run anyway**. Code signing via Azure Trusted Signing is in progress.
 
 ### macOS
 
-Download the `.dmg` from the [Releases page](https://github.com/gevianajr/veesker/releases) and drag Veesker into Applications.
+Download the `.dmg` from the [Releases page](https://github.com/veesker-cloud/veesker/releases) and drag Veesker into Applications.
 
 > Apple Silicon and Intel are both supported. The app is ad-hoc signed; on first launch you may need to **Right-click → Open** to bypass Gatekeeper.
 
@@ -278,7 +278,7 @@ See [CLAUDE.md](CLAUDE.md) for the full development setup. Quick version:
 # Prerequisites: Bun ≥ 1.1, Rust stable, MSVC (Win) or Xcode CLT (macOS)
 
 # Clone & install
-git clone https://github.com/gevianajr/veesker.git
+git clone https://github.com/veesker-cloud/veesker.git
 cd veesker
 bun install
 cd sidecar && bun install && cd ..
@@ -409,6 +409,6 @@ For security issues, please report privately via [SECURITY.md](SECURITY.md).
 
 Designed in 2022 · Shipped in 2026 · Made in São Paulo, Brazil.
 
-[veesker.cloud](https://veesker.cloud) · [GitHub](https://github.com/gevianajr/veesker) · [LinkedIn](https://www.linkedin.com/in/geraldovianajr/) · [Issues](https://github.com/gevianajr/veesker/issues)
+[veesker.cloud](https://veesker.cloud) · [GitHub](https://github.com/veesker-cloud/veesker) · [LinkedIn](https://www.linkedin.com/in/geraldovianajr/) · [Issues](https://github.com/veesker-cloud/veesker/issues)
 
 </div>
