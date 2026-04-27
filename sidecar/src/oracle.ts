@@ -6,6 +6,7 @@ import oracledb from "oracledb";
 import { readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import { embedText, type EmbedParams } from "./embedding";
+import { log } from "./logger";
 
 /** Validate and quote an Oracle identifier for use in double-quoted SQL interpolation. */
 export function quoteIdent(name: string): string {
@@ -368,7 +369,7 @@ export async function openSession(p: OpenSessionParams): Promise<OpenSessionResu
           conn.callTimeout = safety.statementTimeoutMs;
         } catch (e) {
           // Non-fatal: log but proceed. Old oracledb versions may not have callTimeout.
-          console.error("[oracle] failed to apply callTimeout", e);
+          log.error(`[oracle] failed to apply callTimeout: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
 
@@ -702,7 +703,7 @@ async function drainDbmsOutput(conn: oracledb.Connection): Promise<string[] | nu
     }
     return lines;
   } catch (e) {
-    console.error("[drainDbmsOutput]", e);
+    log.error(`[drainDbmsOutput]: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 }
@@ -1658,7 +1659,7 @@ export async function embedBatch(p: {
         );
         embedded++;
       } catch (err) {
-        console.error(`[embedBatch] row ${rowid} failed:`, err);
+        log.error(`[embedBatch] row ${rowid} failed: ${err instanceof Error ? err.message : String(err)}`);
         errors++;
       }
     }

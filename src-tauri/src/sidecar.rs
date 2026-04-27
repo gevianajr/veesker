@@ -108,6 +108,16 @@ impl Sidecar {
             cmd = cmd.env("VEESKER_ORACLEDB_BINARY_DIR", dir);
         }
 
+        // Where the sidecar writes its rotating log file. We point it at
+        // <app_data>/logs/sidecar.log so users can attach the file when
+        // reporting bugs without us having to surface a separate UI.
+        if let Ok(data_dir) = app.path().app_data_dir() {
+            let log_dir = data_dir.join("logs");
+            if std::fs::create_dir_all(&log_dir).is_ok() {
+                cmd = cmd.env("VEESKER_LOG_DIR", log_dir.to_string_lossy().into_owned());
+            }
+        }
+
         let (mut rx, child) = cmd
             .spawn()
             .map_err(|e| format!("failed to spawn sidecar: {e}"))?;

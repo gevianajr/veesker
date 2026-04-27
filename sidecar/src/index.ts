@@ -4,6 +4,7 @@
 
 import { parseRequest, makeError } from "./rpc";
 import { dispatch, type HandlerMap } from "./handlers";
+import { log } from "./logger";
 import { embedText, type EmbedParams } from "./embedding";
 import {
   tryEnableThickMode,
@@ -161,7 +162,7 @@ async function main() {
 main()
   .then(() => gracefulExit(0))
   .catch((err) => {
-    console.error("sidecar fatal:", err);
+    log.error(`sidecar fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
     gracefulExit(1);
   });
 
