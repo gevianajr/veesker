@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "veesker-sidecar",
   "version": "0.0.1",
   "private": true,
@@ -26,7 +26,7 @@
     "build": "bun run build:mac-x64"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "oracledb": "^6.6.0"
   },
   "devDependencies": {
