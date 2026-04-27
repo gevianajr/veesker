@@ -117,3 +117,18 @@ jobs:
               release_id: ${{ needs.create-release.outputs.release_id }},
               draft: false,
             })
+
+      - name: Update download page version
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DEPLOY_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/gevianajr/veesker-site.git" site
+          cd site
+          sed -i "s/const RELEASE = \"[0-9.]*\"/const RELEASE = \"${VERSION}\"/" src/routes/download/+page.svelte
+          git config user.email "geefatec@gmail.com"
+          git config user.name "gevianajr"
+          git add src/routes/download/+page.svelte
+          git diff --cached --quiet || git commit -m "chore(download): bump version to ${VERSION}"
+          git push
