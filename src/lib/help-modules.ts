@@ -53,6 +53,16 @@ export const MODULES: HelpModule[] = [
         ],
       },
       {
+        heading: 'System Tray & Auto-Updates',
+        body: 'Veesker lives in the system tray (Windows taskbar / macOS menu bar). Right-click the tray icon to open or switch connections directly from the tray, without opening the main window. Left-click to bring the main window to focus. Closing the main window minimizes Veesker to the tray — use Quit from the tray menu or Veesker → Quit to exit completely. When an update is available, a notification toast appears at the bottom-right of the screen — click "Update now" to download and install in the background, then "Restart now" when ready.',
+        tip: 'The tray menu lists all your saved connections. Active connections show a Disconnect option; idle connections show an Open arrow.',
+      },
+      {
+        heading: 'License & Commercial Use',
+        body: 'On first launch, Veesker asks whether your usage is personal or commercial. Personal use (open-source projects, education, teams under 50 people, organisations under $5M annual revenue) is free. Larger commercial organisations require a paid subscription. This system is entirely honor-based — Veesker does not contact a license server or gate any features by tier. To review or change your declaration at any time, open Veesker → Plugins & License….',
+        tip: 'All features are available in every tier. The license declaration is voluntary — there is no technical enforcement.',
+      },
+      {
         heading: 'Security Notice',
         body: 'Veesker is pre-release software and has not undergone a formal security audit. The Sheep AI features (SheepChat and Analyze) send schema names, column names, SQL queries, and result samples to api.anthropic.com. Do not use AI features with sensitive, classified, or regulated data. All other features (SQL execution, schema browsing, debugging) are fully local.',
         tip: 'The AI features are completely optional — Veesker works without an Anthropic API key.',
@@ -91,20 +101,17 @@ export const MODULES: HelpModule[] = [
       },
       {
         heading: 'Right-click Context Menu',
-        body: 'Right-clicking any object in the Schema Tree reveals context actions. For any object: View DDL. For procedures and functions: Execute (opens parameter input modal) and Open in Test Window (opens the PL/SQL debugger). For any object: Show Data Flow.',
-        demo: `<div style="background:var(--bg-surface);border:1px solid var(--border-strong);border-radius:6px;padding:4px;width:240px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
-  <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;color:var(--text-secondary);cursor:pointer">
-    <span>📋</span> View DDL
-  </div>
+        body: 'Right-clicking any object in the Schema Tree reveals context actions. For all objects: Open in Test Window (loads the object into the PL/SQL debugger). For procedures and functions only: Execute… (opens a parameter input modal to run it immediately). For tables and views: Export as REST API… (opens the REST API builder). For procedures and functions: Export as REST endpoint….',
+        demo: `<div style="background:var(--bg-surface);border:1px solid var(--border-strong);border-radius:6px;padding:4px;width:260px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
   <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;background:rgba(179,62,31,0.15);color:var(--text-primary);cursor:pointer">
-    <span>▶</span> Execute Procedure / Function
+    <span>🐛</span> Open in Test Window
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;color:var(--text-secondary);cursor:pointer">
+    <span>▶</span> Execute…
   </div>
   <div style="height:1px;background:var(--border);margin:3px 4px"></div>
   <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;color:var(--text-secondary);cursor:pointer">
-    <span>🐛</span> Open in Test Window (Debug)
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;color:var(--text-secondary);cursor:pointer">
-    <span>🕸️</span> Show Data Flow
+    <span>🔗</span> Export as REST API…
   </div>
 </div>`,
       },
@@ -130,10 +137,11 @@ export const MODULES: HelpModule[] = [
       },
       {
         heading: 'Tabs and Running SQL',
-        body: 'The SQL Editor supports multiple tabs — click the + button in the tab bar to open a new tab. Each tab has its own SQL content, result, and history. To run a single statement, place the cursor anywhere inside it and press Ctrl+Enter. To run all statements in the editor, press Ctrl+Shift+Enter.',
+        body: 'The SQL Editor supports multiple tabs — click the + button in the tab bar to open a new tab. Each tab has its own SQL content, result, and history. To run a single statement, place the cursor anywhere inside it and press Ctrl+Enter. To run all statements in the editor, press Ctrl+Shift+Enter or F5.',
         shortcuts: [
           { keys: ['Ctrl', 'Enter'], description: 'Run statement at cursor (or selected text)' },
           { keys: ['Ctrl', 'Shift', 'Enter'], description: 'Run all statements' },
+          { keys: ['F5'], description: 'Run all statements (alternative)' },
           { keys: ['Ctrl', 'W'], description: 'Close active tab' },
         ],
       },
@@ -188,7 +196,7 @@ export const MODULES: HelpModule[] = [
       },
       {
         heading: 'Procedures and Functions',
-        body: 'When you select a procedure or function, the inspector shows its parameter list (name, direction IN/OUT/IN OUT, and data type) and its full DDL source. To execute it with values, right-click it in the Schema Tree and choose Execute, or click the Run button that appears in the inspector header.',
+        body: 'When you select a procedure or function, the inspector shows its parameter list (name, direction IN/OUT/IN OUT, and data type) and its full DDL source. To execute it with values, right-click it in the Schema Tree and choose Execute…, or click the Run button that appears in the inspector header.',
       },
     ],
   },
@@ -326,6 +334,11 @@ export const MODULES: HelpModule[] = [
         body: 'The Locals panel lists all variables in scope at the currently paused line, along with their current values. Values update each time you step. For a quick look, hover over any variable name in the source editor — a tooltip shows its current value without needing to scan the Locals panel.',
         tip: 'Complex types (cursors, records, collections) appear as structured values in the Locals panel. Primitive types show their scalar value directly.',
       },
+      {
+        heading: 'Visual Flow Panel',
+        body: 'After a debug run completes, the Visual Flow Panel slides in from the right side of the screen. It shows the full execution timeline — every line executed, in order, with the object name, line number, and elapsed time for each step. Use the playback controls (first / previous / next / last / play-pause) to scrub through the execution history. The variables view shows the values of in-scope variables at each selected step.',
+        tip: 'Visual Flow is most useful for tracing the path through complex packages or nested calls — you can see exactly which branches were taken and at what timestamps.',
+      },
     ],
   },
   {
@@ -382,6 +395,7 @@ export const MODULES: HelpModule[] = [
   <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
     <tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px"><kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-primary)">Ctrl+Enter</kbd></td><td style="padding:4px 8px;color:var(--text-secondary)">Run statement at cursor</td></tr>
     <tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px"><kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-primary)">Ctrl+Shift+Enter</kbd></td><td style="padding:4px 8px;color:var(--text-secondary)">Run all statements</td></tr>
+    <tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px"><kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-primary)">F5</kbd></td><td style="padding:4px 8px;color:var(--text-secondary)">Run all statements (alternative)</td></tr>
     <tr><td style="padding:4px 8px"><kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-primary)">F6</kbd></td><td style="padding:4px 8px;color:var(--text-secondary)">Generate EXPLAIN PLAN</td></tr>
   </table>
   <div style="color:#b33e1f;font-weight:700;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;font-family:'Space Grotesk',sans-serif">PL/SQL Debugger</div>
