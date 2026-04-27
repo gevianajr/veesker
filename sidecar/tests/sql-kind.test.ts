@@ -46,6 +46,10 @@ describe("classifySql", () => {
     expect(classifySql("COMMIT")).toBe("tcl");
     expect(classifySql("ROLLBACK")).toBe("tcl");
   });
+  test("SET TRANSACTION classifies as tcl", () => {
+    expect(classifySql("SET TRANSACTION READ ONLY")).toBe("tcl");
+    expect(classifySql("set  transaction  isolation level serializable")).toBe("tcl");
+  });
 });
 
 describe("isReadOnlySafe", () => {
@@ -57,6 +61,14 @@ describe("isReadOnlySafe", () => {
     expect(isReadOnlySafe("session")).toBe(false);
     expect(isReadOnlySafe("tcl")).toBe(false);
     expect(isReadOnlySafe("unknown")).toBe(false);
+  });
+  test("EXPLAIN PLAN is rejected even though kind is select", () => {
+    expect(isReadOnlySafe("select", "EXPLAIN PLAN FOR SELECT * FROM emp")).toBe(false);
+    expect(isReadOnlySafe("select", "  -- comment\n EXPLAIN PLAN FOR SELECT 1 FROM dual")).toBe(false);
+  });
+  test("plain SELECT/WITH still allowed in read-only", () => {
+    expect(isReadOnlySafe("select", "SELECT * FROM dual")).toBe(true);
+    expect(isReadOnlySafe("select", "WITH x AS (SELECT 1 FROM dual) SELECT * FROM x")).toBe(true);
   });
 });
 

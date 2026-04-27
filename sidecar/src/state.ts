@@ -18,6 +18,7 @@ export function clearSession(): void {
   currentSession = null;
   currentSchema = null;
   _sessionSafety = {};
+  _sessionParams = null;
 }
 
 export function getActiveSession(): oracledb.Connection {

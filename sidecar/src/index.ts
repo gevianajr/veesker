@@ -159,11 +159,29 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(0))
+  .then(() => gracefulExit(0))
   .catch((err) => {
     console.error("sidecar fatal:", err);
-    process.exit(1);
+    gracefulExit(1);
   });
 
-process.on("SIGTERM", () => process.exit(0));
-process.on("SIGINT",  () => process.exit(0));
+let _exiting = false;
+async function gracefulExit(code: number): Promise<never> {
+  if (_exiting) process.exit(code);
+  _exiting = true;
+  // Best-effort: close the active Oracle session so it doesn't linger
+  // server-side until the idle timeout. Bounded to 2s so a hung close
+  // doesn't keep the sidecar alive.
+  try {
+    await Promise.race([
+      closeSession(),
+      new Promise((res) => setTimeout(res, 2000)),
+    ]);
+  } catch {
+    // closeSession is already best-effort internally.
+  }
+  process.exit(code);
+}
+
+process.on("SIGTERM", () => { void gracefulExit(0); });
+process.on("SIGINT",  () => { void gracefulExit(0); });

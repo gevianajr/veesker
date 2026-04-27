@@ -54,16 +54,22 @@ export function classifySql(sql: string): SqlKind {
   if (s.startsWith("INSERT") || s.startsWith("UPDATE") || s.startsWith("DELETE") || s.startsWith("MERGE") || s.startsWith("UPSERT")) {
     return "dml";
   }
-  if (s.startsWith("COMMIT") || s.startsWith("ROLLBACK") || s.startsWith("SAVEPOINT") || s.startsWith("SET\\s+TRANSACTION")) {
+  if (s.startsWith("COMMIT") || s.startsWith("ROLLBACK") || s.startsWith("SAVEPOINT") || /^SET\s+TRANSACTION\b/.test(s)) {
     return "tcl";
   }
   return "unknown";
 }
 
 /** Read-only sessions allow these kinds. Session-altering statements are
- * deliberately blocked because they can change the user's privileges. */
-export function isReadOnlySafe(kind: SqlKind): boolean {
-  return kind === "select";
+ * deliberately blocked because they can change the user's privileges.
+ * EXPLAIN PLAN is excluded because it INSERTs into PLAN_TABLE — strict
+ * read-only sessions should prefer queryExecute('EXPLAIN PLAN...') only via
+ * the dedicated explainPlan handler, which uses a managed STATEMENT_ID. */
+export function isReadOnlySafe(kind: SqlKind, sql?: string): boolean {
+  if (kind !== "select") return false;
+  // Reject EXPLAIN PLAN — it requires INSERT on PLAN_TABLE.
+  if (sql && /^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*EXPLAIN\s+PLAN\b/i.test(sql)) return false;
+  return true;
 }
 
 /**

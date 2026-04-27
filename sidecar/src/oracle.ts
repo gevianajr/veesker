@@ -365,7 +365,7 @@ export async function openSession(p: OpenSessionParams): Promise<OpenSessionResu
       // We only set if > 0, so existing sessions are unaffected.
       if (typeof safety.statementTimeoutMs === "number" && safety.statementTimeoutMs > 0) {
         try {
-          (conn as any).callTimeout = safety.statementTimeoutMs;
+          conn.callTimeout = safety.statementTimeoutMs;
         } catch (e) {
           // Non-fatal: log but proceed. Old oracledb versions may not have callTimeout.
           console.error("[oracle] failed to apply callTimeout", e);
@@ -756,7 +756,7 @@ function enforceSafetyForStatement(sql: string, opts: { acknowledgeUnsafe?: bool
   const safety = getSessionSafety();
   const kind = classifySql(sql);
 
-  if (safety.readOnly === true && !isReadOnlySafe(kind)) {
+  if (safety.readOnly === true && !isReadOnlySafe(kind, sql)) {
     throw new RpcCodedError(
       READ_ONLY_BLOCKED,
       `This connection is read-only — ${kind.toUpperCase()} statements are blocked. ` +
@@ -885,7 +885,7 @@ export async function queryCancel(p: { requestId: string }): Promise<QueryCancel
   // Interrupt the in-flight call on the shared connection.
   const conn = getActiveSession();
   try {
-    await (conn as any).break();
+    await conn.break();
   } catch {
     // break() may fail if the query already completed; that's fine.
   }
