@@ -110,7 +110,9 @@ pub struct ConnectionFull {
     pub wallet_password_set: Option<bool>,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -153,12 +155,12 @@ pub enum ConnectionInput {
 }
 
 fn validate_env(env: &Option<String>) -> Result<(), ConnectionError> {
-    if let Some(e) = env {
-        if !matches!(e.as_str(), "dev" | "staging" | "prod") {
-            return Err(ConnectionError::invalid(
-                "env must be 'dev', 'staging', or 'prod'",
-            ));
-        }
+    if let Some(e) = env
+        && !matches!(e.as_str(), "dev" | "staging" | "prod")
+    {
+        return Err(ConnectionError::invalid(
+            "env must be 'dev', 'staging', or 'prod'",
+        ));
     }
     Ok(())
 }
@@ -318,9 +320,11 @@ impl ConnectionService {
 
         let password = match secrets::get_password(&row_id) {
             Ok(p) => p,
-            Err(e) if secrets::is_missing(&e) => return Err(ConnectionError::invalid(
-                "user password missing from keychain — edit the connection and re-enter the password",
-            )),
+            Err(e) if secrets::is_missing(&e) => {
+                return Err(ConnectionError::invalid(
+                    "user password missing from keychain — edit the connection and re-enter the password",
+                ));
+            }
             Err(e) => return Err(e.into()),
         };
 
@@ -349,9 +353,11 @@ impl ConnectionService {
             } => {
                 let wallet_password = match secrets::get_wallet_password(&row_id) {
                     Ok(p) => p,
-                    Err(e) if secrets::is_missing(&e) => return Err(ConnectionError::invalid(
-                        "wallet password missing from keychain — edit the connection and re-enter the wallet password",
-                    )),
+                    Err(e) if secrets::is_missing(&e) => {
+                        return Err(ConnectionError::invalid(
+                            "wallet password missing from keychain — edit the connection and re-enter the wallet password",
+                        ));
+                    }
                     Err(e) => return Err(e.into()),
                 };
                 let _ = auth;
@@ -636,17 +642,17 @@ impl ConnectionService {
         if let Err(e) = secrets::delete_password(id) {
             eprintln!("[connections] keychain delete failed for {id}: {e}");
         }
-        if let Some(r) = row {
-            if r.auth_type == AuthType::Wallet {
-                if let Err(e) = secrets::delete_wallet_password(id) {
-                    eprintln!("[connections] wallet keychain delete failed for {id}: {e}");
-                }
-                let dir = self.wallet_dir(id);
-                if dir.exists() {
-                    if let Err(e) = std::fs::remove_dir_all(&dir) {
-                        eprintln!("[connections] wallet dir delete failed for {dir:?}: {e}");
-                    }
-                }
+        if let Some(r) = row
+            && r.auth_type == AuthType::Wallet
+        {
+            if let Err(e) = secrets::delete_wallet_password(id) {
+                eprintln!("[connections] wallet keychain delete failed for {id}: {e}");
+            }
+            let dir = self.wallet_dir(id);
+            if dir.exists()
+                && let Err(e) = std::fs::remove_dir_all(&dir)
+            {
+                eprintln!("[connections] wallet dir delete failed for {dir:?}: {e}");
             }
         }
         Ok(())

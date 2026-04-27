@@ -3,7 +3,7 @@
 // https://github.com/gevianajr/veesker
 
 use chrono::Utc;
-use rusqlite::{params, Connection as SqliteConnection};
+use rusqlite::{Connection as SqliteConnection, params};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]

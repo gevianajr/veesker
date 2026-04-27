@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // https://github.com/gevianajr/veesker
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 use super::connections::ConnectionSafety;
@@ -80,7 +80,13 @@ pub fn wallet_params_with_safety(
     safety: &ConnectionSafety,
 ) -> Value {
     merge_safety(
-        wallet_params(wallet_dir, wallet_password, connect_alias, username, password),
+        wallet_params(
+            wallet_dir,
+            wallet_password,
+            connect_alias,
+            username,
+            password,
+        ),
         Some(safety),
     )
 }

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // https://github.com/gevianajr/veesker
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -254,8 +254,7 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ConnectionRow> {
     })
 }
 
-const SELECT_COLS: &str =
-    "id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
+const SELECT_COLS: &str = "id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
      env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis";
 
 pub fn list(conn: &Connection) -> Result<Vec<ConnectionRow>, StoreError> {
@@ -598,8 +597,9 @@ mod tests {
             INSERT INTO connections
                 (id, name, auth_type, host, port, service_name, username, created_at, updated_at)
                 VALUES ('v3-1', 'V3', 'basic', 'h', 1521, 'svc', 'u',
-                        '2026-04-25T00:00:00Z', '2026-04-25T00:00:00Z');"
-        ).unwrap();
+                        '2026-04-25T00:00:00Z', '2026-04-25T00:00:00Z');",
+        )
+        .unwrap();
 
         init_db(&c).unwrap();
 

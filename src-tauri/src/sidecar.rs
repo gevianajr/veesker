@@ -9,9 +9,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use uuid::Uuid;
 
 /// Locate the directory containing oracledb's native `.node` binding for the current
@@ -19,10 +19,10 @@ use uuid::Uuid;
 /// resources next to the sidecar binary. Returns None if nothing is found — the sidecar
 /// will then run in Thin mode.
 fn resolve_oracledb_binding_dir(app: &AppHandle) -> Option<String> {
-    if let Ok(explicit) = std::env::var("VEESKER_ORACLEDB_BINARY_DIR") {
-        if PathBuf::from(&explicit).is_dir() {
-            return Some(explicit);
-        }
+    if let Ok(explicit) = std::env::var("VEESKER_ORACLEDB_BINARY_DIR")
+        && PathBuf::from(&explicit).is_dir()
+    {
+        return Some(explicit);
     }
     // Dev mode: walk up from CARGO_MANIFEST_DIR (set when running cargo) to find the repo's
     // sidecar/node_modules/oracledb/build/Release directory.

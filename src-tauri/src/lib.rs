@@ -27,8 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .menu(|app| {
-            let about_item =
-                MenuItemBuilder::with_id("open_about", "About Veesker").build(app)?;
+            let about_item = MenuItemBuilder::with_id("open_about", "About Veesker").build(app)?;
             let help_item = MenuItemBuilder::with_id("open_help", "Help")
                 .accelerator("F1")
                 .build(app)?;

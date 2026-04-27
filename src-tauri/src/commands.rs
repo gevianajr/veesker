@@ -3,14 +3,14 @@
 // https://github.com/gevianajr/veesker
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs::OpenOptions;
 use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri::Manager;
 
-use crate::sidecar::{ensure, SidecarState};
+use crate::sidecar::{SidecarState, ensure};
 use crate::tray::{self, ActiveConnection, TrayState};
 
 #[derive(Debug, Deserialize)]
@@ -140,10 +140,10 @@ fn validate_user_path(app: &AppHandle, path: &str) -> Result<PathBuf, Connection
         app.path().app_config_dir().ok(),
     ];
     for root in candidates.iter().flatten() {
-        if let Ok(canon_root) = root.canonicalize() {
-            if canon.starts_with(&canon_root) {
-                return Ok(canon);
-            }
+        if let Ok(canon_root) = root.canonicalize()
+            && canon.starts_with(&canon_root)
+        {
+            return Ok(canon);
         }
     }
     Err(ConnectionError::invalid(
@@ -170,7 +170,11 @@ pub async fn connection_save(
 ) -> Result<ConnectionMeta, ConnectionError> {
     // If a wallet zip path is being supplied, validate it lives under an allowed
     // user folder before the persistence layer touches it.
-    if let ConnectionInput::Wallet { wallet_zip_path: Some(ref mut path), .. } = input {
+    if let ConnectionInput::Wallet {
+        wallet_zip_path: Some(ref mut path),
+        ..
+    } = input
+    {
         let canon = validate_user_path(&app, path)?;
         *path = canon.to_string_lossy().into_owned();
     }
@@ -1166,9 +1170,11 @@ pub async fn ords_test_http(
         .map(|s| s.to_string())
         .filter(|s| !s.is_empty())
         .or_else(|| {
-            fallback_base_url
-                .filter(|s| !s.is_empty())
-                .filter(|s| reqwest::Url::parse(s).map(|u| matches!(u.scheme(), "http" | "https")).unwrap_or(false))
+            fallback_base_url.filter(|s| !s.is_empty()).filter(|s| {
+                reqwest::Url::parse(s)
+                    .map(|u| matches!(u.scheme(), "http" | "https"))
+                    .unwrap_or(false)
+            })
         })
         .ok_or_else(|| ConnectionTestErr {
             code: -32603,
@@ -1217,7 +1223,7 @@ pub async fn ords_test_http(
             return Err(ConnectionTestErr {
                 code: -32602,
                 message: format!("Method not supported: {}", method),
-            })
+            });
         }
     };
 

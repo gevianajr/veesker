@@ -66,7 +66,9 @@ pub fn extract_to(zip_path: &Path, dest_dir: &Path) -> Result<(), WalletError> {
     }
     fs::create_dir_all(dest_dir)?;
 
-    let canon_dest = dest_dir.canonicalize().unwrap_or_else(|_| dest_dir.to_path_buf());
+    let canon_dest = dest_dir
+        .canonicalize()
+        .unwrap_or_else(|_| dest_dir.to_path_buf());
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
@@ -98,17 +100,17 @@ pub fn extract_to(zip_path: &Path, dest_dir: &Path) -> Result<(), WalletError> {
         // Defense in depth: confirm the join landed under canon_dest. canonicalize()
         // requires the file to exist, so we check the parent (which is dest_dir) and
         // then assert the file_name component is non-traversing.
-        if let Ok(parent) = out_path.parent().unwrap_or(dest_dir).canonicalize() {
-            if !parent.starts_with(&canon_dest) {
-                continue;
-            }
+        if let Ok(parent) = out_path.parent().unwrap_or(dest_dir).canonicalize()
+            && !parent.starts_with(&canon_dest)
+        {
+            continue;
         }
         // Refuse to follow existing symlinks at the destination (Windows: junctions/symlinks
         // can be created by other processes between create_dir_all and File::create).
-        if let Ok(meta) = fs::symlink_metadata(&out_path) {
-            if meta.file_type().is_symlink() {
-                continue;
-            }
+        if let Ok(meta) = fs::symlink_metadata(&out_path)
+            && meta.file_type().is_symlink()
+        {
+            continue;
         }
 
         // OpenOptions::create_new() refuses to overwrite, but we already wiped the dir
