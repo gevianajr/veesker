@@ -19,6 +19,8 @@
   import ExplainPlan from "./ExplainPlan.svelte";
   import PerfBanner from "./PerfBanner.svelte";
   import type { CostBadgeData } from "./CostBadgeGutter";
+  import ObjectVersionBadge from "./ObjectVersionBadge.svelte";
+  import ObjectVersionFlyout from "./ObjectVersionFlyout.svelte";
 
   type Props = {
     onCancel: () => void;
@@ -34,6 +36,7 @@
   let tabbarEl: HTMLDivElement | undefined = $state();
   let editorRef: SqlEditor | null = $state(null);
   let flowError = $state<string | null>(null);
+  let flyoutOpen = $state(false);
 
   // ── Perf analyzer ────────────────────────────────────────────────────────────
   const perf = createPerfAnalyzer();
@@ -328,6 +331,31 @@
             </svg>
             Compile
           </button>
+        {/if}
+        {#if active?.plsqlMeta}
+          {@const meta = active.plsqlMeta}
+          <div style="position:relative">
+            <ObjectVersionBadge
+              connectionId={meta.connectionId}
+              owner={meta.owner}
+              objectType={meta.objectType}
+              objectName={meta.objectName}
+              onOpen={() => { flyoutOpen = true; }}
+            />
+            {#if flyoutOpen}
+              <ObjectVersionFlyout
+                connectionId={meta.connectionId}
+                owner={meta.owner}
+                objectType={meta.objectType}
+                objectName={meta.objectName}
+                onLoadInEditor={(ddl) => {
+                  if (active) sqlEditor.updateSql(active.id, ddl);
+                  flyoutOpen = false;
+                }}
+                onClose={() => { flyoutOpen = false; }}
+              />
+            {/if}
+          </div>
         {/if}
         <button
           class="file-btn"

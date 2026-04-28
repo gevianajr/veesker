@@ -1284,3 +1284,138 @@ pub async fn perf_stats(app: AppHandle, sql: String) -> Result<Value, Connection
     let res = call_sidecar(&app, "perf.stats", json!({ "sql": sql })).await?;
     Ok(res)
 }
+
+// ─── Object Version History ───────────────────────────────────────────────────
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureResult {
+    pub captured: bool,
+}
+
+#[tauri::command]
+pub async fn object_version_capture(
+    app: AppHandle,
+    connection_id: String,
+    owner: String,
+    object_type: String,
+    object_name: String,
+    ddl: String,
+    reason: String,
+) -> CaptureResult {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    let captured = svc.object_version_capture(&connection_id, &owner, &object_type, &object_name, &ddl, &reason);
+    CaptureResult { captured }
+}
+
+#[tauri::command]
+pub async fn object_version_list(
+    app: AppHandle,
+    connection_id: String,
+    owner: String,
+    object_type: String,
+    object_name: String,
+) -> Result<Vec<crate::persistence::object_versions::ObjectVersionEntry>, ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_list(&connection_id, &owner, &object_type, &object_name)
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffResult {
+    pub diff: String,
+}
+
+#[tauri::command]
+pub async fn object_version_diff(
+    app: AppHandle,
+    connection_id: String,
+    sha_a: String,
+    sha_b: String,
+    file_path: String,
+) -> Result<DiffResult, ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_diff(&connection_id, &sha_a, &sha_b, &file_path)
+        .map(|diff| DiffResult { diff })
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[derive(Serialize)]
+pub struct LoadResult {
+    pub ddl: String,
+}
+
+#[tauri::command]
+pub async fn object_version_load(
+    app: AppHandle,
+    connection_id: String,
+    commit_sha: String,
+    file_path: String,
+) -> Result<LoadResult, ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_load(&connection_id, &commit_sha, &file_path)
+        .map(|ddl| LoadResult { ddl })
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[tauri::command]
+pub async fn object_version_label(
+    app: AppHandle,
+    connection_id: String,
+    version_id: i64,
+    owner: String,
+    object_type: String,
+    object_name: String,
+    label: Option<String>,
+) -> Result<(), ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_set_label(&connection_id, version_id, &owner, &object_type, &object_name, label.as_deref())
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[tauri::command]
+pub async fn object_version_set_remote(
+    app: AppHandle,
+    connection_id: String,
+    remote_url: String,
+    pat: String,
+) -> Result<(), ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_set_remote(&connection_id, &remote_url, &pat)
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PushResult {
+    pub pushed_commits: u32,
+}
+
+#[tauri::command]
+pub async fn object_version_push(
+    app: AppHandle,
+    connection_id: String,
+) -> Result<PushResult, ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_push(&connection_id)
+        .map(|pushed_commits| PushResult { pushed_commits })
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetRemoteResult {
+    pub url: Option<String>,
+}
+
+#[tauri::command]
+pub async fn object_version_get_remote(
+    app: AppHandle,
+    connection_id: String,
+) -> Result<GetRemoteResult, ConnectionTestErr> {
+    let svc = app.state::<crate::persistence::connections::ConnectionService>();
+    svc.object_version_get_remote(&connection_id)
+        .map(|url| GetRemoteResult { url })
+        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+}

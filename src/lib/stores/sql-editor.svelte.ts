@@ -9,6 +9,7 @@ import { historySave, type HistoryEntry } from "$lib/query-history";
 import { saveAs, saveExisting, openFile } from "$lib/sql-files";
 import { compileErrorsGet, connectionCommit, connectionRollback, explainPlanGet, type ProcExecuteResult } from "$lib/workspace";
 import { detectDestructive, type DestructiveOp } from "$lib/sql-safety";
+import { objectVersionCapture } from "$lib/object-versions";
 
 export type CompileError = {
   line: number;
@@ -31,6 +32,13 @@ export type TabResult = {
   fetchedAll: boolean;                // true if the result came from a fetchAll run (no row cap)
 };
 
+export type PlsqlMeta = {
+  connectionId: string;
+  owner: string;
+  objectType: string;
+  objectName: string;
+};
+
 export type SqlTab = {
   id: string;
   title: string;
@@ -43,6 +51,7 @@ export type SqlTab = {
   filePath: string | null;            // null = never saved
   isDirty: boolean;                   // true when sql !== savedContent
   savedContent: string | null;        // content at last save/load; null if new tab
+  plsqlMeta: PlsqlMeta | null;
 };
 
 /** Returns the active TabResult for a tab, or null if none. */
@@ -174,6 +183,7 @@ function makeTab(title: string, sql: string): SqlTab {
     filePath: null,
     isDirty: false,
     savedContent: null,
+    plsqlMeta: null,
   };
 }
 
@@ -451,6 +461,10 @@ export const sqlEditor = {
               r.compileErrors = ceRes.ok ? ceRes.data : [];
               _tabs = [..._tabs];
             }
+            if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
+              const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
+              void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
+            }
           });
         }
       }
@@ -603,6 +617,10 @@ export const sqlEditor = {
           if (r) {
             r.compileErrors = ceRes.ok ? ceRes.data : [];
             _tabs = [..._tabs];
+          }
+          if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
+            const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
+            void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
           }
         });
       }
@@ -764,6 +782,10 @@ export const sqlEditor = {
               r.compileErrors = ceRes.ok ? ceRes.data : [];
               _tabs = [..._tabs];
             }
+            if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
+              const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
+              void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
+            }
           });
         }
       }
@@ -874,7 +896,7 @@ export const sqlEditor = {
     }
   },
 
-  openWithDdl(title: string, ddl: string): void {
+  openWithDdl(title: string, ddl: string, plsqlMeta: PlsqlMeta | null = null): void {
     // If a tab with this title already exists, just activate it
     const existing = _tabs.find(t => t.title === title);
     if (existing) {
@@ -895,6 +917,7 @@ export const sqlEditor = {
       filePath: null,
       isDirty: false,
       savedContent: null,
+      plsqlMeta,
     };
     _tabs = [..._tabs, tab];
     _activeId = id;
