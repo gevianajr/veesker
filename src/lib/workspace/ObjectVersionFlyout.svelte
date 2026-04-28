@@ -151,7 +151,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="flyout-backdrop" onclick={onClose} onkeydown={() => {}}></div>
 
-<div class="flyout" role="dialog" aria-modal="true" style="top: {anchorTop}px; right: {anchorRight}px;">
+<div class="flyout" role="dialog" aria-modal="true" style="top: {anchorTop}px; right: {anchorRight}px; max-height: min(480px, calc(100vh - {anchorTop}px - 12px));">
   <div class="fly-list">
     <div class="fly-header">{owner} · {objectType} · {objectName}</div>
     <div class="fly-body">
@@ -268,8 +268,7 @@
     z-index: 1000;
     display: grid;
     grid-template-columns: 220px 1fr;
-    width: 680px;
-    max-height: 480px;
+    width: min(680px, 96vw);
     background: var(--bg-surface-alt);
     border: 1px solid var(--border-strong);
     border-radius: 6px;
