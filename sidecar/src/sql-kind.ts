@@ -67,8 +67,7 @@ export function classifySql(sql: string): SqlKind {
  * the dedicated explainPlan handler, which uses a managed STATEMENT_ID. */
 export function isReadOnlySafe(kind: SqlKind, sql?: string): boolean {
   if (kind !== "select") return false;
-  // Reject EXPLAIN PLAN — it requires INSERT on PLAN_TABLE.
-  if (sql && /^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/|\s)*EXPLAIN\s+PLAN\b/i.test(sql)) return false;
+  if (sql && /^EXPLAIN\s+PLAN\b/i.test(stripLeadingComments(sql))) return false;
   return true;
 }
 
