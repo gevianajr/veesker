@@ -461,10 +461,6 @@ export const sqlEditor = {
               r.compileErrors = ceRes.ok ? ceRes.data : [];
               _tabs = [..._tabs];
             }
-            if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
-              const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
-              void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
-            }
           });
         }
       }
@@ -610,7 +606,6 @@ export const sqlEditor = {
         if (!compilable) continue;
         const resultId = tabResults[sr.statementIndex]?.id;
         if (!resultId) continue;
-        const capturedSql = sr.sql;
         compileErrorsGet(compilable.objectType, compilable.objectName).then((ceRes) => {
           const t = _tabs.find((x) => x.id === tabId);
           if (!t) return;
@@ -621,7 +616,7 @@ export const sqlEditor = {
           }
           if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
             const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
-            void objectVersionCapture(connectionId, owner, objectType, objectName, capturedSql, "compile");
+            void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
           }
         });
       }
@@ -782,10 +777,6 @@ export const sqlEditor = {
             if (r) {
               r.compileErrors = ceRes.ok ? ceRes.data : [];
               _tabs = [..._tabs];
-            }
-            if (ceRes.ok && ceRes.data.length === 0 && t.plsqlMeta) {
-              const { connectionId, owner, objectType, objectName } = t.plsqlMeta;
-              void objectVersionCapture(connectionId, owner, objectType, objectName, t.sql, "compile");
             }
           });
         }
