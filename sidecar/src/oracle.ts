@@ -967,13 +967,13 @@ export async function objectDdl(p: {
       let bodyDdl = "";
       try {
         const bodyRes = await conn.execute<[string]>(
-          `SELECT DBMS_METADATA.GET_DDL('PACKAGE BODY', UPPER(:name), UPPER(:owner)) FROM dual`,
+          `SELECT DBMS_METADATA.GET_DDL('PACKAGE_BODY', UPPER(:name), UPPER(:owner)) FROM dual`,
           { name: p.objectName, owner: p.owner },
           fetchOpts
         );
         bodyDdl = ((bodyRes.rows?.[0]?.[0] as string) ?? "").trim();
-      } catch {
-        // No body exists — body stays ""
+      } catch (e) {
+        log.warn(`objectDdl body query failed for ${p.owner}.${p.objectName}: ${e}`);
       }
       const combined = bodyDdl
         ? specDdl + "\n\n" + bodyDdl
