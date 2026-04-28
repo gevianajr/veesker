@@ -54,6 +54,7 @@
   import { ordsStore } from "$lib/stores/ords.svelte";
   import OrdsBootstrapModal from "$lib/workspace/OrdsBootstrapModal.svelte";
   import OAuthClientsPanel from "$lib/workspace/OAuthClientsPanel.svelte";
+  import { objectVersionCapture } from "$lib/object-versions";
 
   const PLSQL_KINDS: ObjectKind[] = ["PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE"];
 
@@ -290,7 +291,14 @@
         const res = await objectDdlGet(owner, kind, name);
         if (ddlLoading?.owner === owner && ddlLoading?.name === name) ddlLoading = null;
         if (res.ok) {
-          sqlEditor.openWithDdl(`${owner}.${name}`, res.data);
+          const connId = page.params.id!;
+          sqlEditor.openWithDdl(`${owner}.${name}`, res.data, {
+            connectionId: connId,
+            owner,
+            objectType: kind,
+            objectName: name,
+          });
+          void objectVersionCapture(connId, owner, kind, name, res.data, "baseline");
         } else {
           if (res.error.code === SESSION_LOST) {
             sessionLost = true;
@@ -690,8 +698,16 @@
                 ddlLoading = { owner, name };
                 try {
                   const res = await objectDdlGet(owner, kind as any, name);
-                  if (res.ok) sqlEditor.openWithDdl(`${owner}.${name}`, res.data);
-                  else if (res.error.code === SESSION_LOST) sessionLost = true;
+                  if (res.ok) {
+                    const connId = page.params.id!;
+                    sqlEditor.openWithDdl(`${owner}.${name}`, res.data, {
+                      connectionId: connId,
+                      owner,
+                      objectType: kind,
+                      objectName: name,
+                    });
+                    void objectVersionCapture(connId, owner, kind, name, res.data, "baseline");
+                  } else if (res.error.code === SESSION_LOST) sessionLost = true;
                 } finally {
                   if (ddlLoading?.owner === owner && ddlLoading?.name === name) ddlLoading = null;
                 }
