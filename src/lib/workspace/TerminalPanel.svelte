@@ -14,10 +14,12 @@
   type Props = {
     onClose: () => void;
     onMinimize?: () => void;
+    onDockToggle?: () => void;
     minimized?: boolean;
+    dock?: "bottom" | "right";
   };
 
-  let { onClose, onMinimize, minimized = false }: Props = $props();
+  let { onClose, onMinimize, onDockToggle, minimized = false, dock = "bottom" }: Props = $props();
 
   let host = $state<HTMLDivElement | undefined>();
   let term: Terminal | null = null;
@@ -132,20 +134,42 @@
     <div class="tp-actions">
       <button
         class="tp-btn"
-        aria-label={minimized ? "Restore terminal" : "Minimize terminal"}
-        title={minimized ? "Restore" : "Minimize"}
-        onclick={onMinimize}
+        aria-label={dock === 'right' ? "Move to bottom" : "Move to right"}
+        title={dock === 'right' ? "Move to bottom panel" : "Move to right panel"}
+        onclick={onDockToggle}
       >
-        {#if minimized}
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <polyline points="2,9 6,5 10,9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        {#if dock === 'right'}
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="1" y="9" width="12" height="4" rx="0" fill="currentColor" opacity="0.35"/>
+            <line x1="1" y1="9" x2="13" y2="9" stroke="currentColor" stroke-width="1.2"/>
           </svg>
         {:else}
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="8" y="1" width="5" height="12" rx="0" fill="currentColor" opacity="0.35"/>
+            <line x1="8" y1="1" x2="8" y2="13" stroke="currentColor" stroke-width="1.2"/>
           </svg>
         {/if}
       </button>
+      {#if dock === 'bottom' && onMinimize}
+        <button
+          class="tp-btn"
+          aria-label={minimized ? "Restore terminal" : "Minimize terminal"}
+          title={minimized ? "Restore" : "Minimize"}
+          onclick={onMinimize}
+        >
+          {#if minimized}
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <polyline points="2,9 6,5 10,9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          {:else}
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          {/if}
+        </button>
+      {/if}
       <button class="tp-btn" aria-label="Close terminal" onclick={onClose} title="Close (Ctrl+`)">×</button>
     </div>
   </div>

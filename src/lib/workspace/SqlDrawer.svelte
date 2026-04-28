@@ -86,12 +86,20 @@
   // ── Terminal ──────────────────────────────────────────────────────────────
   let terminalOpen = $state(false);
   let termMinimized = $state(false);
+  let termDock = $state<"bottom" | "right">((() => {
+    try { return (localStorage.getItem("veesker:term:dock") as "bottom" | "right") ?? "bottom"; } catch { return "bottom"; }
+  })());
   let termPanelRef = $state<TerminalPanel | null>(null);
   let termHeight = $state<number>((() => {
     try { return parseInt(localStorage.getItem("veesker:term:h") ?? "220") || 220; } catch { return 220; }
   })());
+  let termWidth = $state<number>((() => {
+    try { return parseInt(localStorage.getItem("veesker:term:w") ?? "420") || 420; } catch { return 420; }
+  })());
   let _termDragStartY = 0;
   let _termDragStartHeight = 0;
+  let _termDragStartX = 0;
+  let _termDragStartWidth = 0;
 
   function toggleTerminal() {
     if (terminalOpen && termMinimized) {
@@ -104,6 +112,13 @@
       termMinimized = false;
       setTimeout(() => termPanelRef?.focus(), 50);
     }
+  }
+
+  function toggleTermDock() {
+    termDock = termDock === "bottom" ? "right" : "bottom";
+    termMinimized = false;
+    try { localStorage.setItem("veesker:term:dock", termDock); } catch { /* ignore */ }
+    setTimeout(() => termPanelRef?.focus(), 50);
   }
 
   function onTermHandleDown(e: PointerEvent) {
@@ -122,6 +137,24 @@
     const el = e.currentTarget as HTMLElement;
     if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     try { localStorage.setItem("veesker:term:h", String(termHeight)); } catch { /* ignore */ }
+  }
+
+  function onTermVHandleDown(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    _termDragStartX = e.clientX;
+    _termDragStartWidth = termWidth;
+  }
+
+  function onTermVHandleMove(e: PointerEvent) {
+    if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    const maxW = typeof window !== "undefined" ? window.innerWidth * 0.7 : 900;
+    termWidth = Math.max(200, Math.min(maxW, _termDragStartWidth - (e.clientX - _termDragStartX)));
+  }
+
+  function onTermVHandleUp(e: PointerEvent) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    try { localStorage.setItem("veesker:term:w", String(termWidth)); } catch { /* ignore */ }
   }
 
   function _onGlobalKeyDown(e: KeyboardEvent) {
@@ -448,7 +481,8 @@
         />
       {/if}
 
-      <div class="main-area">
+      <div class="main-area" class:main-row={terminalOpen && termDock === 'right'}>
+        <div class="editor-grid-area">
         {#if sqlEditor.activeId === null}
           <div class="empty">Click + to open a new query.</div>
         {:else}
@@ -692,8 +726,9 @@
             </div>
           </div>
         {/if}
+        </div>
         {#if terminalOpen}
-          {#if !termMinimized}
+          {#if termDock === 'bottom' && !termMinimized}
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
             <div
@@ -706,12 +741,33 @@
               onpointerup={onTermHandleUp}
               onpointercancel={onTermHandleUp}
             ></div>
+          {:else if termDock === 'right'}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <div
+              class="term-vhandle"
+              role="separator"
+              aria-orientation="vertical"
+              tabindex="0"
+              onpointerdown={onTermVHandleDown}
+              onpointermove={onTermVHandleMove}
+              onpointerup={onTermVHandleUp}
+              onpointercancel={onTermVHandleUp}
+            ></div>
           {/if}
-          <div class="term-pane" style={termMinimized ? "height:28px" : `min-height:${termHeight}px`}>
+          <div
+            class="term-pane"
+            class:term-pane-right={termDock === 'right'}
+            style={termDock === 'right'
+              ? `flex:0 0 ${termWidth}px;width:${termWidth}px`
+              : (termMinimized ? "height:28px" : `min-height:${termHeight}px`)}
+          >
             <TerminalPanel
               bind:this={termPanelRef}
-              minimized={termMinimized}
-              onMinimize={() => { termMinimized = !termMinimized; }}
+              minimized={termMinimized && termDock === 'bottom'}
+              onMinimize={termDock === 'bottom' ? () => { termMinimized = !termMinimized; } : undefined}
+              onDockToggle={toggleTermDock}
+              dock={termDock}
               onClose={() => { terminalOpen = false; termMinimized = false; }}
             />
           </div>
@@ -885,6 +941,17 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    overflow: hidden;
+  }
+  .main-area.main-row {
+    flex-direction: row;
+  }
+  .editor-grid-area {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
   }
 
@@ -1102,4 +1169,31 @@
     overflow: hidden;
     min-height: 28px;
   }
+  .term-pane-right {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  /* ── Vertical resize handle (right dock) ────────────────────────────────── */
+  .term-vhandle {
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .term-vhandle::before {
+    content: "";
+    width: 3px;
+    height: 36px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.10);
+    transition: background 0.15s;
+  }
+  .term-vhandle:hover { background: rgba(179, 62, 31, 0.07); }
+  .term-vhandle:hover::before { background: rgba(179, 62, 31, 0.75); }
 </style>
