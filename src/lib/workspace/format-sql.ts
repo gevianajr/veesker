@@ -32,12 +32,22 @@ const ORACLE_KW = new Set<string>([
   "WHEN","WHERE","WHILE","WITH",
 ]);
 
+function normalizePlsqlWhitespace(sql: string): string {
+  return sql
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
+}
+
 /**
  * Uppercase Oracle reserved keywords in PL/SQL source, leaving string literals,
  * double-quoted identifiers, and comments untouched.
+ * Also normalises trailing whitespace and collapses runs of 3+ blank lines to 2.
  */
 function uppercasePlsql(sql: string): string {
-  return sql.replace(
+  const uppercased = sql.replace(
     /'(?:[^']|'')*'|"[^"]*"|--[^\n]*|\/\*[\s\S]*?\*\/|[A-Za-z_$#][A-Za-z0-9_$#]*/g,
     (match) => {
       const ch = match[0];
@@ -45,6 +55,7 @@ function uppercasePlsql(sql: string): string {
       return ORACLE_KW.has(match.toUpperCase()) ? match.toUpperCase() : match;
     },
   );
+  return normalizePlsqlWhitespace(uppercased);
 }
 
 /**

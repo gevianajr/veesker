@@ -17,11 +17,13 @@
     owner: string;
     objectType: string;
     objectName: string;
+    anchorTop?: number;
+    anchorRight?: number;
     onLoadInEditor: (ddl: string) => void;
     onClose: () => void;
   };
 
-  let { connectionId, owner, objectType, objectName, onLoadInEditor, onClose }: Props = $props();
+  let { connectionId, owner, objectType, objectName, anchorTop = 32, anchorRight = 0, onLoadInEditor, onClose }: Props = $props();
 
   const filePath = $derived(objectFilePath(owner, objectType, objectName));
 
@@ -149,7 +151,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="flyout-backdrop" onclick={onClose} onkeydown={() => {}}></div>
 
-<div class="flyout" role="dialog" aria-modal="true">
+<div class="flyout" role="dialog" aria-modal="true" style="top: {anchorTop}px; right: {anchorRight}px;">
   <div class="fly-list">
     <div class="fly-header">{owner} · {objectType} · {objectName}</div>
     <div class="fly-body">
@@ -259,13 +261,11 @@
   .flyout-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 99;
+    z-index: 999;
   }
   .flyout {
-    position: absolute;
-    top: 32px;
-    right: 0;
-    z-index: 100;
+    position: fixed;
+    z-index: 1000;
     display: grid;
     grid-template-columns: 220px 1fr;
     width: 680px;

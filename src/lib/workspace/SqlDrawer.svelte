@@ -39,6 +39,9 @@
   let editorRef: SqlEditor | null = $state(null);
   let flowError = $state<string | null>(null);
   let flyoutOpen = $state(false);
+  let flyoutAnchorTop = $state(0);
+  let flyoutAnchorRight = $state(0);
+  let badgeAnchorEl = $state<HTMLDivElement | null>(null);
 
   // ── Perf analyzer ────────────────────────────────────────────────────────────
   const perf = createPerfAnalyzer();
@@ -285,13 +288,20 @@
       </div>
       {#if active?.plsqlMeta}
         {@const badgeMeta = (active.packageActiveTab === "spec" && active.specMeta) ? active.specMeta : active.plsqlMeta}
-        <div style="position:relative; display:flex; align-items:stretch;">
+        <div bind:this={badgeAnchorEl} style="position:relative; display:flex; align-items:stretch;">
           <ObjectVersionBadge
             connectionId={badgeMeta.connectionId}
             owner={badgeMeta.owner}
             objectType={badgeMeta.objectType}
             objectName={badgeMeta.objectName}
-            onOpen={() => { flyoutOpen = true; }}
+            onOpen={() => {
+              if (badgeAnchorEl) {
+                const r = badgeAnchorEl.getBoundingClientRect();
+                flyoutAnchorTop = r.bottom;
+                flyoutAnchorRight = window.innerWidth - r.right;
+              }
+              flyoutOpen = true;
+            }}
           />
           {#if flyoutOpen}
             <ObjectVersionFlyout
@@ -299,6 +309,8 @@
               owner={badgeMeta.owner}
               objectType={badgeMeta.objectType}
               objectName={badgeMeta.objectName}
+              anchorTop={flyoutAnchorTop}
+              anchorRight={flyoutAnchorRight}
               onLoadInEditor={(ddl) => {
                 if (active) {
                   if (active.packageActiveTab === "spec") sqlEditor.updatePackageSpec(active.id, ddl);
@@ -415,7 +427,7 @@
                   </svg>
                 </button>
                 <div class="dock-sep"></div>
-                <button class="dock-btn dock-format" title="Beautify / Format code" aria-label="Format code" disabled={!tab.sql?.trim()} onclick={handleFormat}>
+                <button class="dock-btn dock-format" title="Beautify / Format code" aria-label="Format code" disabled={!(tab.packageActiveTab === "spec" ? (tab.packageSpec ?? tab.sql) : tab.sql)?.trim()} onclick={handleFormat}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M2.5 13.5L9.5 6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     <rect x="1.2" y="12.2" width="2.8" height="2.8" rx="0.4" transform="rotate(-45 2.6 13.6)" stroke="currentColor" stroke-width="1.1" fill="none"/>
