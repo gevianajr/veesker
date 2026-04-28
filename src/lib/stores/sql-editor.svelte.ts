@@ -22,7 +22,7 @@ export type TabResult = {
   statementIndex: number;             // 0-based; for display as "Statement N+1"
   sqlPreview: string;                 // first ~80 chars of the statement, single line
   sqlOriginal: string | null;         // full SQL of the statement (for re-execution / Fetch All)
-  status: "ok" | "error" | "cancelled" | "running" | "explain";
+  status: "ok" | "error" | "cancelled" | "running" | "explain" | "commit" | "rollback";
   result: QueryResult | null;
   error: { code: number; message: string } | null;
   elapsedMs: number;                  // 0 while running
@@ -979,15 +979,53 @@ export const sqlEditor = {
   },
 
   async commit(): Promise<void> {
+    const t0 = Date.now();
     const res = await connectionCommit();
     if (!res.ok) throw new Error(res.error.message ?? "Commit failed");
     _pendingTx = false;
+    const idx = _tabs.findIndex((t) => t.id === _activeId);
+    if (idx >= 0) {
+      const entry: TabResult = {
+        id: crypto.randomUUID(),
+        statementIndex: _tabs[idx].results.length,
+        sqlPreview: "COMMIT",
+        sqlOriginal: null,
+        status: "commit",
+        result: null,
+        error: null,
+        elapsedMs: Date.now() - t0,
+        dbmsOutput: null,
+        compileErrors: null,
+        explainNodes: null,
+        fetchedAll: false,
+      };
+      _tabs[idx] = { ..._tabs[idx], results: [..._tabs[idx].results, entry] };
+    }
   },
 
   async rollback(): Promise<void> {
+    const t0 = Date.now();
     const res = await connectionRollback();
     if (!res.ok) throw new Error(res.error.message ?? "Rollback failed");
     _pendingTx = false;
+    const idx = _tabs.findIndex((t) => t.id === _activeId);
+    if (idx >= 0) {
+      const entry: TabResult = {
+        id: crypto.randomUUID(),
+        statementIndex: _tabs[idx].results.length,
+        sqlPreview: "ROLLBACK",
+        sqlOriginal: null,
+        status: "rollback",
+        result: null,
+        error: null,
+        elapsedMs: Date.now() - t0,
+        dbmsOutput: null,
+        compileErrors: null,
+        explainNodes: null,
+        fetchedAll: false,
+      };
+      _tabs[idx] = { ..._tabs[idx], results: [..._tabs[idx].results, entry] };
+    }
   },
 
   reset(): void {

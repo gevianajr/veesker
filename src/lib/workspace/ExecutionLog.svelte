@@ -18,6 +18,8 @@
   function summary(r: TabResult): string {
     if (r.status === "running") return "…";
     if (r.status === "cancelled") return "cancelled";
+    if (r.status === "commit") return `committed · ${r.elapsedMs}ms`;
+    if (r.status === "rollback") return `rolled back · ${r.elapsedMs}ms`;
     if (r.status === "error") return r.error ? String(r.error.code) : "error";
     if (r.result === null) return `${r.elapsedMs}ms`;
     const isData = r.result.columns.length > 0;
@@ -30,6 +32,8 @@
 
   function statusIcon(r: TabResult): string {
     if (r.status === "running") return "⟳";
+    if (r.status === "commit") return "✓";
+    if (r.status === "rollback") return "↩";
     if (r.status === "ok" && r.dbmsOutput && r.dbmsOutput.length > 0) return "⊞";
     if (r.status === "ok") return "✓";
     if (r.status === "error") return "✗";
@@ -96,7 +100,8 @@
               class="row"
               class:err={r.status === "error"}
               class:cancelled={r.status === "cancelled"}
-              class:ok={r.status === "ok"}
+              class:ok={r.status === "ok" || r.status === "commit"}
+              class:rollback={r.status === "rollback"}
               class:running={r.status === "running"}
             >
               <span class="icon" class:spin={r.status === "running"}>{statusIcon(r)}</span>
@@ -200,6 +205,8 @@
     color: var(--text-secondary);
   }
   .row.ok .icon { color: #2e6b2e; }
+  .row.rollback .icon { color: #e8c87e; }
+  .row.rollback .summary { color: #e8c87e; }
   .row.err .icon { color: #b33e1f; }
   .row.cancelled .icon { color: var(--text-muted); }
   .row.running .icon { color: #b33e1f; }
