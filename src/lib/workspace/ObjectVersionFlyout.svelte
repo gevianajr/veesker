@@ -425,7 +425,7 @@
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
-    background: rgba(0,0,0,0.1);
+    background: var(--bg-page);
     flex-shrink: 0;
   }
   .remote-url { font-size: 10px; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

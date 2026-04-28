@@ -37,7 +37,6 @@
   let editorRef: SqlEditor | null = $state(null);
   let flowError = $state<string | null>(null);
   let flyoutOpen = $state(false);
-  let badgeRef = $state<ObjectVersionBadge | null>(null);
 
   // ── Perf analyzer ────────────────────────────────────────────────────────────
   const perf = createPerfAnalyzer();
@@ -337,7 +336,6 @@
           {@const meta = active.plsqlMeta}
           <div style="position:relative">
             <ObjectVersionBadge
-              bind:this={badgeRef}
               connectionId={meta.connectionId}
               owner={meta.owner}
               objectType={meta.objectType}
@@ -351,7 +349,7 @@
                 objectType={meta.objectType}
                 objectName={meta.objectName}
                 onLoadInEditor={(ddl) => {
-                  sqlEditor.updateSql(active.id, ddl);
+                  if (active) sqlEditor.updateSql(active.id, ddl);
                   flyoutOpen = false;
                 }}
                 onClose={() => { flyoutOpen = false; }}
