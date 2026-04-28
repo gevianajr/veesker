@@ -592,7 +592,15 @@
                 </button>
                 <div class="dock-sep"></div>
                 {#if COMPILE_REGEX.test(tab.packageActiveTab === "spec" ? (tab.packageSpec ?? tab.sql) : tab.sql)}
-                  <button class="dock-btn dock-compile" title="Compile" aria-label="Compile" onclick={() => void sqlEditor.runActiveAll()}>
+                  <button class="dock-btn dock-compile" title="Compile (F5)" aria-label="Compile" onclick={() => void sqlEditor.runActiveAll()}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                      <polygon points="3,2 14,8 3,14"/>
+                    </svg>
+                  </button>
+                  <div class="dock-sep"></div>
+                {:else}
+                  {@const currentSql = tab.packageActiveTab === "spec" ? (tab.packageSpec ?? tab.sql) : tab.sql}
+                  <button class="dock-btn dock-run" title="Execute (F5)" aria-label="Execute" disabled={!currentSql?.trim() || !!active?.running} onclick={() => void sqlEditor.runActiveAll()}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                       <polygon points="3,2 14,8 3,14"/>
                     </svg>
@@ -1034,6 +1042,8 @@
   .dock-format:hover:not(:disabled) { background: rgba(100,160,255,0.14); color: #c4d9ff; transform: scale(1.15) translateY(-2px); }
   .dock-compile { color: #f5a08a; }
   .dock-compile:hover:not(:disabled) { background: rgba(179,62,31,0.18); color: #f5c4a8; transform: scale(1.15) translateY(-2px); }
+  .dock-run { color: #7ec96a; }
+  .dock-run:hover:not(:disabled) { background: rgba(126,201,106,0.15); color: #9fe88a; transform: scale(1.15) translateY(-2px); }
   .dock-commit { color: #7ec96a; }
   .dock-commit:hover:not(:disabled) { background: rgba(126,201,106,0.15); color: #9fe88a; transform: scale(1.15) translateY(-2px); }
   .dock-rollback { color: #f5a08a; }
