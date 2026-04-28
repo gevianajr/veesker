@@ -961,9 +961,14 @@ export async function objectDdl(p: {
       { type: p.objectType, name: p.objectName, owner: p.owner },
       fetchOpts
     );
-    const specDdl: string = ((specRes.rows?.[0]?.[0] as string) ?? "").trim();
+    const rawDdl: string = ((specRes.rows?.[0]?.[0] as string) ?? "").trim();
 
     if (p.objectType.toUpperCase() === "PACKAGE") {
+      // Oracle sometimes returns the combined spec+body when GET_DDL('PACKAGE', ...) is called.
+      // Extract just the spec by truncating at the PACKAGE BODY declaration if present.
+      const bodyHeaderIdx = rawDdl.search(/\n\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:EDITIONABLE\s+)?PACKAGE\s+BODY\b/i);
+      const specDdl = bodyHeaderIdx !== -1 ? rawDdl.slice(0, bodyHeaderIdx).trim() : rawDdl;
+
       let bodyDdl = "";
       try {
         const bodyRes = await conn.execute<[string]>(
@@ -980,6 +985,8 @@ export async function objectDdl(p: {
         : specDdl;
       return { ddl: combined, spec: specDdl, body: bodyDdl || undefined };
     }
+
+    const specDdl = rawDdl;
 
     return { ddl: specDdl };
   });
