@@ -334,23 +334,26 @@
           </button>
         {/if}
         {#if active?.plsqlMeta}
-          {@const meta = active.plsqlMeta}
+          {@const badgeMeta = (active.packageActiveTab === "spec" && active.specMeta) ? active.specMeta : active.plsqlMeta}
           <div style="position:relative; display:flex; align-items:stretch;">
             <ObjectVersionBadge
-              connectionId={meta.connectionId}
-              owner={meta.owner}
-              objectType={meta.objectType}
-              objectName={meta.objectName}
+              connectionId={badgeMeta.connectionId}
+              owner={badgeMeta.owner}
+              objectType={badgeMeta.objectType}
+              objectName={badgeMeta.objectName}
               onOpen={() => { flyoutOpen = true; }}
             />
             {#if flyoutOpen}
               <ObjectVersionFlyout
-                connectionId={meta.connectionId}
-                owner={meta.owner}
-                objectType={meta.objectType}
-                objectName={meta.objectName}
+                connectionId={badgeMeta.connectionId}
+                owner={badgeMeta.owner}
+                objectType={badgeMeta.objectType}
+                objectName={badgeMeta.objectName}
                 onLoadInEditor={(ddl) => {
-                  if (active) sqlEditor.updateSql(active.id, ddl);
+                  if (active) {
+                    if (active.packageActiveTab === "spec") sqlEditor.updatePackageSpec(active.id, ddl);
+                    else sqlEditor.updateSql(active.id, ddl);
+                  }
                   flyoutOpen = false;
                 }}
                 onClose={() => { flyoutOpen = false; }}

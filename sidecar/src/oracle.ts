@@ -978,7 +978,7 @@ export async function objectDdl(p: {
       const combined = bodyDdl
         ? specDdl + "\n\n" + bodyDdl
         : specDdl;
-      return { ddl: combined, spec: specDdl, body: bodyDdl };
+      return { ddl: combined, spec: specDdl, body: bodyDdl || undefined };
     }
 
     return { ddl: specDdl };
