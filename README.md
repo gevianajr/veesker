@@ -40,6 +40,8 @@ Veesker follows the **DBeaver model**: the Community Edition is a fully function
 | **AI — Schema-aware (knows your DB)** | — | ✅ Cloud |
 | **AI — Query execution via AI** | — | ✅ Cloud |
 | **AI — Query optimization + performance** | — | ✅ Cloud |
+| **AI — Charts via natural language** | — | ✅ Cloud |
+| **AI — Debugger analysis + suggestions** | — | ✅ Cloud |
 | **Vector Search Studio** | — | ✅ Cloud |
 | **Team features + shared queries** | — | ✅ Cloud |
 | **Usage dashboard + billing** | — | ✅ Cloud |
