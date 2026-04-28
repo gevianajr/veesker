@@ -9,7 +9,7 @@ import { historySave, type HistoryEntry } from "$lib/query-history";
 import { saveAs, saveExisting, openFile } from "$lib/sql-files";
 import { compileErrorsGet, connectionCommit, connectionRollback, explainPlanGet, type ProcExecuteResult } from "$lib/workspace";
 import { detectDestructive, type DestructiveOp } from "$lib/sql-safety";
-import { objectVersionCapture, objectFilePath } from "$lib/object-versions";
+import { objectVersionCapture } from "$lib/object-versions";
 
 export type CompileError = {
   line: number;
