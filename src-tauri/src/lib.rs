@@ -5,6 +5,7 @@
 mod commands;
 mod persistence;
 mod sidecar;
+mod terminal;
 mod tray;
 
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -65,6 +66,7 @@ pub fn run() {
 
             MenuBuilder::new(app).items(&[&about, &file, &edit]).build()
         })
+        .manage(terminal::new_store())
         .manage(SidecarState(Mutex::new(None)))
         .manage(TrayHandle(std::sync::Mutex::new(None)))
         .manage(ActiveConnection(tokio::sync::Mutex::new(None)))
@@ -289,6 +291,10 @@ pub fn run() {
             commands::object_version_set_remote,
             commands::object_version_push,
             commands::object_version_get_remote,
+            terminal::terminal_create,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

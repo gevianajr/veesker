@@ -5,6 +5,7 @@
 -->
 
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { sqlEditor, COMPILE_REGEX, runExplain, setActiveResult } from "$lib/stores/sql-editor.svelte";
   import { formatSql } from "$lib/workspace/format-sql";
   import { createPerfAnalyzer } from "$lib/stores/perf-analyzer.svelte";
@@ -23,6 +24,7 @@
   import ObjectVersionBadge from "./ObjectVersionBadge.svelte";
   import ObjectVersionFlyout from "./ObjectVersionFlyout.svelte";
   import PlsqlOutline from "./PlsqlOutline.svelte";
+  import TerminalPanel from "./TerminalPanel.svelte";
 
   type Props = {
     onCancel: () => void;
@@ -80,6 +82,54 @@
       try { localStorage.setItem("veesker:dock:pos", JSON.stringify(dockPos)); } catch { /* ignore */ }
     }
   }
+
+  // ── Terminal ──────────────────────────────────────────────────────────────
+  let terminalOpen = $state(false);
+  let termMinimized = $state(false);
+  let termPanelRef = $state<TerminalPanel | null>(null);
+  let termHeight = $state<number>((() => {
+    try { return parseInt(localStorage.getItem("veesker:term:h") ?? "220") || 220; } catch { return 220; }
+  })());
+  let _termDragStartY = 0;
+  let _termDragStartHeight = 0;
+
+  function toggleTerminal() {
+    if (terminalOpen && termMinimized) {
+      termMinimized = false;
+      setTimeout(() => termPanelRef?.focus(), 50);
+    } else if (terminalOpen) {
+      termMinimized = true;
+    } else {
+      terminalOpen = true;
+      termMinimized = false;
+      setTimeout(() => termPanelRef?.focus(), 50);
+    }
+  }
+
+  function onTermHandleDown(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    _termDragStartY = e.clientY;
+    _termDragStartHeight = termHeight;
+  }
+
+  function onTermHandleMove(e: PointerEvent) {
+    if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return;
+    const maxH = typeof window !== "undefined" ? window.innerHeight * 0.75 : 800;
+    termHeight = Math.max(80, Math.min(maxH, _termDragStartHeight - (e.clientY - _termDragStartY)));
+  }
+
+  function onTermHandleUp(e: PointerEvent) {
+    const el = e.currentTarget as HTMLElement;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    try { localStorage.setItem("veesker:term:h", String(termHeight)); } catch { /* ignore */ }
+  }
+
+  function _onGlobalKeyDown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "`") { e.preventDefault(); toggleTerminal(); }
+  }
+
+  onMount(() => window.addEventListener("keydown", _onGlobalKeyDown));
+  onDestroy(() => window.removeEventListener("keydown", _onGlobalKeyDown));
 
   // ── Perf analyzer ────────────────────────────────────────────────────────────
   const perf = createPerfAnalyzer();
@@ -364,6 +414,19 @@
         </div>
       {/if}
       <button
+        class="term-toggle"
+        class:term-open={terminalOpen}
+        title="Terminal (Ctrl+`)"
+        aria-label="Toggle terminal"
+        onclick={toggleTerminal}
+      >
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/>
+          <polyline points="3.5,4.5 5.5,6.5 3.5,8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6.5" y1="8.5" x2="9" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button
         class="collapse"
         aria-label="Collapse drawer"
         onclick={() => { if (sqlEditor.editorExpanded) sqlEditor.toggleEditorExpanded(); sqlEditor.toggleDrawer(); }}
@@ -629,6 +692,30 @@
             </div>
           </div>
         {/if}
+        {#if terminalOpen}
+          {#if !termMinimized}
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <div
+              class="term-resize-handle"
+              role="separator"
+              aria-orientation="horizontal"
+              tabindex="0"
+              onpointerdown={onTermHandleDown}
+              onpointermove={onTermHandleMove}
+              onpointerup={onTermHandleUp}
+              onpointercancel={onTermHandleUp}
+            ></div>
+          {/if}
+          <div class="term-pane" style={termMinimized ? "height:28px" : `min-height:${termHeight}px`}>
+            <TerminalPanel
+              bind:this={termPanelRef}
+              minimized={termMinimized}
+              onMinimize={() => { termMinimized = !termMinimized; }}
+              onClose={() => { terminalOpen = false; termMinimized = false; }}
+            />
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -673,15 +760,26 @@
 
   /* ── Top resize handle ─────────────────────────────────────────────────── */
   .top-handle {
-    height: 4px;
+    height: 8px;
     width: 100%;
     cursor: ns-resize;
     background: transparent;
     flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .top-handle:hover {
-    background: rgba(179, 62, 31, 0.4);
+  .top-handle::before {
+    content: "";
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.10);
+    transition: background 0.15s;
   }
+  .top-handle:hover { background: rgba(179, 62, 31, 0.07); }
+  .top-handle:hover::before { background: rgba(179, 62, 31, 0.75); }
   .top-handle:focus-visible {
     outline: 2px solid #b33e1f;
     outline-offset: -1px;
@@ -876,22 +974,34 @@
 
   /* ── Middle resize handle ──────────────────────────────────────────────── */
   .mid-handle {
-    height: 4px;
+    height: 8px;
     width: 100%;
     cursor: ns-resize;
     background: transparent;
     flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .mid-handle:hover {
-    background: rgba(179, 62, 31, 0.4);
+  .mid-handle::before {
+    content: "";
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.10);
+    transition: background 0.15s;
   }
+  .mid-handle:hover { background: rgba(179, 62, 31, 0.07); }
+  .mid-handle:hover::before { background: rgba(179, 62, 31, 0.75); }
   .mid-handle:focus-visible {
     outline: 2px solid #b33e1f;
     outline-offset: -1px;
   }
 
   .grid-pane {
-    min-height: 80px;
+    flex: 1 1 auto;
+    min-height: 60px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -948,5 +1058,48 @@
   .pkg-subtab-active {
     color: #f6f1e8;
     border-bottom-color: #7ec96a;
+  }
+
+  /* ── Terminal toggle button ─────────────────────────────────────────────── */
+  .term-toggle {
+    background: transparent;
+    border: none;
+    border-left: 1px solid rgba(255,255,255,0.05);
+    padding: 0 0.7rem;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background 0.1s, color 0.1s;
+  }
+  .term-toggle:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+  .term-toggle.term-open { color: #7ec96a; }
+
+  /* ── Terminal pane ──────────────────────────────────────────────────────── */
+  .term-resize-handle {
+    height: 8px;
+    width: 100%;
+    cursor: ns-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .term-resize-handle::before {
+    content: "";
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.10);
+    transition: background 0.15s;
+  }
+  .term-resize-handle:hover { background: rgba(179, 62, 31, 0.07); }
+  .term-resize-handle:hover::before { background: rgba(179, 62, 31, 0.75); }
+  .term-pane {
+    flex: 1 1 auto;
+    overflow: hidden;
+    min-height: 28px;
   }
 </style>
