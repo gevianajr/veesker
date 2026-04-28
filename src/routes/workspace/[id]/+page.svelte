@@ -293,8 +293,8 @@
         if (res.ok) {
           const connId = page.params.id!;
           const ddlData = res.data;
-          if (kind === "PACKAGE" && ddlData.spec !== undefined) {
-            sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.body ?? ddlData.ddl, {
+          if (kind === "PACKAGE" && ddlData.spec && ddlData.body) {
+            sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.body, {
               connectionId: connId,
               owner,
               objectType: "PACKAGE BODY",
@@ -310,7 +310,7 @@
               });
             }
             void objectVersionCapture(connId, owner, "PACKAGE", name, ddlData.spec, "baseline");
-            void objectVersionCapture(connId, owner, "PACKAGE BODY", name, ddlData.body ?? "", "baseline");
+            void objectVersionCapture(connId, owner, "PACKAGE BODY", name, ddlData.body, "baseline");
           } else {
             sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.ddl, {
               connectionId: connId,
@@ -323,6 +323,8 @@
         } else {
           if (res.error.code === SESSION_LOST) {
             sessionLost = true;
+          } else if (/ORA-31603/.test(res.error.message)) {
+            detailError = `DDL not available for ${owner}.${name} — Oracle built-in objects cannot be exported via DBMS_METADATA.`;
           } else {
             detailError = `Failed to load DDL: ${res.error.message}`;
           }
@@ -722,8 +724,8 @@
                   if (res.ok) {
                     const connId = page.params.id!;
                     const ddlData = res.data;
-                    if (kind === "PACKAGE" && ddlData.spec !== undefined) {
-                      sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.body ?? ddlData.ddl, {
+                    if (kind === "PACKAGE" && ddlData.spec && ddlData.body) {
+                      sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.body, {
                         connectionId: connId,
                         owner,
                         objectType: "PACKAGE BODY",
@@ -739,7 +741,7 @@
                         });
                       }
                       void objectVersionCapture(connId, owner, "PACKAGE", name, ddlData.spec, "baseline");
-                      void objectVersionCapture(connId, owner, "PACKAGE BODY", name, ddlData.body ?? "", "baseline");
+                      void objectVersionCapture(connId, owner, "PACKAGE BODY", name, ddlData.body, "baseline");
                     } else {
                       sqlEditor.openWithDdl(`${owner}.${name}`, ddlData.ddl, {
                         connectionId: connId,
@@ -749,7 +751,13 @@
                       });
                       void objectVersionCapture(connId, owner, kind, name, ddlData.ddl, "baseline");
                     }
-                  } else if (res.error.code === SESSION_LOST) sessionLost = true;
+                  } else if (res.error.code === SESSION_LOST) {
+                    sessionLost = true;
+                  } else if (/ORA-31603/.test(res.error.message)) {
+                    detailError = `DDL not available for ${owner}.${name} — Oracle built-in objects cannot be exported via DBMS_METADATA.`;
+                  } else {
+                    detailError = `Failed to load DDL: ${res.error.message}`;
+                  }
                 } finally {
                   if (ddlLoading?.owner === owner && ddlLoading?.name === name) ddlLoading = null;
                 }

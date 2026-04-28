@@ -58,7 +58,7 @@ function write(level: Level, msg: string): void {
   const path = join(dir, "sidecar.log");
   rotate(path);
   try {
-    appendFileSync(path, stamped, { encoding: "utf8" }); // lgtm[js/network-data-written-to-file]
+    appendFileSync(path, stamped, { encoding: "utf8" }); // lgtm[js/http-to-file-access]
   } catch {
     // Don't let logging failures cascade.
   }

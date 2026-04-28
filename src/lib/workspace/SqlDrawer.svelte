@@ -358,32 +358,34 @@
             {/if}
           </div>
         {/if}
-        <button
-          class="file-btn"
-          title="Explain Plan (F6)"
-          aria-label="Explain Plan"
-          onclick={() => triggerExplain(active?.sql ?? "")}
-        >
-          Explain
-        </button>
-        <button
-          class="file-btn"
-          title="Visual Flow — static execution trace"
-          aria-label="Visual Flow (static)"
-          disabled={!active?.sql?.trim()}
-          onclick={() => void explainWithVisualFlow(false)}
-        >
-          Visual Flow (static)
-        </button>
-        <button
-          class="file-btn"
-          title="Visual Flow — with runtime statistics"
-          aria-label="Visual Flow with stats"
-          disabled={!active?.sql?.trim()}
-          onclick={() => void explainWithVisualFlow(true)}
-        >
-          Visual Flow + Stats
-        </button>
+        {#if !active?.plsqlMeta}
+          <button
+            class="file-btn"
+            title="Explain Plan (F6)"
+            aria-label="Explain Plan"
+            onclick={() => triggerExplain(active?.sql ?? "")}
+          >
+            Explain
+          </button>
+          <button
+            class="file-btn"
+            title="Visual Flow — static execution trace"
+            aria-label="Visual Flow (static)"
+            disabled={!active?.sql?.trim()}
+            onclick={() => void explainWithVisualFlow(false)}
+          >
+            Visual Flow (static)
+          </button>
+          <button
+            class="file-btn"
+            title="Visual Flow — with runtime statistics"
+            aria-label="Visual Flow with stats"
+            disabled={!active?.sql?.trim()}
+            onclick={() => void explainWithVisualFlow(true)}
+          >
+            Visual Flow + Stats
+          </button>
+        {/if}
       </div>
       <div class="txn-actions">
         <button
@@ -510,7 +512,10 @@
             />
           {/if}
           {#if flowError}
-            <div class="flow-error">{flowError}</div>
+            <div class="flow-error">
+              <span>{flowError}</span>
+              <button class="flow-error-close" aria-label="Dismiss" onclick={() => { flowError = null; }}>×</button>
+            </div>
           {/if}
 
           <PerfBanner
@@ -837,7 +842,23 @@
     background: rgba(231, 76, 60, 0.08);
     border-top: 1px solid rgba(231, 76, 60, 0.2);
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
+  .flow-error span { flex: 1; }
+  .flow-error-close {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+  .flow-error-close:hover { opacity: 1; }
   .pkg-subtabs {
     display: flex;
     background: var(--bg-page);

@@ -961,7 +961,7 @@ export async function objectDdl(p: {
       { type: p.objectType, name: p.objectName, owner: p.owner },
       fetchOpts
     );
-    const specDdl: string = (specRes.rows?.[0]?.[0] as string) ?? "";
+    const specDdl: string = ((specRes.rows?.[0]?.[0] as string) ?? "").trim();
 
     if (p.objectType.toUpperCase() === "PACKAGE") {
       let bodyDdl = "";
@@ -971,12 +971,12 @@ export async function objectDdl(p: {
           { name: p.objectName, owner: p.owner },
           fetchOpts
         );
-        bodyDdl = (bodyRes.rows?.[0]?.[0] as string) ?? "";
+        bodyDdl = ((bodyRes.rows?.[0]?.[0] as string) ?? "").trim();
       } catch {
         // No body exists — body stays ""
       }
-      const combined = bodyDdl.trim()
-        ? specDdl.trimEnd() + "\n\n" + bodyDdl
+      const combined = bodyDdl
+        ? specDdl + "\n\n" + bodyDdl
         : specDdl;
       return { ddl: combined, spec: specDdl, body: bodyDdl };
     }
