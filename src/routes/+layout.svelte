@@ -39,14 +39,17 @@
     } catch { return ""; }
   }
 
-  onMount(async () => {
-    await initAuth();
-    const token = await invoke<string | null>("auth_token_get");
-    if (token) {
-      authCtx.tier = "cloud";
-      authCtx.email = decodeJwtEmail(token);
-    }
-    if (FEATURES.cloudAudit) CloudAuditService.start();
+  onMount(() => {
+    void (async () => {
+      await initAuth();
+      const token = await invoke<string | null>("auth_token_get");
+      if (token) {
+        authCtx.tier = "cloud";
+        authCtx.email = decodeJwtEmail(token);
+      }
+      if (FEATURES.cloudAudit) CloudAuditService.start();
+    })();
+
     const unlistenAbout = listen("open-about", () => { showAbout = true; });
     const unlistenHelp = listen("open-help", () => { showHelp = true; });
     const unlistenPlugins = listen("open-plugins", () => { showPluginManager = true; });
