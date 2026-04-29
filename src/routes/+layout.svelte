@@ -7,9 +7,10 @@
 <script lang="ts">
   import "../app.css";
   import { theme } from "$lib/stores/theme.svelte";
-  import { onMount } from "svelte";
+  import { onMount, setContext } from "svelte";
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
+  import { invoke } from "@tauri-apps/api/core";
   import AboutDialog from "$lib/workspace/AboutDialog.svelte";
   import HelpModal from "$lib/workspace/HelpModal.svelte";
   import UpdateNotification from "$lib/workspace/UpdateNotification.svelte";
@@ -26,8 +27,23 @@
   let showCommercialModal = $state(license.needsFirstLaunchPrompt);
   let showPluginManager = $state(false);
 
-  onMount(() => {
-    void initAuth();
+  export const authCtx = $state({ tier: "ce" as "ce" | "cloud", email: "" });
+  setContext("auth", authCtx);
+
+  function decodeJwtEmail(token: string): string {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      return typeof payload.email === "string" ? payload.email : "";
+    } catch { return ""; }
+  }
+
+  onMount(async () => {
+    await initAuth();
+    const token = await invoke<string | null>("auth_token_get");
+    if (token) {
+      authCtx.tier = "cloud";
+      authCtx.email = decodeJwtEmail(token);
+    }
     const unlistenAbout = listen("open-about", () => { showAbout = true; });
     const unlistenHelp = listen("open-help", () => { showHelp = true; });
     const unlistenPlugins = listen("open-plugins", () => { showPluginManager = true; });
@@ -48,6 +64,10 @@
 
   $effect(() => {
     document.documentElement.dataset.theme = theme.current;
+  });
+
+  $effect(() => {
+    document.documentElement.dataset.tier = authCtx.tier;
   });
 </script>
 

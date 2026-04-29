@@ -13,6 +13,21 @@
   --row-alt: rgba(26, 22, 18, 0.02);
   --scrollbar-thumb: rgba(0, 0, 0, 0.15);
   --bg: #faf7f2; /* used by DataFlow color-mix */
+  --accent: #b33e1f;
+  --accent-dim: rgba(179, 62, 31, 0.07);
+  --accent-muted: rgba(179, 62, 31, 0.12);
+  --accent-border: rgba(179, 62, 31, 0.2);
+  --accent-border-focus: rgba(179, 62, 31, 0.5);
+  --accent-shadow: rgba(179, 62, 31, 0.1);
+}
+
+[data-tier="cloud"] {
+  --accent: #2bb4ee;
+  --accent-dim: rgba(43, 180, 238, 0.07);
+  --accent-muted: rgba(43, 180, 238, 0.12);
+  --accent-border: rgba(43, 180, 238, 0.2);
+  --accent-border-focus: rgba(43, 180, 238, 0.5);
+  --accent-shadow: rgba(43, 180, 238, 0.1);
 }
 
 [data-theme="dark"] {

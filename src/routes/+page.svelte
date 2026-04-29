@@ -6,16 +6,17 @@
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { onMount, getContext } from "svelte";
   import {
     listConnections,
     deleteConnection,
     type ConnectionMeta,
   } from "$lib/connections";
   import { ask, message } from "@tauri-apps/plugin-dialog";
-  import { FEATURES } from "$lib/services/features";
   import { logout } from "$lib/services/auth";
   import LoginModal from "$lib/workspace/LoginModal.svelte";
+
+  const authCtx = getContext<{ tier: "ce" | "cloud"; email: string }>("auth");
 
   let connections = $state<ConnectionMeta[]>([]);
   let loading = $state(true);
@@ -51,6 +52,12 @@
 
   onMount(refresh);
 
+  async function handleLogout() {
+    await logout();
+    authCtx.tier = "ce";
+    authCtx.email = "";
+  }
+
   async function onDelete(e: MouseEvent, c: ConnectionMeta) {
     e.stopPropagation();
     if (deletingId) return;
@@ -80,21 +87,38 @@
 </script>
 
 <main>
-  <img src="/ce-logo.png" class="home-watermark" alt="" aria-hidden="true" />
+  <img
+    src={authCtx.tier === "cloud" ? "/veesker-cloud-logo.png" : "/ce-logo.png"}
+    class="home-watermark" alt="" aria-hidden="true"
+  />
   <header>
     <div class="brand">
-      <img src="/ce-logo.png" class="brand-logo" alt="Veesker CE" />
+      <img
+        src={authCtx.tier === "cloud" ? "/veesker-cloud-logo.png" : "/ce-logo.png"}
+        class="brand-logo"
+        alt={authCtx.tier === "cloud" ? "Veesker Cloud" : "Veesker CE"}
+      />
       <div class="brand-text">
         <h1>veesker</h1>
-        <p class="tagline">Community Edition</p>
+        {#if authCtx.tier === "cloud"}
+          <p class="tagline tagline-cloud">Cloud</p>
+        {:else}
+          <p class="tagline">Community Edition</p>
+        {/if}
       </div>
     </div>
     <div class="header-actions">
-      {#if FEATURES.isLoggedIn}
-        <button class="cloud-badge" onclick={async () => { await logout(); }}>
+      {#if authCtx.tier === "cloud"}
+        <div class="cloud-account">
           <img src="/veesker-cloud-logo.png" class="cloud-btn-icon" alt="" aria-hidden="true" />
-          Cloud
-        </button>
+          <span class="cloud-account-email">{authCtx.email || "Cloud"}</span>
+          <button class="cloud-signout" onclick={handleLogout} title="Sign out">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h3M9 9l3-2.5L9 4M4 6.5h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Sign out
+          </button>
+        </div>
       {:else}
         <button class="cloud-signin" onclick={() => { showLogin = true; }}>
           <img src="/veesker-cloud-logo.png" class="cloud-btn-icon" alt="" aria-hidden="true" />
@@ -274,7 +298,18 @@
 </main>
 
 {#if showLogin}
-  <LoginModal onClose={() => { showLogin = false; }} />
+  <LoginModal onClose={async () => {
+    showLogin = false;
+    const { invoke: inv } = await import("@tauri-apps/api/core");
+    const token = await inv<string | null>("auth_token_get");
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        authCtx.tier = "cloud";
+        authCtx.email = payload.email ?? "";
+      } catch { /* ignore */ }
+    }
+  }} />
 {/if}
 
 <style>
@@ -376,7 +411,7 @@
     transition: background 0.15s;
     white-space: nowrap;
   }
-  .new-btn:hover { background: #b33e1f; }
+  .new-btn:hover { background: var(--accent); }
 
   .cloud-btn-icon {
     width: 18px;
@@ -407,26 +442,49 @@
     border-color: rgba(43, 180, 238, 0.5);
   }
 
-  .cloud-badge {
+  .cloud-account {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    background: rgba(43, 180, 238, 0.12);
-    color: #2bb4ee;
+    gap: 0.5rem;
+    background: rgba(43, 180, 238, 0.1);
     border: 1px solid rgba(43, 180, 238, 0.3);
     border-radius: 8px;
-    padding: 0.6rem 1rem;
+    padding: 0.5rem 0.75rem 0.5rem 0.6rem;
     font-family: "Space Grotesk", sans-serif;
     font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
+    color: #2bb4ee;
     white-space: nowrap;
   }
-  .cloud-badge:hover {
+  .cloud-account-email {
+    font-weight: 600;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cloud-signout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: transparent;
+    border: 1px solid rgba(43, 180, 238, 0.25);
+    border-radius: 5px;
+    padding: 0.25rem 0.5rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(43, 180, 238, 0.7);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    margin-left: 0.15rem;
+  }
+  .cloud-signout:hover {
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
     border-color: rgba(239, 68, 68, 0.3);
+  }
+  .tagline-cloud {
+    color: #2bb4ee !important;
+    font-weight: 600;
   }
 
   /* ── Deleting state ──────────────────────────────────────── */
@@ -464,8 +522,8 @@
     transition: border-color 0.15s, box-shadow 0.15s;
   }
   .search-wrap:focus-within {
-    border-color: rgba(179, 62, 31, 0.5);
-    box-shadow: 0 0 0 3px rgba(179, 62, 31, 0.1);
+    border-color: var(--accent-border-focus);
+    box-shadow: 0 0 0 3px var(--accent-shadow);
   }
   .search-icon { color: var(--text-muted); flex-shrink: 0; }
   .search-input {
@@ -506,9 +564,9 @@
   }
   .chip:hover { color: var(--text-primary); border-color: var(--text-muted); }
   .chip-on {
-    background: rgba(179, 62, 31, 0.12);
-    border-color: rgba(179, 62, 31, 0.5);
-    color: #b33e1f;
+    background: var(--accent-muted);
+    border-color: var(--accent-border-focus);
+    color: var(--accent);
   }
   .empty-filter {
     display: flex;
@@ -519,7 +577,7 @@
   .link-btn {
     background: none;
     border: none;
-    color: #b33e1f;
+    color: var(--accent);
     cursor: pointer;
     font-size: 12px;
     text-decoration: underline;
@@ -562,9 +620,9 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    background: rgba(179, 62, 31, 0.07);
-    color: #7a2a14;
-    border: 1px solid rgba(179, 62, 31, 0.2);
+    background: rgba(239, 68, 68, 0.07);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: 8px;
     padding: 0.85rem 1rem;
     font-size: 13px;
@@ -632,7 +690,7 @@
     box-shadow: none;
   }
   .card:focus-visible {
-    outline: 2px solid #b33e1f;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
@@ -650,8 +708,8 @@
     transition: background 0.12s;
   }
   .card:hover .card-icon {
-    background: rgba(179, 62, 31, 0.1);
-    color: #b33e1f;
+    background: var(--accent-shadow);
+    color: var(--accent);
   }
   .card-icon.wallet {
     background: rgba(142, 68, 173, 0.08);
@@ -739,9 +797,9 @@
     padding: 0.3rem 0.4rem;
   }
   .action-btn.delete:hover {
-    background: rgba(179, 62, 31, 0.08);
-    color: #b33e1f;
-    border-color: rgba(179, 62, 31, 0.2);
+    background: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
   }
   .open-arrow {
     font-size: 15px;
@@ -751,7 +809,7 @@
     line-height: 1;
   }
   .card:hover .open-arrow {
-    color: #b33e1f;
+    color: var(--accent);
     transform: translateX(2px);
   }
 </style>

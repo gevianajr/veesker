@@ -8,18 +8,17 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy } from "svelte";
   import { applyFeatureFlags } from "$lib/services/features";
-  import SubscribeModal from "./SubscribeModal.svelte";
 
   type Props = { onClose: () => void };
   let { onClose }: Props = $props();
 
-  let showSubscribe = $state(false);
-
-  type AuthState = "idle" | "waiting" | "error";
+  type AuthState = "idle" | "waiting" | "subscribing" | "error";
   let authState: AuthState = $state("idle");
   let email = $state("");
   let errorMessage = $state("");
   let polling = false;
+  let subPolling = false;
+  let authToken = $state("");
 
   async function sendLink() {
     if (!email.trim()) return;
@@ -53,18 +52,14 @@
           localStorage.setItem("veesker:features", JSON.stringify(data.features));
           applyFeatureFlags(data.features);
           polling = false;
-          // If no active subscription, show upgrade modal before closing
-          const meRes = await fetch("https://api.veesker.cloud/v1/auth/me", {
-            headers: { Authorization: `Bearer ${data.token}` },
-          }).catch(() => null);
-          if (meRes?.ok) {
-            const me = await meRes.json().catch(() => ({}));
-            if (me?.org?.subscription_status !== "active" && me?.org?.subscription_status !== "trialing") {
-              showSubscribe = true;
-              return;
-            }
+          authToken = data.token;
+          const active = await isSubscriptionActive(data.token);
+          if (active) {
+            onClose();
+            return;
           }
-          onClose();
+          authState = "subscribing";
+          startSubscriptionPoll();
           return;
         }
         if (data.status === "expired") {
@@ -84,23 +79,55 @@
     }
   }
 
+  async function isSubscriptionActive(token: string): Promise<boolean> {
+    try {
+      const res = await fetch("https://api.veesker.cloud/v1/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return false;
+      const me = await res.json();
+      return me?.org?.subscription_status === "active" || me?.org?.subscription_status === "trialing";
+    } catch {
+      return false;
+    }
+  }
+
+  async function startSubscriptionPoll() {
+    subPolling = true;
+    const deadline = Date.now() + 15 * 60 * 1000;
+    while (subPolling && Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 4000));
+      if (!subPolling) break;
+      const active = await isSubscriptionActive(authToken);
+      if (active) {
+        subPolling = false;
+        onClose();
+        return;
+      }
+    }
+    if (subPolling) {
+      subPolling = false;
+      authState = "error";
+      errorMessage = "Subscription not confirmed. Contact support if this persists.";
+    }
+  }
+
   function retry() {
     polling = false;
+    subPolling = false;
     authState = "idle";
     errorMessage = "";
   }
 
   function handleClose() {
     polling = false;
+    subPolling = false;
     onClose();
   }
 
-  onDestroy(() => { polling = false; });
+  onDestroy(() => { polling = false; subPolling = false; });
 </script>
 
-{#if showSubscribe}
-  <SubscribeModal onClose={onClose} />
-{:else}
 <div class="backdrop" role="presentation" onclick={handleClose}>
   <div class="modal" role="dialog" aria-modal="true" onclick={(e) => e.stopPropagation()}>
     <button class="close-btn" aria-label="Close" onclick={handleClose}>
@@ -155,6 +182,16 @@
       <p class="waiting-hint">Waiting for confirmation…</p>
       <button class="btn ghost" onclick={retry}>Use a different email</button>
 
+    {:else if authState === "subscribing"}
+      <h2>Complete your subscription</h2>
+      <p class="lead">Your browser opened the payment page.<br/>Return here after completing checkout.</p>
+      <div class="pulse-wrap" aria-label="Waiting for payment">
+        <div class="pulse-ring pulse-ring--green"></div>
+        <div class="pulse-dot pulse-dot--green"></div>
+      </div>
+      <p class="waiting-hint">Waiting for payment confirmation…</p>
+      <button class="btn ghost" onclick={retry}>Cancel</button>
+
     {:else}
       <div class="error-icon" aria-hidden="true">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -175,7 +212,6 @@
     {/if}
   </div>
 </div>
-{/if}
 
 <style>
   .backdrop {
@@ -307,6 +343,13 @@
   }
   .btn:disabled { opacity: 0.38; cursor: not-allowed; }
 
+  .btn.ghost {
+    background: transparent;
+    color: rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn.ghost:hover { color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.2); }
+
   .btn.primary {
     background: #2bb4ee;
     color: #fff;
@@ -355,12 +398,14 @@
     border: 2px solid rgba(43, 180, 238, 0.4);
     animation: pulse-out 1.6s ease-out infinite;
   }
+  .pulse-ring--green { border-color: rgba(52, 211, 153, 0.4); }
   .pulse-dot {
     width: 20px; height: 20px;
     border-radius: 50%;
     background: #2bb4ee;
     box-shadow: 0 0 12px rgba(43, 180, 238, 0.6);
   }
+  .pulse-dot--green { background: #34d399; box-shadow: 0 0 12px rgba(52, 211, 153, 0.6); }
   @keyframes pulse-out {
     0%   { transform: scale(0.8); opacity: 0.8; }
     100% { transform: scale(1.8); opacity: 0; }
