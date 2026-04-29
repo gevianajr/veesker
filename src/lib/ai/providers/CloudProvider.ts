@@ -34,7 +34,7 @@ export function CloudProvider(): AIProvider {
         return { ok: false, error: { code: "UNAUTHORIZED", message: "Session expired. Please sign in again." } };
       }
       if (res.status === 402) {
-        return { ok: false, error: { code: "PAYMENT_REQUIRED", message: "Credit limit reached. Visit veesker.cloud to top up." } };
+        return { ok: false, error: { code: "PAYMENT_REQUIRED", message: "A Veesker Cloud subscription is required to use Cloud AI." } };
       }
       if (!res.ok) {
         return { ok: false, error: { code: "CLOUD_UNAVAILABLE", message: "Veesker Cloud is temporarily unavailable." } };
