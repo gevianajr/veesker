@@ -8,6 +8,9 @@
   import { license, type UsageType } from "$lib/stores/license.svelte";
   import { listAuthProviders, listAiProviders, listObjectActions, listGatedFeatures, type LicenseTier } from "$lib/plugins";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { getContext } from "svelte";
+
+  const authCtx = getContext<{ tier: "ce" | "cloud"; email: string }>("auth");
 
   type Props = { onClose: () => void };
   let { onClose }: Props = $props();
@@ -29,6 +32,10 @@
 
   function openCommercialPolicy() {
     void openUrl("https://github.com/gevianajr/veesker/blob/main/COMMERCIAL_USE.md");
+  }
+
+  function openBilling() {
+    void openUrl("https://veesker.cloud/billing");
   }
 
   const installedAuth = $derived(listAuthProviders());
@@ -65,49 +72,63 @@
       <!-- License section -->
       <section>
         <h3>License & Usage</h3>
-        <p class="hint">
-          Veesker is open source under Apache 2.0. The packaged app has
-          a <button class="link" onclick={openCommercialPolicy}>commercial use policy</button>
-          based on organization size — see <button class="link" onclick={openPricing}>pricing</button>.
-        </p>
+        {#if authCtx.tier === "cloud"}
+          <div class="cloud-card">
+            <img src="/veesker-cloud-logo.png" class="cloud-card-logo" alt="" aria-hidden="true" />
+            <div class="cloud-card-body">
+              <div class="cloud-card-row">
+                <span class="cloud-card-email">{authCtx.email}</span>
+                <span class="cloud-badge">Cloud Active</span>
+              </div>
+              <p class="cloud-card-desc">Schema-aware AI, managed embeddings, and priority support — billed monthly via Stripe.</p>
+              <button class="cloud-billing-btn" onclick={openBilling}>Manage billing →</button>
+            </div>
+          </div>
+        {:else}
+          <p class="hint">
+            Veesker is open source under Apache 2.0. The packaged app has
+            a <button class="link" onclick={openCommercialPolicy}>commercial use policy</button>
+            based on organization size — see <button class="link" onclick={openPricing}>pricing</button>.
+          </p>
 
-        <label class="row">
-          <span class="lbl">Usage type:</span>
-          <select bind:value={usageType} class="input">
-            <option value="unknown">Not specified</option>
-            <option value="personal">Personal / small organization</option>
-            <option value="commercial">Commercial (≥50 employees or ≥US$ 5M revenue)</option>
-          </select>
-        </label>
+          <label class="row">
+            <span class="lbl">Usage type:</span>
+            <select bind:value={usageType} class="input">
+              <option value="unknown">Not specified</option>
+              <option value="personal">Personal / small organization</option>
+              <option value="commercial">Commercial (≥50 employees or ≥US$ 5M revenue)</option>
+            </select>
+          </label>
 
-        <label class="row">
-          <span class="lbl">Tier:</span>
-          <select bind:value={tier} class="input">
-            <option value="personal">Personal (free)</option>
-            <option value="pro">Pro</option>
-            <option value="business">Business</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
-        </label>
+          <label class="row">
+            <span class="lbl">Tier:</span>
+            <select bind:value={tier} class="input">
+              <option value="personal">Personal (free)</option>
+              <option value="pro">Pro</option>
+              <option value="business">Business</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </label>
 
-        <label class="row">
-          <span class="lbl">License key:</span>
-          <input
-            class="input"
-            type="text"
-            bind:value={licenseKeyInput}
-            placeholder="Paste your license key (optional, for paid tiers)"
-          />
-        </label>
+          <label class="row">
+            <span class="lbl">License key:</span>
+            <input
+              class="input"
+              type="text"
+              bind:value={licenseKeyInput}
+              placeholder="Paste your license key (optional, for paid tiers)"
+            />
+          </label>
 
-        <p class="hint">
-          The license key is informational at this stage. License validation
-          for paid add-ons activates when the marketplace launches.
-        </p>
+          <p class="hint">
+            The license key is informational at this stage. License validation
+            for paid add-ons activates when the marketplace launches.
+          </p>
 
-        <div class="actions">
-          <button class="btn primary" onclick={saveLicense}>Save</button>
-        </div>
+          <div class="actions">
+            <button class="btn primary" onclick={saveLicense}>Save</button>
+          </div>
+        {/if}
       </section>
 
       <hr />
@@ -164,7 +185,7 @@
         <ul class="about">
           <li>Veesker is <strong>fully open source</strong> under <button class="link" onclick={() => void openUrl('https://github.com/gevianajr/veesker/blob/main/LICENSE')}>Apache License 2.0</button></li>
           <li>No telemetry, no usage tracking, no license server check</li>
-          <li>All features are available in all tiers — no feature gating</li>
+          <li>CE is fully featured — no feature gating within the Community Edition</li>
           <li>Compliance with the commercial policy is honor-based + EULA</li>
         </ul>
       </section>
@@ -256,4 +277,51 @@
     color: #f5a08a; cursor: pointer; text-decoration: underline;
     font: inherit;
   }
+
+  /* ── Cloud subscription card ─────────────────────────────── */
+  .cloud-card {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: rgba(43,180,238,0.06);
+    border: 1px solid rgba(43,180,238,0.2);
+    border-radius: 8px; padding: 14px;
+  }
+  .cloud-card-logo {
+    width: 44px; height: 44px; border-radius: 10px;
+    flex-shrink: 0; object-fit: cover;
+    box-shadow: 0 0 12px rgba(43,180,238,0.25);
+    border: 1px solid rgba(43,180,238,0.3);
+  }
+  .cloud-card-body { flex: 1; min-width: 0; }
+  .cloud-card-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .cloud-card-email {
+    font-size: 12px; color: var(--text-primary);
+    font-family: "JetBrains Mono", monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cloud-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+    background: rgba(43,180,238,0.15); color: #2bb4ee;
+    border: 1px solid rgba(43,180,238,0.35); flex-shrink: 0;
+  }
+  .cloud-card-desc {
+    font-size: 11px; color: var(--text-muted);
+    line-height: 1.5; margin: 0 0 10px;
+  }
+  .cloud-billing-btn {
+    background: none; border: none; padding: 0;
+    color: #2bb4ee; cursor: pointer; font-size: 11.5px;
+    font-family: "Space Grotesk", sans-serif; font-weight: 600;
+  }
+  .cloud-billing-btn:hover { text-decoration: underline; }
+
+  /* ── Cloud: accent the Save button and links ─────────────── */
+  :global([data-tier="cloud"]) .btn.primary {
+    background: rgba(43,180,238,0.18); border-color: rgba(43,180,238,0.45);
+    color: #2bb4ee;
+  }
+  :global([data-tier="cloud"]) .btn.primary:hover { background: rgba(43,180,238,0.3); }
+  :global([data-tier="cloud"]) .link { color: #2bb4ee; }
 </style>

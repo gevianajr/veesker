@@ -493,7 +493,7 @@
 
       {#if loading}
         <div class="msg assistant">
-          <img src="/veesker-sheep.png" class="msg-avatar" alt="AI" />
+          <img src={authCtx.tier === "cloud" ? "/veesker-cloud-logo.png" : "/veesker-sheep.png"} class="msg-avatar" alt="AI" />
           <div class="bubble ai-bubble thinking">
             <span class="dots"><span></span><span></span><span></span></span>
           </div>
@@ -978,6 +978,15 @@
   .send-btn:disabled { opacity: 0.4; cursor: default; }
 
   /* ── Cloud tier overrides ─────────────────────────────────── */
+  :global([data-tier="cloud"]) .sheep-panel {
+    background: #0d1117;
+    border-left-color: rgba(43, 180, 238, 0.1);
+  }
+  :global([data-tier="cloud"]) .panel-head {
+    background: #0a0e14;
+    border-bottom-color: rgba(43, 180, 238, 0.1);
+  }
+  :global([data-tier="cloud"]) .user-bubble { background: #2bb4ee; }
   :global([data-tier="cloud"]) .send-btn { background: #2bb4ee; }
   :global([data-tier="cloud"]) .send-btn:hover:not(:disabled) { background: #40bdee; }
   :global([data-tier="cloud"]) .chat-input:focus { border-color: rgba(43,180,238,0.5); }
