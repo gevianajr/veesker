@@ -469,4 +469,33 @@
   .nav-btn.primary { background: #b33e1f; border-color: #b33e1f; color: #fff; font-weight: 600; }
   .nav-btn.primary:hover:not(:disabled) { background: #c94b28; border-color: #c94b28; }
   .step-fraction { font-size: 10px; color: var(--text-muted); font-family: "JetBrains Mono", monospace; }
+
+  /* ── Cloud tier overrides ─────────────────────────────────── */
+  :global([data-tier="cloud"]) .header,
+  :global([data-tier="cloud"]) .progress-wrap,
+  :global([data-tier="cloud"]) .sidebar,
+  :global([data-tier="cloud"]) .step-nav { background: #0a0e14; }
+  :global([data-tier="cloud"]) .header { border-bottom-color: rgba(43,180,238,0.12); }
+  :global([data-tier="cloud"]) .close-btn:hover {
+    background: rgba(43,180,238,0.15);
+    border-color: rgba(43,180,238,0.35);
+    color: #2bb4ee;
+  }
+  :global([data-tier="cloud"]) .progress-meta span:last-child { color: #2bb4ee; }
+  :global([data-tier="cloud"]) .progress-fill { background: #2bb4ee; }
+  :global([data-tier="cloud"]) .module-row.active {
+    background: rgba(43,180,238,0.1);
+    border-left-color: #2bb4ee;
+  }
+  :global([data-tier="cloud"]) .module-row.done { color: rgba(43,180,238,0.8); }
+  :global([data-tier="cloud"]) .m-check { color: #2bb4ee; }
+  :global([data-tier="cloud"]) .dot.active { background: #2bb4ee; }
+  :global([data-tier="cloud"]) .dot.done { background: rgba(43,180,238,0.4); }
+  :global([data-tier="cloud"]) .tip {
+    background: rgba(43,180,238,0.07);
+    border-left-color: #2bb4ee;
+  }
+  :global([data-tier="cloud"]) .tip-label { color: #2bb4ee; }
+  :global([data-tier="cloud"]) .nav-btn.primary { background: #2bb4ee; border-color: #2bb4ee; }
+  :global([data-tier="cloud"]) .nav-btn.primary:hover:not(:disabled) { background: #40bdee; border-color: #40bdee; }
 </style>

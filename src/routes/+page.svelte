@@ -429,6 +429,15 @@
     gap: 0.5rem;
   }
 
+  /* ── Cloud brand overrides ───────────────────────────────── */
+  :global([data-tier="cloud"]) .brand-logo {
+    box-shadow: 0 4px 20px rgba(43, 180, 238, 0.3), 0 0 0 1.5px rgba(43, 180, 238, 0.35);
+  }
+  :global([data-tier="cloud"]) h1 {
+    color: #e6edf3;
+    text-shadow: 0 0 32px rgba(43, 180, 238, 0.18);
+  }
+
   .new-btn {
     display: inline-flex;
     align-items: center;
