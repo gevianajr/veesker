@@ -9,6 +9,8 @@
   import { AIService } from "$lib/ai/AIService";
   import { dashboard } from "$lib/stores/dashboard.svelte";
   import ChartWidget from "./ChartWidget.svelte";
+  import SubscribeModal from "./SubscribeModal.svelte";
+  import LoginModal from "./LoginModal.svelte";
   import { tick, onMount } from "svelte";
 
   type AnalyzePayload = {
@@ -41,6 +43,8 @@
   let loading = $state(false);
   let error = $state<string | null>(null);
   let showSettings = $state(false);
+  let showSubscribeModal = $state(false);
+  let showLoginModal = $state(false);
   let apiKey = $state("");
   let messagesEl = $state<HTMLDivElement | null>(null);
   let inputEl = $state<HTMLTextAreaElement | null>(null);
@@ -332,8 +336,10 @@
     if (res.ok) {
       messages = [...messages, { role: "assistant" as const, content: res.data.content }];
     } else {
-      if (res.error.code === "CLOUD_NOT_IMPLEMENTED") {
-        error = "Veesker Cloud is coming soon. Using BYOK in the meantime.";
+      if (res.error.code === "PAYMENT_REQUIRED") {
+        showSubscribeModal = true;
+      } else if (res.error.code === "UNAUTHORIZED") {
+        showLoginModal = true;
       } else {
         error = res.error.message ?? "Unknown error";
       }
@@ -538,6 +544,13 @@
     </div>
   {/if}
 </aside>
+
+{#if showSubscribeModal}
+  <SubscribeModal onClose={() => { showSubscribeModal = false; }} />
+{/if}
+{#if showLoginModal}
+  <LoginModal onClose={() => { showLoginModal = false; }} />
+{/if}
 
 <style>
   .sheep-panel {
