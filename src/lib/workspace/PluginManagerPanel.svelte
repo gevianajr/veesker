@@ -1,7 +1,7 @@
 <!--
   Copyright 2022-2026 Geraldo Ferreira Viana Júnior
   Licensed under the Apache License, Version 2.0
-  https://github.com/gevianajr/veesker
+  https://github.com/veesker-cloud/veesker-community-edition
 -->
 
 <script lang="ts">
@@ -31,7 +31,7 @@
   }
 
   function openCommercialPolicy() {
-    void openUrl("https://github.com/gevianajr/veesker/blob/main/COMMERCIAL_USE.md");
+    void openUrl("https://github.com/veesker-cloud/veesker-community-edition/blob/main/COMMERCIAL_USE.md");
   }
 
   function openBilling() {
@@ -183,7 +183,7 @@
       <section>
         <h3>About</h3>
         <ul class="about">
-          <li>Veesker is <strong>fully open source</strong> under <button class="link" onclick={() => void openUrl('https://github.com/gevianajr/veesker/blob/main/LICENSE')}>Apache License 2.0</button></li>
+          <li>Veesker is <strong>fully open source</strong> under <button class="link" onclick={() => void openUrl('https://github.com/veesker-cloud/veesker-community-edition/blob/main/LICENSE')}>Apache License 2.0</button></li>
           <li>No telemetry, no usage tracking, no license server check</li>
           <li>CE is fully featured — no feature gating within the Community Edition</li>
           <li>Compliance with the commercial policy is honor-based + EULA</li>

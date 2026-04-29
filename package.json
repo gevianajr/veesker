@@ -10,10 +10,10 @@
   "homepage": "https://veesker.cloud",
   "repository": {
     "type": "git",
-    "url": "https://github.com/veesker-cloud/veesker.git"
+    "url": "https://github.com/veesker-cloud/veesker-community-edition.git"
   },
   "bugs": {
-    "url": "https://github.com/veesker-cloud/veesker/issues"
+    "url": "https://github.com/veesker-cloud/veesker-community-edition/issues"
   },
   "type": "module",
   "scripts": {

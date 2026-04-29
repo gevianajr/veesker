@@ -1,7 +1,7 @@
 <!--
   Copyright 2022-2026 Geraldo Ferreira Viana Júnior
   Licensed under the Apache License, Version 2.0
-  https://github.com/gevianajr/veesker
+  https://github.com/veesker-cloud/veesker-community-edition
 -->
 
 <script lang="ts">
@@ -80,7 +80,7 @@
 
       <p class="hint">
         This choice is honor-based. You can change it later in Settings.
-        See <button class="link" onclick={() => void openUrl('https://github.com/gevianajr/veesker/blob/main/COMMERCIAL_USE.md')}>COMMERCIAL_USE.md</button> for details.
+        See <button class="link" onclick={() => void openUrl('https://github.com/veesker-cloud/veesker-community-edition/blob/main/COMMERCIAL_USE.md')}>COMMERCIAL_USE.md</button> for details.
       </p>
     </div>
 

@@ -1,7 +1,7 @@
 <!--
   Copyright 2022-2026 Geraldo Ferreira Viana Júnior
   Licensed under the Apache License, Version 2.0
-  https://github.com/gevianajr/veesker
+  https://github.com/veesker-cloud/veesker-community-edition
 -->
 
 <script lang="ts">
@@ -47,7 +47,7 @@
       <div class="label">Created by</div>
       <div class="value">Geraldo Ferreira Viana Júnior</div>
       <div class="links">
-        <button onclick={() => openUrl("https://github.com/gevianajr/veesker")}>GitHub</button>
+        <button onclick={() => openUrl("https://github.com/veesker-cloud/veesker-community-edition")}>GitHub</button>
         <button onclick={() => openUrl("https://veesker.cloud")}>Website</button>
         <button onclick={() => openUrl("https://www.linkedin.com/in/geraldovianajr/")}>LinkedIn</button>
       </div>

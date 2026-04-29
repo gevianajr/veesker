@@ -43,7 +43,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/gevianajr/veesker/releases/latest/download/latest.json"
+        "https://github.com/veesker-cloud/veesker-community-edition/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNFQTQzNjFCNkQ0MTNDNTUKUldSVlBFRnRHemFrUGw1bjA4RVI5Z1U5QWZYOFZxN0FlbHZ0N1J0QzcyRm8yVDdtK3hSSlZMZU4K",
       "windows": {
