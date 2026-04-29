@@ -92,9 +92,15 @@
     </div>
     <div class="header-actions">
       {#if FEATURES.isLoggedIn}
-        <button class="cloud-badge" onclick={async () => { await logout(); }}>☁ Cloud</button>
+        <button class="cloud-badge" onclick={async () => { await logout(); }}>
+          <img src="/veesker-cloud-logo.png" class="cloud-btn-icon" alt="" aria-hidden="true" />
+          Cloud
+        </button>
       {:else}
-        <button class="cloud-signin" onclick={() => { showLogin = true; }}>☁ Sign in to Cloud</button>
+        <button class="cloud-signin" onclick={() => { showLogin = true; }}>
+          <img src="/veesker-cloud-logo.png" class="cloud-btn-icon" alt="" aria-hidden="true" />
+          Sign in to Cloud
+        </button>
       {/if}
       <button class="new-btn" onclick={() => goto("/connections/new")}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -369,10 +375,18 @@
   }
   .new-btn:hover { background: #b33e1f; }
 
+  .cloud-btn-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
   .cloud-signin {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     background: rgba(43, 180, 238, 0.1);
     color: #2bb4ee;
     border: 1px solid rgba(43, 180, 238, 0.3);
@@ -393,7 +407,7 @@
   .cloud-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     background: rgba(43, 180, 238, 0.12);
     color: #2bb4ee;
     border: 1px solid rgba(43, 180, 238, 0.3);
