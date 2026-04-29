@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { applyFeatureFlags, resetFeatures } from "./features";
 import { CloudAuditService } from "./CloudAuditService";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 function decodeJwtExp(token: string): number | null {
   try {
@@ -59,4 +60,5 @@ export async function logout(): Promise<void> {
   await invoke("auth_token_clear");
   localStorage.removeItem("veesker:features");
   resetFeatures();
+  void getCurrentWindow().setTitle("Veesker");
 }

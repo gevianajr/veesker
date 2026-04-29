@@ -11,6 +11,7 @@
   import { goto } from "$app/navigation";
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import AboutDialog from "$lib/workspace/AboutDialog.svelte";
   import HelpModal from "$lib/workspace/HelpModal.svelte";
   import UpdateNotification from "$lib/workspace/UpdateNotification.svelte";
@@ -46,6 +47,7 @@
       if (token) {
         authCtx.tier = "cloud";
         authCtx.email = decodeJwtEmail(token);
+        void getCurrentWindow().setTitle("Veesker Cloud");
       }
       if (FEATURES.cloudAudit) CloudAuditService.start();
     })();

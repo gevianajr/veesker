@@ -9,6 +9,7 @@
   import { onDestroy } from "svelte";
   import { applyFeatureFlags } from "$lib/services/features";
   import { CloudAuditService } from "$lib/services/CloudAuditService";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
 
   type Props = { onClose: () => void };
   let { onClose }: Props = $props();
@@ -53,6 +54,7 @@
           localStorage.setItem("veesker:features", JSON.stringify(data.features));
           applyFeatureFlags(data.features);
           if (data.features?.cloudAudit) CloudAuditService.start();
+          void getCurrentWindow().setTitle("Veesker Cloud");
           polling = false;
           authToken = data.token;
           const active = await isSubscriptionActive(data.token);

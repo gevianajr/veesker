@@ -203,6 +203,11 @@
   :global(.bar-mark) {
     flex-shrink: 0;
     opacity: 0.9;
+    color: #E85D3C;
+  }
+  :global([data-tier="cloud"]) :global(.bar-mark) {
+    color: #2bb4ee;
+    opacity: 1;
   }
   .bar-divider {
     width: 1px;
