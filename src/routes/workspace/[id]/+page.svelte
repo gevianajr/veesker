@@ -55,6 +55,8 @@
   import OrdsBootstrapModal from "$lib/workspace/OrdsBootstrapModal.svelte";
   import OAuthClientsPanel from "$lib/workspace/OAuthClientsPanel.svelte";
   import { objectVersionCapture } from "$lib/object-versions";
+  import { logout } from "$lib/services/auth";
+  import { FEATURES } from "$lib/services/features";
 
   const PLSQL_KINDS: ObjectKind[] = ["PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE"];
 
@@ -471,6 +473,10 @@
     }
   }
 
+  async function handleLogout(): Promise<void> {
+    await logout();
+  }
+
   async function onDisconnect(): Promise<void> {
     await workspaceClose();
     await goto("/");
@@ -671,6 +677,13 @@
             onclick={() => (showOAuthPanel = true)}
             title="Manage OAuth Clients"
           >🔐 OAuth</button>
+          {#if FEATURES.isLoggedIn}
+            <button
+              class="cloud-badge"
+              onclick={handleLogout}
+              title="Signed in to Veesker Cloud — click to sign out"
+            >☁ Cloud</button>
+          {/if}
         </div>
         {#if activeWsTab === "schema"}
           {#if selected && selected.kind === "REST_MODULE"}
@@ -1000,6 +1013,25 @@
   .ws-tab.active {
     color: var(--text-primary);
     border-bottom-color: rgba(179, 62, 31, 0.7);
+  }
+  .cloud-badge {
+    margin-left: auto;
+    margin-right: 6px;
+    align-self: center;
+    font-size: 11px;
+    padding: 3px 9px;
+    background: rgba(43, 180, 238, 0.2);
+    border: 1px solid rgba(43, 180, 238, 0.4);
+    border-radius: 4px;
+    color: #2bb4ee;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .cloud-badge:hover {
+    background: rgba(43, 180, 238, 0.32);
+    border-color: rgba(43, 180, 238, 0.65);
   }
   .test-panel-wrap {
     position: fixed;
