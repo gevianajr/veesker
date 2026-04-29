@@ -2451,4 +2451,10 @@
     flex-shrink: 0;
     display: inline-block;
   }
+
+  /* ── Cloud tier overrides ─────────────────────────────────── */
+  :global([data-tier="cloud"]) .tab.active { border-bottom-color: #2bb4ee; }
+  :global([data-tier="cloud"]) .back-btn:hover { color: #2bb4ee; }
+  :global([data-tier="cloud"]) .spinner { border-top-color: #2bb4ee; }
+  :global([data-tier="cloud"]) .spinner-xs { border-top-color: #2bb4ee; }
 </style>

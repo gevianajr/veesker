@@ -657,4 +657,9 @@
     padding: 6px 14px; text-align: left;
   }
   .ctx-item:hover { background: var(--row-hover); }
+
+  /* ── Cloud tier overrides ─────────────────────────────────── */
+  :global([data-tier="cloud"]) .search:focus {
+    border-color: rgba(43, 180, 238, 0.55);
+  }
 </style>

@@ -1070,4 +1070,13 @@
     from { transform: translateX(20px); opacity: 0; }
     to   { transform: translateX(0);     opacity: 1; }
   }
+
+  /* ── Cloud tier overrides ─────────────────────────────────── */
+  :global([data-tier="cloud"]) .ws-tab.active {
+    border-bottom-color: rgba(43, 180, 238, 0.8);
+  }
+  :global([data-tier="cloud"]) .resize-handle:hover,
+  :global([data-tier="cloud"]) .resize-handle:active {
+    background: rgba(43, 180, 238, 0.25);
+  }
 </style>
