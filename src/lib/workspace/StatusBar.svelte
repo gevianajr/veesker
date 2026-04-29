@@ -360,4 +360,10 @@
     color: #fff;
   }
   :global([data-tier="cloud"]) .sql-btn.active:hover { background: #40bdee; }
+  :global([data-tier="cloud"]) .theme-btn.active {
+    background: rgba(43, 180, 238, 0.15);
+    border-color: rgba(43, 180, 238, 0.4);
+    color: #2bb4ee;
+  }
+  :global([data-tier="cloud"]) .theme-btn.active:hover { background: rgba(43, 180, 238, 0.25); }
 </style>
