@@ -8,6 +8,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onDestroy } from "svelte";
   import { applyFeatureFlags } from "$lib/services/features";
+  import { CloudAuditService } from "$lib/services/CloudAuditService";
 
   type Props = { onClose: () => void };
   let { onClose }: Props = $props();
@@ -51,6 +52,7 @@
           await invoke("auth_token_set", { token: data.token });
           localStorage.setItem("veesker:features", JSON.stringify(data.features));
           applyFeatureFlags(data.features);
+          if (data.features?.cloudAudit) CloudAuditService.start();
           polling = false;
           authToken = data.token;
           const active = await isSubscriptionActive(data.token);

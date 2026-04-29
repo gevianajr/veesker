@@ -10,6 +10,7 @@ import { saveAs, saveExisting, openFile } from "$lib/sql-files";
 import { compileErrorsGet, connectionCommit, connectionRollback, explainPlanGet, type ProcExecuteResult } from "$lib/workspace";
 import { detectDestructive, type DestructiveOp } from "$lib/sql-safety";
 import { objectVersionCapture } from "$lib/object-versions";
+import { CloudAuditService } from "$lib/services/CloudAuditService";
 
 export type CompileError = {
   line: number;
@@ -90,6 +91,7 @@ let _activeId = $state<string | null>(null);
 let _drawerOpen = $state(false);
 let _queryCounter = $state(0);
 let _connectionId: string | null = null;
+let _connectionName: string | null = null;
 let _connectionUsername: string | null = null;
 let _connectionHost: string | null = null;
 type PendingConfirm = {
@@ -225,17 +227,32 @@ function chooseActiveResultId(results: TabResult[]): string | null {
 function pushHistory(sql: string, r: TabResult): void {
   if (_connectionId === null) return;
   if (r.status === "cancelled") return;
+  const success = r.status === "ok";
+  const rowCount = r.status === "ok" && r.result !== null ? r.result.rowCount : null;
+  const errorCode = r.status === "error" && r.error !== null ? r.error.code : null;
+  const errorMessage = r.status === "error" && r.error !== null ? r.error.message : null;
   void historySave({
     connectionId: _connectionId,
     sql,
-    success: r.status === "ok",
-    rowCount: r.status === "ok" && r.result !== null ? r.result.rowCount : null,
+    success,
+    rowCount,
     elapsedMs: r.elapsedMs,
-    errorCode: r.status === "error" && r.error !== null ? r.error.code : null,
-    errorMessage: r.status === "error" && r.error !== null ? r.error.message : null,
+    errorCode,
+    errorMessage,
     username: _connectionUsername,
     host: _connectionHost,
   }).catch((e) => console.warn("history save failed:", e));
+  void CloudAuditService.push({
+    connectionId: _connectionId || null,
+    connectionName: _connectionName || null,
+    host: _connectionHost || null,
+    sql,
+    success,
+    rowCount,
+    elapsedMs: r.elapsedMs,
+    errorCode,
+    errorMessage,
+  });
 }
 
 function askConfirm(sql: string): true | Promise<boolean> {
@@ -269,8 +286,9 @@ export const sqlEditor = {
     return _activeId === null ? null : findTab(_activeId);
   },
   get connectionId() { return _connectionId; },
-  setConnectionContext(id: string | null, username: string | null, host: string | null): void {
+  setConnectionContext(id: string | null, name: string | null, username: string | null, host: string | null): void {
     _connectionId = id;
+    _connectionName = name;
     _connectionUsername = username;
     _connectionHost = host;
   },
@@ -1035,6 +1053,7 @@ export const sqlEditor = {
     _queryCounter = 0;
     _logCollapsed = false;
     _connectionId = null;
+    _connectionName = null;
     _connectionUsername = null;
     _connectionHost = null;
     _pendingConfirm = null;

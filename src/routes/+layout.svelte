@@ -20,6 +20,8 @@
   import { license } from "$lib/stores/license.svelte";
   import type { Snippet } from "svelte";
   import { initAuth } from "$lib/services/auth";
+  import { CloudAuditService } from "$lib/services/CloudAuditService";
+  import { FEATURES } from "$lib/services/features";
 
   let { children }: { children: Snippet } = $props();
   let showAbout = $state(false);
@@ -44,6 +46,7 @@
       authCtx.tier = "cloud";
       authCtx.email = decodeJwtEmail(token);
     }
+    if (FEATURES.cloudAudit) CloudAuditService.start();
     const unlistenAbout = listen("open-about", () => { showAbout = true; });
     const unlistenHelp = listen("open-help", () => { showHelp = true; });
     const unlistenPlugins = listen("open-plugins", () => { showPluginManager = true; });

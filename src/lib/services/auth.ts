@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { applyFeatureFlags, resetFeatures } from "./features";
+import { CloudAuditService } from "./CloudAuditService";
 
 function decodeJwtExp(token: string): number | null {
   try {
@@ -54,6 +55,7 @@ export async function initAuth(): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
+  CloudAuditService.stop();
   await invoke("auth_token_clear");
   localStorage.removeItem("veesker:features");
   resetFeatures();
