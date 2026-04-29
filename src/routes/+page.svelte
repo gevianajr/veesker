@@ -12,7 +12,6 @@
     deleteConnection,
     type ConnectionMeta,
   } from "$lib/connections";
-  import VeeskerMark from "$lib/VeeskerMark.svelte";
   import { ask, message } from "@tauri-apps/plugin-dialog";
   import { FEATURES } from "$lib/services/features";
   import { logout } from "$lib/services/auth";
@@ -81,13 +80,13 @@
 </script>
 
 <main>
-  <img src="/veesker-sheep.png" class="home-watermark" alt="" aria-hidden="true" />
+  <img src="/ce-logo.png" class="home-watermark" alt="" aria-hidden="true" />
   <header>
     <div class="brand">
-      <VeeskerMark size={52} />
+      <img src="/ce-logo.png" class="brand-logo" alt="Veesker CE" />
       <div class="brand-text">
         <h1>veesker</h1>
-        <p class="tagline">Oracle Studio</p>
+        <p class="tagline">Community Edition</p>
       </div>
     </div>
     <div class="header-actions">
@@ -323,8 +322,11 @@
     align-items: center;
     gap: 1rem;
   }
-  .brand :global(svg) {
+  .brand-logo {
+    width: 52px;
+    height: 52px;
     border-radius: 12px;
+    object-fit: cover;
     display: block;
     box-shadow: 0 2px 8px rgba(26, 22, 18, 0.12);
   }
