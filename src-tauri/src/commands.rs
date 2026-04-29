@@ -1440,3 +1440,34 @@ pub async fn auth_token_set(token: String) -> Result<(), String> {
 pub async fn auth_token_clear() -> Result<(), String> {
     crate::persistence::secrets::delete_auth_token().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn cloud_api_get(path: String, params: Option<std::collections::HashMap<String, String>>) -> Result<Value, String> {
+    let token = crate::persistence::secrets::get_auth_token()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "not_authenticated".to_string())?;
+
+    let base = "https://api.veesker.cloud";
+    let url = format!("{}{}", base, path);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut req = client.get(&url).bearer_auth(&token);
+    if let Some(p) = params {
+        req = req.query(&p.into_iter().collect::<Vec<_>>());
+    }
+
+    let res = req.send().await.map_err(|e| e.to_string())?;
+    let status = res.status().as_u16();
+    let body: Value = res.json().await.map_err(|e| e.to_string())?;
+
+    if status == 403 {
+        return Err("forbidden".to_string());
+    }
+    if status >= 400 {
+        return Err(format!("server_error_{}", status));
+    }
+    Ok(body)
+}

@@ -294,6 +294,7 @@ pub fn run() {
             commands::auth_token_get,
             commands::auth_token_set,
             commands::auth_token_clear,
+            commands::cloud_api_get,
             terminal::terminal_create,
             terminal::terminal_write,
             terminal::terminal_resize,

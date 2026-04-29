@@ -48,47 +48,41 @@
 
   let expandedId = $state<string | null>(null);
 
-  async function getToken(): Promise<string | null> {
-    return invoke<string | null>("auth_token_get");
-  }
-
   async function loadStats() {
-    const token = await getToken();
-    if (!token) return;
     try {
-      const res = await fetch("https://api.veesker.cloud/v1/audit/stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) stats = await res.json().then(d => d.stats);
-    } catch { /* non-critical */ }
+      const data = await invoke<{ stats: Stats }>("cloud_api_get", { path: "/v1/audit/stats" });
+      stats = data.stats;
+    } catch { /* non-critical — stats row just stays hidden */ }
   }
 
   async function loadEntries(reset = false) {
     if (reset) offset = 0;
     loading = true;
     error = null;
-    const token = await getToken();
-    if (!token) { loading = false; return; }
-
-    const params = new URLSearchParams({
-      limit: String(LIMIT),
-      offset: String(reset ? 0 : offset),
-    });
-    if (failuresOnly) params.set("failures", "true");
-    if (userFilter.trim()) params.set("user", userFilter.trim());
-
     try {
-      const res = await fetch(`https://api.veesker.cloud/v1/audit?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const params: Record<string, string> = {
+        limit: String(LIMIT),
+        offset: String(reset ? 0 : offset),
+      };
+      if (failuresOnly) params.failures = "true";
+      if (userFilter.trim()) params.user = userFilter.trim();
+
+      const data = await invoke<{ entries: Entry[] }>("cloud_api_get", {
+        path: "/v1/audit",
+        params,
       });
-      if (res.status === 403) { forbidden = true; loading = false; return; }
-      if (!res.ok) { error = `Error ${res.status}`; loading = false; return; }
-      const data = await res.json();
       entries = reset ? data.entries : [...entries, ...data.entries];
       hasMore = data.entries.length === LIMIT;
       if (!reset) offset += data.entries.length;
-    } catch {
-      error = "Failed to load audit log.";
+    } catch (e) {
+      const msg = String(e);
+      if (msg === "forbidden") {
+        forbidden = true;
+      } else if (msg === "not_authenticated") {
+        error = "Not signed in to Cloud.";
+      } else {
+        error = `Failed to load: ${msg}`;
+      }
     }
     loading = false;
   }

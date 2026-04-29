@@ -6,6 +6,7 @@
 
 <script lang="ts">
   import { sqlEditor } from "$lib/stores/sql-editor.svelte";
+  import { getContext } from "svelte";
   import VeeskerMark from "$lib/VeeskerMark.svelte";
 
   type Props = {
@@ -22,6 +23,9 @@
     onToggleTheme?: () => void;
     env?: "dev" | "staging" | "prod";
     readOnly?: boolean;
+    onSignIn?: () => void;
+    onAuditLog?: () => void;
+    onSignOut?: () => void;
   };
   let {
     connectionName, userLabel, schema, serverVersion,
@@ -29,7 +33,11 @@
     onDisconnect, onSwitchConnection,
     theme = "light", onToggleTheme,
     env, readOnly = false,
+    onSignIn, onAuditLog, onSignOut,
   }: Props = $props();
+
+  const authCtx = getContext<{ tier: "ce" | "cloud"; email: string }>("auth");
+  let showCloudMenu = $state(false);
 
   // Shorten version: "Oracle AI Database 26ai Free Release 23.26.1.0.0 – ..." → "23.26.1.0.0"
   const shortVersion = $derived(
@@ -142,6 +150,48 @@
       </svg>
       Disconnect
     </button>
+    <div class="cloud-wrap">
+      {#if authCtx.tier === "cloud"}
+        <button
+          class="cloud-btn cloud-btn--account"
+          onclick={() => { showCloudMenu = !showCloudMenu; }}
+          title="Veesker Cloud account"
+        >
+          <img src="/veesker-cloud-logo.png" class="cloud-icon" alt="" aria-hidden="true" />
+          Cloud
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true" class:chevron-open={showCloudMenu}>
+            <path d="M1.5 3l2.5 2 2.5-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        {#if showCloudMenu}
+          <div class="cloud-dropdown" role="menu">
+            <button class="cloud-dropdown-item" role="menuitem" onclick={() => { showCloudMenu = false; onAuditLog?.(); }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+                <path d="M3 4h6M3 6h6M3 8h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+              </svg>
+              Audit log
+            </button>
+            <button class="cloud-dropdown-item cloud-dropdown-item--danger" role="menuitem" onclick={() => { showCloudMenu = false; onSignOut?.(); }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M4.5 2H2a.5.5 0 00-.5.5v7A.5.5 0 002 10h2.5M8 4l3 2-3 2M5 6h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Sign out
+            </button>
+          </div>
+          <div class="cloud-dropdown-backdrop" role="presentation" onclick={() => { showCloudMenu = false; }}></div>
+        {/if}
+      {:else}
+        <button
+          class="cloud-btn cloud-btn--signin"
+          onclick={() => { onSignIn?.(); }}
+          title="Sign in to Veesker Cloud"
+        >
+          <img src="/veesker-cloud-logo.png" class="cloud-icon" alt="" aria-hidden="true" />
+          Cloud
+        </button>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -371,4 +421,101 @@
     color: #2bb4ee;
   }
   :global([data-tier="cloud"]) .theme-btn.active:hover { background: rgba(43, 180, 238, 0.25); }
+
+  /* ── Cloud button ─────────────────────────────────────────── */
+  .cloud-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .cloud-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+  .cloud-btn--account {
+    background: rgba(43, 180, 238, 0.18);
+    border-color: rgba(43, 180, 238, 0.35);
+    color: #2bb4ee;
+  }
+  .cloud-btn--account:hover {
+    background: rgba(43, 180, 238, 0.28);
+    border-color: rgba(43, 180, 238, 0.55);
+  }
+  .cloud-btn--signin {
+    background: rgba(43, 180, 238, 0.08);
+    border-color: rgba(43, 180, 238, 0.22);
+    color: rgba(43, 180, 238, 0.75);
+  }
+  .cloud-btn--signin:hover {
+    background: rgba(43, 180, 238, 0.18);
+    border-color: rgba(43, 180, 238, 0.45);
+    color: #2bb4ee;
+  }
+  .cloud-icon {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .chevron-open {
+    transform: rotate(180deg);
+    transition: transform 0.15s;
+  }
+  .cloud-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #1a1e27;
+    border: 1px solid rgba(43, 180, 238, 0.25);
+    border-radius: 7px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    padding: 4px;
+    z-index: 500;
+    min-width: 148px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cloud-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 6px 10px;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    color: rgba(255,255,255,0.75);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .cloud-dropdown-item:hover {
+    background: rgba(43, 180, 238, 0.12);
+    color: #e6edf3;
+  }
+  .cloud-dropdown-item--danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+  }
+  .cloud-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 499;
+  }
 </style>

@@ -48,6 +48,7 @@ export async function initAuth(): Promise<void> {
       if (data.features) {
         applyFeatureFlags(data.features);
         localStorage.setItem("veesker:features", JSON.stringify(data.features));
+        if (data.features.cloudAudit) CloudAuditService.start();
       }
     }
   }).catch(() => {

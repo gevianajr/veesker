@@ -58,6 +58,7 @@
   import { logout } from "$lib/services/auth";
   import { FEATURES } from "$lib/services/features";
   import LoginModal from "$lib/workspace/LoginModal.svelte";
+  import AuditLogPanel from "$lib/workspace/AuditLogPanel.svelte";
 
   const authCtx = getContext<{ tier: "ce" | "cloud"; email: string }>("auth");
 
@@ -122,6 +123,7 @@
   let testPanelOpen = $state<{ basePath: string } | null>(null);
   let showOAuthPanel = $state(false);
   let showLogin = $state(false);
+  let showAuditLog = $state(false);
 
   // ── Panel resize (persisted) ─────────────────────────────────────────────────
   function loadPanelWidth(key: string, def: number): number {
@@ -645,6 +647,9 @@
       onToggleTheme={() => theme.toggle()}
       env={meta.env}
       readOnly={meta.readOnly ?? false}
+      onSignIn={() => { showLogin = true; }}
+      onAuditLog={() => { showAuditLog = true; }}
+      onSignOut={handleLogout}
     />
     <div class="body" class:body-collapsed={sqlEditor.editorExpanded}>
       <div class="panel-wrap" style="width: {schemaWidth}px; min-width: 160px; max-width: 480px;">
@@ -693,22 +698,6 @@
             onclick={() => (showOAuthPanel = true)}
             title="Manage OAuth Clients"
           >🔐 OAuth</button>
-          {#if FEATURES.isLoggedIn}
-            <button
-              class="cloud-badge"
-              onclick={handleLogout}
-              title="Signed in to Veesker Cloud — click to sign out"
-            >☁ Cloud</button>
-          {:else}
-            <button
-              class="cloud-signin-btn"
-              onclick={() => { showLogin = true; }}
-              title="Sign in to Veesker Cloud"
-            >
-              <img src="/veesker-cloud-logo.png" class="cloud-signin-icon" alt="" aria-hidden="true" />
-              Sign in to Cloud
-            </button>
-          {/if}
         </div>
         {#if activeWsTab === "schema"}
           {#if selected && selected.kind === "REST_MODULE"}
@@ -937,6 +926,9 @@
       }
     }} />
   {/if}
+  {#if showAuditLog}
+    <AuditLogPanel onClose={() => { showAuditLog = false; }} />
+  {/if}
   {#if ddlLoading}
     <div class="ddl-toast" role="status" aria-live="polite">
       <span class="ddl-spinner"></span>
@@ -1053,55 +1045,6 @@
   .ws-tab.active {
     color: var(--text-primary);
     border-bottom-color: rgba(179, 62, 31, 0.7);
-  }
-  .cloud-badge {
-    margin-left: auto;
-    margin-right: 6px;
-    align-self: center;
-    font-size: 11px;
-    padding: 3px 9px;
-    background: rgba(43, 180, 238, 0.2);
-    border: 1px solid rgba(43, 180, 238, 0.4);
-    border-radius: 4px;
-    color: #2bb4ee;
-    cursor: pointer;
-    font-family: inherit;
-    line-height: 1;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .cloud-badge:hover {
-    background: rgba(43, 180, 238, 0.32);
-    border-color: rgba(43, 180, 238, 0.65);
-  }
-  .cloud-signin-btn {
-    margin-left: auto;
-    margin-right: 6px;
-    align-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 5px 12px;
-    background: linear-gradient(135deg, rgba(43,180,238,0.18), rgba(24,151,207,0.14));
-    border: 1px solid rgba(43, 180, 238, 0.45);
-    border-radius: 6px;
-    color: #7dd3f5;
-    cursor: pointer;
-    font-family: "Space Grotesk", inherit;
-    line-height: 1;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-  }
-  .cloud-signin-btn:hover {
-    background: linear-gradient(135deg, rgba(43,180,238,0.28), rgba(24,151,207,0.22));
-    border-color: rgba(43, 180, 238, 0.7);
-    color: #b8e9fa;
-  }
-  .cloud-signin-icon {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    object-fit: cover;
   }
   .test-panel-wrap {
     position: fixed;
