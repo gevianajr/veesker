@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { FEATURES, resetFeatures } from "./features";
+import { FEATURES, resetFeatures, applyFeatureFlags } from "./features";
 
 // Mock Tauri invoke
 vi.mock("@tauri-apps/api/core", () => ({
@@ -64,5 +64,38 @@ describe("initAuth", () => {
     // no localStorage entry set
     const { initAuth } = await import("./auth");
     await expect(initAuth()).resolves.not.toThrow();
+  });
+
+  it("clears token and resets features when /me returns 401", async () => {
+    vi.mocked(invoke).mockResolvedValue(makeJwt(FUTURE_EXP));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 401 }));
+    const { initAuth } = await import("./auth");
+    await initAuth();
+    await new Promise((resolve) => setTimeout(resolve, 0)); // flush background .then()
+    expect(invoke).toHaveBeenCalledWith("auth_token_clear");
+    expect(FEATURES.cloudAI).toBe(false);
+  });
+});
+
+describe("logout", () => {
+  beforeEach(() => {
+    resetFeatures();
+    vi.mocked(invoke).mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("clears keyring, localStorage, and resets features", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    localStorage.setItem("veesker:features", JSON.stringify({ cloudAI: true }));
+    applyFeatureFlags({ cloudAI: true, isLoggedIn: true });
+    const { logout } = await import("./auth");
+    await logout();
+    expect(invoke).toHaveBeenCalledWith("auth_token_clear");
+    expect(localStorage.getItem("veesker:features")).toBeNull();
+    expect(FEATURES.cloudAI).toBe(false);
   });
 });

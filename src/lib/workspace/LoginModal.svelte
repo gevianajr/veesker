@@ -6,6 +6,7 @@
 
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { onDestroy } from "svelte";
   import { applyFeatureFlags } from "$lib/services/features";
 
   type Props = { onClose: () => void };
@@ -79,6 +80,8 @@
     polling = false;
     onClose();
   }
+
+  onDestroy(() => { polling = false; });
 </script>
 
 <div class="modal-backdrop" role="presentation" onclick={handleClose}>
