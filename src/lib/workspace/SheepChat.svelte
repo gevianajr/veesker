@@ -404,19 +404,21 @@
           </svg>
         </button>
       {/if}
-      <button
-        class="icon-btn"
-        class:active={showSettings}
-        onclick={() => showSettings = !showSettings}
-        title="API settings"
-        aria-label="Settings"
-      >
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1.2"/>
-          <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.6 2.6l.85.85M9.55 9.55l.85.85M2.6 10.4l.85-.85M9.55 3.45l.85-.85"
-            stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-      </button>
+      {#if authCtx.tier !== "cloud"}
+        <button
+          class="icon-btn"
+          class:active={showSettings}
+          onclick={() => showSettings = !showSettings}
+          title="API settings"
+          aria-label="Settings"
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M6.5 1v1.2M6.5 10.8V12M1 6.5h1.2M10.8 6.5H12M2.6 2.6l.85.85M9.55 9.55l.85.85M2.6 10.4l.85-.85M9.55 3.45l.85-.85"
+              stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      {/if}
       <button class="icon-btn" onclick={onClose} title="Close" aria-label="Close">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M3 3l7 7M10 3l-7 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -425,8 +427,8 @@
     </div>
   </div>
 
-  <!-- Settings pane -->
-  {#if showSettings}
+  <!-- Settings pane — CE only -->
+  {#if showSettings && authCtx.tier !== "cloud"}
     <div class="settings-pane">
       <label class="settings-label" for="sheep-api-key">Anthropic API Key</label>
       <input
