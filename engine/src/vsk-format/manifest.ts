@@ -13,7 +13,8 @@
  *   - `piiMasks` — record of masks applied at build time (informational; does not unmask)
  */
 
-export type VskMaskType = "hash" | "redact" | "static" | "partial";
+export const VSK_MASK_TYPES = ["hash", "redact", "static", "partial"] as const;
+export type VskMaskType = typeof VSK_MASK_TYPES[number];
 
 export interface VskColumn {
   name: string;
@@ -40,6 +41,14 @@ export interface VskManifest {
   ttlExpiresAt: string;
   tables: VskTable[];
   piiMasks: VskPiiMask[];
+  /** Optional. The `@veesker/engine` version that wrote this manifest. Future
+   *  readers may use this to gate compatibility checks (e.g. SQL-translator
+   *  semantic changes). Absent in early sandboxes — readers MUST tolerate. */
+  engineVersion?: string;
+  /** Optional. The on-disk data-section format. Defaults to `"parquet-streams-v1"`
+   *  when absent (backwards compatibility). New formats add new tags here without
+   *  bumping the file-header version. */
+  dataFormat?: string;
 }
 
 export function writeManifest(m: VskManifest): Uint8Array {
@@ -69,6 +78,8 @@ function isManifest(x: unknown): x is VskManifest {
   if (typeof m.ttlExpiresAt !== "string") return false;
   if (!Array.isArray(m.tables)) return false;
   if (!Array.isArray(m.piiMasks)) return false;
+  if (m.engineVersion !== undefined && typeof m.engineVersion !== "string") return false;
+  if (m.dataFormat !== undefined && typeof m.dataFormat !== "string") return false;
   for (const t of m.tables) if (!isTable(t)) return false;
   for (const p of m.piiMasks) if (!isMask(p)) return false;
   return true;
@@ -95,6 +106,7 @@ function isMask(x: unknown): x is VskPiiMask {
   const m = x as Record<string, unknown>;
   if (typeof m.table !== "string") return false;
   if (typeof m.column !== "string") return false;
-  if (m.maskType !== "hash" && m.maskType !== "redact" && m.maskType !== "static" && m.maskType !== "partial") return false;
+  if (typeof m.maskType !== "string") return false;
+  if (!VSK_MASK_TYPES.includes(m.maskType as VskMaskType)) return false;
   return true;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { writeHeader, readHeader, VSK_MAGIC, VSK_VERSION } from "../src/vsk-format/header";
-import { writeManifest, readManifest, type VskManifest } from "../src/vsk-format/manifest";
+import { writeManifest, readManifest, VSK_MASK_TYPES, type VskManifest } from "../src/vsk-format/manifest";
 
 describe("vsk-format header", () => {
   it("round-trips a header", () => {
@@ -114,5 +114,37 @@ describe("vsk-format manifest", () => {
     const parsed = readManifest(writeManifest(unicode));
     expect(parsed.schemaName).toBe("PEDIDOS_ÇÃO");
     expect(parsed.tables[0]!.name).toBe("CLIENTÉS");
+  });
+
+  it("accepts a manifest with optional engineVersion and dataFormat", () => {
+    const withProvenance: VskManifest = {
+      ...sample,
+      engineVersion: "0.1.0",
+      dataFormat: "parquet-streams-v1",
+    };
+    const parsed = readManifest(writeManifest(withProvenance));
+    expect(parsed.engineVersion).toBe("0.1.0");
+    expect(parsed.dataFormat).toBe("parquet-streams-v1");
+  });
+
+  it("rejects engineVersion of wrong type", () => {
+    const bad = JSON.stringify({ ...sample, engineVersion: 42 });
+    expect(() => readManifest(new TextEncoder().encode(bad))).toThrow(/malformed/i);
+  });
+
+  it("rejects an unknown maskType", () => {
+    const bad = JSON.stringify({ ...sample, piiMasks: [{ table: "ORDERS", column: "EMAIL", maskType: "shuffle" }] });
+    expect(() => readManifest(new TextEncoder().encode(bad))).toThrow(/malformed/i);
+  });
+
+  it("accepts an empty tables array and empty piiMasks", () => {
+    const empty: VskManifest = { ...sample, tables: [], piiMasks: [] };
+    const parsed = readManifest(writeManifest(empty));
+    expect(parsed.tables).toEqual([]);
+    expect(parsed.piiMasks).toEqual([]);
+  });
+
+  it("exposes VSK_MASK_TYPES as a const tuple", () => {
+    expect(VSK_MASK_TYPES).toEqual(["hash", "redact", "static", "partial"]);
   });
 });
