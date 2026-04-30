@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { mapOracleType, mapDuckDBType } from "../src/oracle-shim/types";
 import { translate } from "../src/oracle-shim/translator";
+import { installSystemViews } from "../src/oracle-shim/system-views";
+import { DuckDBHost } from "../src/duckdb-host";
 
 describe("oracle-shim type adapter — Oracle → DuckDB", () => {
   const cases: Array<[string, string]> = [
@@ -220,5 +222,92 @@ describe("oracle-shim SQL translator", () => {
   it("translates ROWNUM at end of statement (semicolon variant)", () => {
     expect(translate("SELECT * FROM t WHERE ROWNUM <= 5;"))
       .toBe("SELECT * FROM t LIMIT 5;");
+  });
+});
+
+describe("oracle-shim system views", () => {
+  it("populates USER_OBJECTS and USER_TAB_COLUMNS from a DuckDB schema", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec("CREATE TABLE orders (id INT, total DECIMAL(18,2))");
+      await host.exec("CREATE TABLE customers (id INT, name VARCHAR)");
+      await installSystemViews(host, "TEST_OWNER");
+
+      const objs = await host.query("SELECT object_name FROM user_objects ORDER BY object_name");
+      expect(objs.map((r) => r.object_name)).toEqual(["CUSTOMERS", "ORDERS"]);
+
+      const cols = await host.query(
+        "SELECT column_name, data_type FROM user_tab_columns WHERE table_name='ORDERS' ORDER BY column_id",
+      );
+      expect(cols).toEqual([
+        { column_name: "ID", data_type: "NUMBER(10,0)" },
+        { column_name: "TOTAL", data_type: "NUMBER(18,2)" },
+      ]);
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("only includes tables, not the system views themselves", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec("CREATE TABLE foo (id INT)");
+      await installSystemViews(host, "X");
+      const rows = await host.query("SELECT object_name FROM user_objects ORDER BY object_name");
+      const names = rows.map((r) => r.object_name);
+      expect(names).toContain("FOO");
+      expect(names).not.toContain("USER_OBJECTS");
+      expect(names).not.toContain("USER_TAB_COLUMNS");
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("can be reinstalled after schema changes", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec("CREATE TABLE a (id INT)");
+      await installSystemViews(host, "X");
+      let rows = await host.query("SELECT object_name FROM user_objects");
+      expect(rows.length).toBe(1);
+
+      await host.exec("CREATE TABLE b (id INT)");
+      await installSystemViews(host, "X");
+      rows = await host.query("SELECT object_name FROM user_objects ORDER BY object_name");
+      expect(rows.map((r) => r.object_name)).toEqual(["A", "B"]);
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("populates nullable indicator", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec("CREATE TABLE t (id INT NOT NULL, name VARCHAR)");
+      await installSystemViews(host, "X");
+      const rows = await host.query(
+        "SELECT column_name, nullable FROM user_tab_columns WHERE table_name='T' ORDER BY column_id",
+      );
+      expect(rows).toEqual([
+        { column_name: "ID", nullable: "N" },
+        { column_name: "NAME", nullable: "Y" },
+      ]);
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("escapes special characters in column / table names safely", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "weird$tab" ("col_1" INT)`);
+      await installSystemViews(host, "X");
+      const rows = await host.query(
+        "SELECT object_name FROM user_objects WHERE object_name = 'WEIRD$TAB'",
+      );
+      expect(rows.length).toBe(1);
+    } finally {
+      await host.close();
+    }
   });
 });
