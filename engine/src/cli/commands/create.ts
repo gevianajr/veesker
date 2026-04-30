@@ -6,6 +6,22 @@ import { writeVsk } from "../../vsk-format/writer";
 import { assertValidTableName } from "../../vsk-format/errors";
 import type { VskManifest, VskTable } from "../../vsk-format/manifest";
 
+/**
+ * Allowlist for `column.type` strings in the schema JSON. Permits letters,
+ * digits, spaces, parens, and commas (e.g. `DECIMAL(10,2)`, `VARCHAR(100)`,
+ * `TIMESTAMP WITH TIME ZONE`). Rejects semicolons, identifiers prefixed with
+ * symbols, and anything that could close the DDL and inject another statement.
+ */
+const COLUMN_TYPE_RE = /^[A-Za-z][A-Za-z0-9 (),]{0,63}$/;
+
+function assertValidColumnType(type: string): void {
+  if (!COLUMN_TYPE_RE.test(type)) {
+    throw new Error(
+      `invalid column type ${JSON.stringify(type).slice(0, 80)} (must match ${COLUMN_TYPE_RE.source})`,
+    );
+  }
+}
+
 interface SchemaJson {
   schemaName: string;
   ttlDays: number;
@@ -39,12 +55,27 @@ function readSchema(path: string): SchemaJson {
       const cc = c as Record<string, unknown>;
       if (typeof cc.name !== "string") throw new Error("column.name must be a string");
       if (typeof cc.type !== "string") throw new Error("column.type must be a string");
+      assertValidColumnType(cc.type);
       if (typeof cc.nullable !== "boolean") throw new Error("column.nullable must be a boolean");
     }
   }
   return obj as SchemaJson;
 }
 
+/**
+ * Register the `create` subcommand on the given commander program.
+ *
+ * Trust model: the schema JSON is treated as trusted-author input. Each
+ * `csv` path is read from the local filesystem; each `column.type` is
+ * interpolated into a `CREATE TABLE` DDL after a regex allowlist check
+ * (see {@link COLUMN_TYPE_RE}). Each `table.name` passes through
+ * `assertValidTableName` before any DB work.
+ *
+ * Do NOT consume schemas from untrusted sources without additional
+ * sandboxing — even with the allowlist, a malicious author could exhaust
+ * disk by pointing `csv` at a huge file or by declaring thousands of
+ * tables.
+ */
 export function registerCreate(program: Command): void {
   program
     .command("create")
