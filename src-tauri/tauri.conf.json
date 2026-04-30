@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' asset: https://asset.localhost; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: asset: https://asset.localhost blob:; connect-src ipc: http://ipc.localhost https://api.anthropic.com https://api.veesker.cloud http://localhost:1420; frame-src 'none'; object-src 'none'"
+      "csp": "default-src 'self' asset: https://asset.localhost; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: asset: https://asset.localhost blob:; connect-src ipc: http://ipc.localhost https://api.veesker.cloud; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
     }
   },
   "bundle": {
