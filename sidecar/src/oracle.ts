@@ -183,13 +183,18 @@ export function tryEnableThickMode(): { mode: "thin" | "thick"; libDir?: string;
   const explicit = process.env.VEESKER_INSTANT_CLIENT_DIR;
   if (explicit) attempts.push({ libDir: explicit, label: `env VEESKER_INSTANT_CLIENT_DIR=${explicit}` });
   // LOW-002: cached libDir from a previous successful init wins second priority.
-  // Skips the deep filesystem walk on every startup (was 1-3s on machines with
-  // multiple Oracle installs).
   const cached = readCachedLibDir();
   if (cached) attempts.push({ libDir: cached, label: `cache hit ${cached}` });
   attempts.push({ label: "default search path" });
-  for (const dir of findInstantClientCandidates()) {
-    attempts.push({ libDir: dir, label: `auto-discovered ${dir}` });
+  // Only walk the filesystem if there's no cache hit. findInstantClientCandidates()
+  // does a synchronous readdir recursion across C:\\app\\<user>\\product\\..., C:\\Oracle,
+  // C:\\Program Files\\Oracle, etc., which is the 1-3s cost the cache exists to skip.
+  // Discovered via ultrareview bug_003 — the previous version called this even on
+  // cache hits, defeating the whole point of LOW-002.
+  if (!cached) {
+    for (const dir of findInstantClientCandidates()) {
+      attempts.push({ libDir: dir, label: `auto-discovered ${dir}` });
+    }
   }
 
   for (const a of attempts) {

@@ -98,16 +98,23 @@ function stripStringsAndComments(sql: string): string {
   while (i < sql.length) {
     const c = sql[i];
     const next = sql[i + 1];
-    // Line comment
+    // Line comment — emit a space to preserve token boundaries (the trailing
+    // newline below would normally do this, but defend against edits that
+    // change the loop bound).
     if (c === "-" && next === "-") {
       while (i < sql.length && sql[i] !== "\n") i++;
+      result += " ";
       continue;
     }
-    // Block comment
+    // Block comment — MUST emit a space placeholder. Without it, an inline
+    // comment like SELECT/*hint*/1 collapses into "SELECT1" and the first-
+    // word check rejects a legitimate read-only query. Discovered via
+    // ultrareview bug_001 on the audit-2026-04-30 PR.
     if (c === "/" && next === "*") {
       i += 2;
       while (i < sql.length - 1 && !(sql[i] === "*" && sql[i + 1] === "/")) i++;
       i += 2;
+      result += " ";
       continue;
     }
     // Standard string literal with Oracle-style '' escape.
@@ -149,10 +156,15 @@ function stripStringsAndComments(sql: string): string {
 }
 
 const DANGEROUS_KEYWORDS = [
-  // DML / DDL / TCL
+  // DML / DDL / TCL.
+  // NOTE: REPLACE is intentionally absent. Oracle has no standalone REPLACE
+  // statement (that's MySQL/SQLite); REPLACE() is a string function, and
+  // CREATE OR REPLACE is already covered by CREATE. Including REPLACE here
+  // would block legitimate `SELECT REPLACE(name, 'a', 'b') FROM t` queries.
+  // Discovered via ultrareview bug_002 on the audit-2026-04-30 PR.
   "INSERT", "UPDATE", "DELETE", "MERGE", "CREATE", "DROP", "ALTER", "TRUNCATE",
   "RENAME", "GRANT", "REVOKE", "EXECUTE", "EXEC", "CALL", "BEGIN", "DECLARE",
-  "COMMIT", "ROLLBACK", "UPSERT", "REPLACE", "LOCK", "SET",
+  "COMMIT", "ROLLBACK", "UPSERT", "LOCK", "SET",
   // Side-effecting Oracle packages — exfiltration / DoS / autonomous DDL.
   "UTL_HTTP", "UTL_TCP", "UTL_SMTP", "UTL_FILE", "UTL_INADDR",
   "DBMS_LOCK", "DBMS_HTTP", "DBMS_LDAP", "DBMS_SCHEDULER",

@@ -111,6 +111,29 @@ describe("isReadOnlySql (MEDIUM-001 hardened gate)", () => {
   test("blocks multi-statement SELECT;DROP", () => {
     expect(isReadOnlySql("SELECT 1; DROP TABLE x")).toBe(false);
   });
+
+  // Regression for ultrareview bug_001 — block comments without surrounding
+  // whitespace must not collapse keyword + next-token boundaries.
+  test("accepts SELECT with block comment lacking surrounding whitespace", () => {
+    expect(isReadOnlySql("SELECT/*c*/1 FROM dual")).toBe(true);
+    expect(isReadOnlySql("WITH/*c*/cte AS (SELECT 1 FROM dual) SELECT * FROM cte")).toBe(true);
+  });
+
+  test("accepts SELECT with Oracle hint inline comment", () => {
+    expect(isReadOnlySql("SELECT /*+ INDEX(t i1) */ * FROM t")).toBe(true);
+  });
+
+  // Regression for ultrareview bug_002 — REPLACE() is a string function in
+  // Oracle, not a statement. It must not be in DANGEROUS_KEYWORDS.
+  test("accepts SELECT REPLACE() function call (common Oracle string built-in)", () => {
+    expect(isReadOnlySql("SELECT REPLACE(name, 'old', 'new') FROM employees")).toBe(true);
+  });
+
+  test("accepts nested SELECT REPLACE() calls (CHR(13)/CHR(10) cleaning pattern)", () => {
+    expect(isReadOnlySql(
+      "SELECT REPLACE(REPLACE(addr, CHR(13), ''), CHR(10), ' ') FROM customers"
+    )).toBe(true);
+  });
 });
 
 describe("aiChat (PROD-001 prod-connection gate)", () => {
