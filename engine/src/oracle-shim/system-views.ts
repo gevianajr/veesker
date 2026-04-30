@@ -1,36 +1,40 @@
 import type { DuckDBHost } from "../duckdb-host";
 import { mapDuckDBType } from "./types";
 
-const SYSTEM_TABLE_NAMES = ["user_objects", "user_tab_columns"] as const;
-
 /**
  * Drop and rebuild Oracle-style metadata views inside a DuckDB host.
  *
  * Populates two tables:
- *   - `USER_OBJECTS` — one row per non-system table (object_name + object_type)
- *   - `USER_TAB_COLUMNS` — one row per column with Oracle-mapped data_type
+ *   - `USER_OBJECTS(object_name, object_type, status, created, last_ddl_time)`
+ *     — one row per non-system table.
+ *   - `USER_TAB_COLUMNS(table_name, column_name, data_type, data_length, nullable, column_id)`
+ *     — one row per column with Oracle-mapped data_type.
  *
  * Idempotent: safe to call multiple times. Subsequent calls fully refresh
  * the views to reflect the current `information_schema` state — handy
  * after DDL.
  *
+ * Refresh atomicity: uses `CREATE OR REPLACE TABLE` rather than DROP+CREATE
+ * to avoid leaving the host in a half-rebuilt state if a step fails.
+ *
+ * Performance: emits exactly two batch INSERTs per call (one per view) so
+ * a sandbox with hundreds of tables doesn't pay thousands of round-trips.
+ *
  * Notes:
  *   - Object names are upper-cased on output (Oracle convention).
  *   - DuckDB types are mapped to Oracle equivalents via `mapDuckDBType`.
  *   - The system-view tables themselves are excluded from `USER_OBJECTS`.
+ *   - `data_length` is a placeholder (4000) for v1 — real Oracle byte
+ *     lengths come in Plan 7.
  *   - The `owner` parameter is informational; the views currently expose
- *     only the host's `main` schema (DuckDB's default). Reserved for
- *     future use when multi-schema support lands.
+ *     only the host's `main` schema (DuckDB default). Reserved for
+ *     multi-schema support.
  */
-export async function installSystemViews(host: DuckDBHost, owner: string): Promise<void> {
+export async function installSystemViews(host: DuckDBHost, owner?: string): Promise<void> {
   void owner;
 
-  for (const t of SYSTEM_TABLE_NAMES) {
-    await host.exec(`DROP TABLE IF EXISTS ${t}`);
-  }
-
   await host.exec(`
-    CREATE TABLE user_objects (
+    CREATE OR REPLACE TABLE user_objects (
       object_name VARCHAR,
       object_type VARCHAR,
       status VARCHAR,
@@ -39,7 +43,7 @@ export async function installSystemViews(host: DuckDBHost, owner: string): Promi
     )
   `);
   await host.exec(`
-    CREATE TABLE user_tab_columns (
+    CREATE OR REPLACE TABLE user_tab_columns (
       table_name VARCHAR,
       column_name VARCHAR,
       data_type VARCHAR,
@@ -57,11 +61,17 @@ export async function installSystemViews(host: DuckDBHost, owner: string): Promi
     ORDER BY table_name
   `);
 
+  if (tables.length === 0) return;
+
+  const objectRows: string[] = [];
+  const columnRows: string[] = [];
+
   for (const row of tables) {
     const tName = String(row.table_name);
     const tNameUpper = tName.toUpperCase();
-    await host.exec(
-      `INSERT INTO user_objects VALUES (${sqlStr(tNameUpper)}, 'TABLE', 'VALID', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+
+    objectRows.push(
+      `(${sqlStr(tNameUpper)}, 'TABLE', 'VALID', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
     );
 
     const cols = await host.query(`
@@ -75,10 +85,17 @@ export async function installSystemViews(host: DuckDBHost, owner: string): Promi
       const oraType = mapDuckDBType(String(c.data_type));
       const nullable = String(c.is_nullable) === "YES" ? "Y" : "N";
       const colId = Number(c.ordinal_position);
-      await host.exec(
-        `INSERT INTO user_tab_columns VALUES (${sqlStr(tNameUpper)}, ${sqlStr(colName)}, ${sqlStr(oraType)}, 4000, ${sqlStr(nullable)}, ${colId})`,
+      columnRows.push(
+        `(${sqlStr(tNameUpper)}, ${sqlStr(colName)}, ${sqlStr(oraType)}, 4000, ${sqlStr(nullable)}, ${colId})`,
       );
     }
+  }
+
+  if (objectRows.length > 0) {
+    await host.exec(`INSERT INTO user_objects VALUES ${objectRows.join(", ")}`);
+  }
+  if (columnRows.length > 0) {
+    await host.exec(`INSERT INTO user_tab_columns VALUES ${columnRows.join(", ")}`);
   }
 }
 

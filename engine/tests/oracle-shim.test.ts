@@ -310,4 +310,35 @@ describe("oracle-shim system views", () => {
       await host.close();
     }
   });
+
+  it("escapes single quotes in identifiers via sqlStr", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "O'Brien" ("col'name" INT)`);
+      await installSystemViews(host);
+      const objs = await host.query(
+        "SELECT object_name FROM user_objects WHERE object_name = 'O''BRIEN'",
+      );
+      expect(objs.length).toBe(1);
+      const cols = await host.query(
+        "SELECT column_name FROM user_tab_columns WHERE table_name = 'O''BRIEN'",
+      );
+      expect(cols.map((r) => r.column_name)).toEqual(["COL'NAME"]);
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("handles empty schema (no tables) without error", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await installSystemViews(host);
+      const objs = await host.query("SELECT * FROM user_objects");
+      expect(objs).toEqual([]);
+      const cols = await host.query("SELECT * FROM user_tab_columns");
+      expect(cols).toEqual([]);
+    } finally {
+      await host.close();
+    }
+  });
 });
