@@ -24,8 +24,8 @@
       "identifier": "fs:scope",
       "allow": [
         { "path": "$DOCUMENT/**" },
-        { "path": "$DESKTOP/**" },
-        { "path": "$DOWNLOAD/**" }
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$APPDATA/dev.veesker.app/**" }
       ]
     },
     "dialog:allow-save",
