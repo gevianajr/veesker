@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { registerInfo } from "./commands/info";
 import { registerCreate } from "./commands/create";
+import { registerQuery } from "./commands/query";
 
 const program = new Command();
 program
@@ -11,6 +12,7 @@ program
 
 registerInfo(program);
 registerCreate(program);
+registerQuery(program);
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(`error: ${(err as Error).message}`);
