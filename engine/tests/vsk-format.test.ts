@@ -3,6 +3,8 @@ import { writeHeader, readHeader, VSK_MAGIC, VSK_VERSION } from "../src/vsk-form
 import { writeManifest, readManifest, VSK_MASK_TYPES, type VskManifest } from "../src/vsk-format/manifest";
 import { writeVsk } from "../src/vsk-format/writer";
 import { readVsk } from "../src/vsk-format/reader";
+import { readVskHeader, readVskManifest } from "../src/vsk-format/reader";
+import { VskFormatError } from "../src/vsk-format/errors";
 import { DuckDBHost } from "../src/duckdb-host";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -269,6 +271,165 @@ describe("vsk-format writer + reader", () => {
     } finally {
       await src.close();
       try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+});
+
+describe("vsk-format safety + edge cases", () => {
+  it("writer rejects an unsafe table name in the manifest", async () => {
+    const src = await DuckDBHost.openInMemory();
+    try {
+      const path = join(tmpdir(), `vsk-unsafe-${process.pid}-${Date.now()}.vsk`);
+      await expect(writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "../../../etc/passwd", rowCount: 0, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      })).rejects.toThrow(/invalid table name/i);
+      expect(existsSync(path)).toBe(false);
+    } finally {
+      await src.close();
+    }
+  });
+
+  it("writer rejects a table name with a newline", async () => {
+    const src = await DuckDBHost.openInMemory();
+    try {
+      const path = join(tmpdir(), `vsk-nl-${process.pid}-${Date.now()}.vsk`);
+      await expect(writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "ORDERS\nDROP", rowCount: 0, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      })).rejects.toThrow(/invalid table name/i);
+    } finally {
+      await src.close();
+    }
+  });
+
+  it("readVsk supports replace: true to overwrite existing tables", async () => {
+    const path = join(tmpdir(), `vsk-replace-${process.pid}-${Date.now()}.vsk`);
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE t (id INT)");
+      await src.exec("INSERT INTO t VALUES (42)");
+      await writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "T", rowCount: 1, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      });
+
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await dst.exec("CREATE TABLE t (id INT)");
+        await expect(readVsk(path, dst)).rejects.toThrow();
+        await readVsk(path, dst, { replace: true });
+        const rows = await dst.query("SELECT id FROM t");
+        expect(rows).toEqual([{ id: 42 }]);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("round-trips an empty tables array", async () => {
+    const path = join(tmpdir(), `vsk-empty-${process.pid}-${Date.now()}.vsk`);
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [],
+        piiMasks: [],
+      });
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        const m = await readVsk(path, dst);
+        expect(m.tables).toEqual([]);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("round-trips a 0-row table", async () => {
+    const path = join(tmpdir(), `vsk-zero-${process.pid}-${Date.now()}.vsk`);
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE empty (id INT, label VARCHAR)");
+      await writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "EMPTY", rowCount: 0, columns: [
+          { name: "ID", type: "INTEGER", nullable: false },
+          { name: "LABEL", type: "VARCHAR", nullable: true },
+        ] }],
+        piiMasks: [],
+      });
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await readVsk(path, dst);
+        const rows = await dst.query("SELECT * FROM empty");
+        expect(rows).toEqual([]);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("readVskHeader does not load the whole file (smoke)", async () => {
+    const path = join(tmpdir(), `vsk-cheap-header-${process.pid}-${Date.now()}.vsk`);
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE t (id INT)");
+      await src.exec("INSERT INTO t SELECT range FROM range(0, 100)");
+      await writeVsk(src, path, {
+        builtAt: "2026-04-30T12:00:00.000Z",
+        sourceId: "x",
+        schemaName: "X",
+        ttlExpiresAt: "2026-05-07T12:00:00.000Z",
+        tables: [{ name: "T", rowCount: 100, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      });
+      const header = readVskHeader(path);
+      expect(header.version).toBe(1);
+      const m = readVskManifest(path);
+      expect(m.schemaName).toBe("X");
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("VskFormatError is thrown with the right code on bad magic", () => {
+    const buf = new Uint8Array(64);
+    new DataView(buf.buffer).setUint16(4, 1, true);
+    try {
+      readHeader(buf);
+      throw new Error("readHeader should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(VskFormatError);
+      expect((err as VskFormatError).code).toBe("BAD_MAGIC");
     }
   });
 });

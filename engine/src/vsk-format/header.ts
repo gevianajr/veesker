@@ -1,3 +1,5 @@
+import { VskFormatError } from "./errors";
+
 /**
  * `.vsk` file header — fixed 64 bytes at offset 0 of every sandbox file.
  *
@@ -51,16 +53,16 @@ export function writeHeader(fields: Omit<VskHeader, "magic" | "version">): Uint8
 
 export function readHeader(buf: Uint8Array): VskHeader {
   if (buf.byteLength < HEADER_SIZE) {
-    throw new Error(`vsk header truncated: got ${buf.byteLength}, expected ${HEADER_SIZE}`);
+    throw new VskFormatError("TRUNCATED", `vsk header truncated: got ${buf.byteLength}, expected ${HEADER_SIZE}`);
   }
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const magic = view.getUint32(0, false);
   if (magic !== VSK_MAGIC) {
-    throw new Error(`vsk: bad magic bytes (got 0x${magic.toString(16)})`);
+    throw new VskFormatError("BAD_MAGIC", `vsk: bad magic bytes (got 0x${magic.toString(16)})`);
   }
   const version = view.getUint16(4, true);
   if (version !== VSK_VERSION) {
-    throw new Error(`vsk: unsupported version ${version} (engine supports ${VSK_VERSION})`);
+    throw new VskFormatError("BAD_VERSION", `vsk: unsupported version ${version} (engine supports ${VSK_VERSION})`);
   }
   return {
     magic,

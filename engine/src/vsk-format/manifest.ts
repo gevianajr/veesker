@@ -1,3 +1,5 @@
+import { VskFormatError } from "./errors";
+
 /**
  * `.vsk` manifest — JSON document describing a sandbox's contents.
  *
@@ -61,10 +63,10 @@ export function readManifest(buf: Uint8Array): VskManifest {
   try {
     obj = JSON.parse(text);
   } catch (err) {
-    throw new Error(`vsk manifest: malformed JSON (${(err as Error).message})`);
+    throw new VskFormatError("MALFORMED_MANIFEST", `vsk manifest: malformed JSON (${(err as Error).message})`);
   }
   if (!isManifest(obj)) {
-    throw new Error("vsk manifest: malformed (missing or wrongly-typed required fields)");
+    throw new VskFormatError("MALFORMED_MANIFEST", "vsk manifest: malformed (missing or wrongly-typed required fields)");
   }
   return obj;
 }
