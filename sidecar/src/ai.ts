@@ -77,23 +77,91 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-/**
- * Strip SQL comments then verify the statement is read-only.
- * Blocks leading comments before DML, WITH...DELETE/INSERT, and any
- * explicit DML/DDL keyword regardless of position.
- */
-function isReadOnlySql(raw: string): boolean {
-  const stripped = raw
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+// MEDIUM-001 (audit 2026-04-30): SQL string-and-comment-aware tokenizer used by
+// the AI tool gate. Replaces the prior naive comment-strip regex which had two
+// problems: (1) bypasses via UTL_HTTP / DBMS_LOCK / FOR UPDATE, and (2) over-
+// blocks legitimate SELECTs whose string literals contain DML keywords (e.g.,
+// `SELECT ... WHERE message LIKE '%insert into%'`).
+//
+// SECURITY: this is the AI tool's last-resort gate. The primary defense should
+// be a dedicated read-only Oracle role (see roadmap PROD-006/AI-RO-CRED).
+// When that ships, this function becomes belt-and-suspenders.
+function stripStringsAndComments(sql: string): string {
+  let result = "";
+  let i = 0;
+  while (i < sql.length) {
+    const c = sql[i];
+    const next = sql[i + 1];
+    // Line comment
+    if (c === "-" && next === "-") {
+      while (i < sql.length && sql[i] !== "\n") i++;
+      continue;
+    }
+    // Block comment
+    if (c === "/" && next === "*") {
+      i += 2;
+      while (i < sql.length - 1 && !(sql[i] === "*" && sql[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+    // Standard string literal with Oracle-style '' escape.
+    if (c === "'") {
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === "'" && sql[i + 1] === "'") { i += 2; continue; }
+        if (sql[i] === "'") { i++; break; }
+        i++;
+      }
+      result += "''"; // empty placeholder
+      continue;
+    }
+    // Oracle q-quoted string: q'<delim>...<delim>'
+    if ((c === "q" || c === "Q") && next === "'" && sql[i + 2]) {
+      const open = sql[i + 2];
+      const closingMap: Record<string, string> = { "[": "]", "(": ")", "{": "}", "<": ">" };
+      const close = closingMap[open] ?? open;
+      i += 3;
+      while (i < sql.length - 1) {
+        if (sql[i] === close && sql[i + 1] === "'") { i += 2; break; }
+        i++;
+      }
+      result += "''";
+      continue;
+    }
+    // Quoted identifier
+    if (c === '"') {
+      i++;
+      while (i < sql.length && sql[i] !== '"') i++;
+      i++;
+      result += '""';
+      continue;
+    }
+    result += c;
+    i++;
+  }
+  return result;
+}
 
+const DANGEROUS_KEYWORDS = [
+  // DML / DDL / TCL
+  "INSERT", "UPDATE", "DELETE", "MERGE", "CREATE", "DROP", "ALTER", "TRUNCATE",
+  "RENAME", "GRANT", "REVOKE", "EXECUTE", "EXEC", "CALL", "BEGIN", "DECLARE",
+  "COMMIT", "ROLLBACK", "UPSERT", "REPLACE", "LOCK", "SET",
+  // Side-effecting Oracle packages — exfiltration / DoS / autonomous DDL.
+  "UTL_HTTP", "UTL_TCP", "UTL_SMTP", "UTL_FILE", "UTL_INADDR",
+  "DBMS_LOCK", "DBMS_HTTP", "DBMS_LDAP", "DBMS_SCHEDULER",
+  "DBMS_AQ", "DBMS_PIPE", "DBMS_FLASHBACK", "DBMS_OUTPUT",
+];
+const DANGEROUS_RE = new RegExp(`\\b(${DANGEROUS_KEYWORDS.join("|")})\\b`, "i");
+const FOR_UPDATE_RE = /\bFOR\s+UPDATE\b/i;
+
+export function isReadOnlySql(raw: string): boolean {
+  const stripped = stripStringsAndComments(raw).replace(/\s+/g, " ").trim();
   const first = /^(\w+)/i.exec(stripped)?.[1]?.toUpperCase();
   if (first !== "SELECT" && first !== "WITH") return false;
-
-  const dangerous = /\b(INSERT|UPDATE|DELETE|MERGE|CREATE|DROP|ALTER|TRUNCATE|RENAME|GRANT|REVOKE|EXECUTE|EXEC|CALL|BEGIN|DECLARE|COMMIT|ROLLBACK|UPSERT|REPLACE)\b/i;
-  return !dangerous.test(stripped);
+  if (DANGEROUS_RE.test(stripped)) return false;
+  if (FOR_UPDATE_RE.test(stripped)) return false;
+  return true;
 }
 
 async function executeTool(name: string, input: Record<string, string>): Promise<string> {
