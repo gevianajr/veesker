@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "description": "VeeskerDB — embedded analytical engine with Oracle SQL compatibility shim",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/veesker-cloud/veesker-community-edition.git"
+  },
+  "homepage": "https://veesker.cloud",
+  "author": {
+    "name": "Geraldo Ferreira Viana Júnior",
+    "email": "geraldovianajr@veesker.cloud",
+    "url": "https://github.com/gevianajr"
+  },
+  "bugs": {
+    "url": "https://github.com/veesker-cloud/veesker-community-edition/issues"
+  },
   "type": "module",
   "main": "src/index.ts",
   "bin": {
@@ -10,7 +23,11 @@
   },
   "scripts": {
     "test": "bun test",
-    "build:cli": "bun build src/cli/index.ts --compile --outfile dist/vsk-engine"
+    "typecheck": "tsc --noEmit",
+    "build:cli:win-x64": "bun build src/cli/index.ts --compile --target=bun-windows-x64 --outfile dist/vsk-engine.exe",
+    "build:cli:mac-arm64": "bun build src/cli/index.ts --compile --target=bun-darwin-arm64 --outfile dist/vsk-engine",
+    "build:cli:mac-x64": "bun build src/cli/index.ts --compile --target=bun-darwin-x64 --outfile dist/vsk-engine",
+    "build:cli:linux-x64": "bun build src/cli/index.ts --compile --target=bun-linux-x64 --outfile dist/vsk-engine"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.2-r.1",
@@ -19,6 +36,7 @@
     "libsodium-wrappers-sumo": "^0.8.4"
   },
   "devDependencies": {
-    "@types/libsodium-wrappers-sumo": "^0.7.8"
+    "@types/libsodium-wrappers-sumo": "^0.7.8",
+    "bun-types": "latest"
   }
 }
