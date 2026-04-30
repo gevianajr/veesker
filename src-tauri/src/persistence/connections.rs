@@ -165,6 +165,68 @@ fn validate_env(env: &Option<String>) -> Result<(), ConnectionError> {
     Ok(())
 }
 
+// HIGH-002 (audit 2026-04-30): reject any character that has meaning in Oracle
+// EZConnect+ syntax. Without this, a user-supplied host like
+// `db.evil.com)(SECURITY=(SSL_SERVER_CERT_DN=*))` would be interpolated into
+// the connection string and Oracle would parse it as TNS descriptor fragments,
+// allowing connection-string injection (disable cert validation, redirect
+// wallet location to attacker SMB share, etc.).
+//
+// Allowed: ASCII letters, digits, dot, hyphen, colon (IPv6), brackets (IPv6
+// bracketed form). Reject anything else, including parentheses, equals, slash,
+// backslash, question mark, ampersand, whitespace, control chars.
+pub(crate) fn validate_host(host: &str) -> Result<(), ConnectionError> {
+    if host.trim().is_empty() {
+        return Err(ConnectionError::invalid("host is required"));
+    }
+    if host.len() > 253 {
+        return Err(ConnectionError::invalid("host too long (max 253 chars)"));
+    }
+    let invalid_chars = ['(', ')', '?', '=', '/', '\\', ' ', '\t', '\n', '"', '\'', '@', '&', '%'];
+    if host.chars().any(|c| invalid_chars.contains(&c) || c.is_control()) {
+        return Err(ConnectionError::invalid(
+            "host contains invalid characters (allowed: letters, digits, hyphens, dots, colons, brackets for IPv6)",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_service_name(svc: &str) -> Result<(), ConnectionError> {
+    if svc.trim().is_empty() {
+        return Err(ConnectionError::invalid("service name is required"));
+    }
+    if svc.len() > 128 {
+        return Err(ConnectionError::invalid("service name too long (max 128 chars)"));
+    }
+    if !svc
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+    {
+        return Err(ConnectionError::invalid(
+            "service name contains invalid characters (allowed: letters, digits, underscore, dot, hyphen)",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_connect_alias(alias: &str) -> Result<(), ConnectionError> {
+    if alias.trim().is_empty() {
+        return Err(ConnectionError::invalid("connect alias is required"));
+    }
+    if alias.len() > 128 {
+        return Err(ConnectionError::invalid("connect alias too long (max 128 chars)"));
+    }
+    if !alias
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+    {
+        return Err(ConnectionError::invalid(
+            "connect alias contains invalid characters (allowed: letters, digits, underscore, dot, hyphen)",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WalletInfo {
@@ -395,9 +457,10 @@ impl ConnectionService {
                 if name.trim().is_empty() {
                     return Err(ConnectionError::invalid("name is required"));
                 }
-                if host.trim().is_empty() {
-                    return Err(ConnectionError::invalid("host is required"));
-                }
+                // HIGH-002 (audit 2026-04-30): char-class validation prevents
+                // EZConnect+ injection via host or service_name fields.
+                validate_host(&host)?;
+                validate_service_name(&service_name)?;
                 if username.trim().is_empty() {
                     return Err(ConnectionError::invalid("username is required"));
                 }
@@ -443,9 +506,9 @@ impl ConnectionService {
                 if wallet_password.is_empty() && id.is_none() {
                     return Err(ConnectionError::invalid("wallet password is required"));
                 }
-                if connect_alias.trim().is_empty() {
-                    return Err(ConnectionError::invalid("connect alias is required"));
-                }
+                // HIGH-002 (audit 2026-04-30): char-class validation on the
+                // wallet alias prevents the same injection vector via TNS aliases.
+                validate_connect_alias(&connect_alias)?;
                 validate_env(&safety.env)?;
                 let row = self.assemble_wallet_row(
                     id.as_deref(),
@@ -785,5 +848,94 @@ impl ConnectionService {
     pub fn object_version_push(&self, connection_id: &str) -> Result<u32, ConnectionError> {
         object_versions::push(&self.data_dir, connection_id)
             .map_err(|e| ConnectionError::internal(format!("object_version_push: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    // HIGH-002 (audit 2026-04-30): each Appendix C payload must be rejected.
+    #[test]
+    fn rejects_host_with_paren_injection() {
+        assert!(validate_host("good.com)(SECURITY=").is_err());
+    }
+
+    #[test]
+    fn rejects_host_with_question_mark() {
+        assert!(validate_host("good.com?WALLET_LOCATION=//evil").is_err());
+    }
+
+    #[test]
+    fn rejects_host_with_equals() {
+        assert!(validate_host("good.com=evil.com").is_err());
+    }
+
+    #[test]
+    fn rejects_host_with_whitespace() {
+        assert!(validate_host("good com").is_err());
+    }
+
+    #[test]
+    fn rejects_host_with_backslash() {
+        assert!(validate_host("\\\\evil-server\\share").is_err());
+    }
+
+    #[test]
+    fn rejects_host_with_zone_id() {
+        assert!(validate_host("fe80::1%eth0").is_err());
+    }
+
+    #[test]
+    fn accepts_valid_hostname() {
+        assert!(validate_host("db.example.com").is_ok());
+    }
+
+    #[test]
+    fn accepts_valid_ipv4() {
+        assert!(validate_host("192.168.1.1").is_ok());
+    }
+
+    #[test]
+    fn accepts_valid_ipv6_unbracketed() {
+        assert!(validate_host("::1").is_ok());
+    }
+
+    #[test]
+    fn accepts_valid_ipv6_bracketed() {
+        assert!(validate_host("[2001:db8::1]").is_ok());
+    }
+
+    #[test]
+    fn rejects_service_name_with_query_param() {
+        assert!(validate_service_name("PROD?WALLET_LOCATION=//evil").is_err());
+    }
+
+    #[test]
+    fn rejects_service_name_with_paren() {
+        assert!(validate_service_name("PROD)(WRONG").is_err());
+    }
+
+    #[test]
+    fn accepts_valid_service_name() {
+        assert!(validate_service_name("FREEPDB1").is_ok());
+        assert!(validate_service_name("orcl.example.com").is_ok());
+    }
+
+    #[test]
+    fn rejects_service_name_too_long() {
+        let long = "a".repeat(129);
+        assert!(validate_service_name(&long).is_err());
+    }
+
+    #[test]
+    fn rejects_connect_alias_with_special_chars() {
+        assert!(validate_connect_alias("alias?param=value").is_err());
+        assert!(validate_connect_alias("alias)injection").is_err());
+    }
+
+    #[test]
+    fn accepts_valid_connect_alias() {
+        assert!(validate_connect_alias("mydb_high").is_ok());
     }
 }
