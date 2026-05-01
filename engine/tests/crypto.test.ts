@@ -3,6 +3,7 @@ import { sodiumReady, getSodium } from "../src/crypto/sodium";
 import { generateKeypair, publicKeyFromPrivate, pubkeyToBase64, pubkeyFromBase64 } from "../src/crypto/keypair";
 import { OsKeyringStore, InMemoryKeyStore, type KeyStore } from "../src/crypto/keystore";
 import { encryptBlob, decryptBlob, randomKey } from "../src/crypto/blob";
+import { sealEnvelope, openEnvelope, type Envelope } from "../src/crypto/envelope";
 
 describe("crypto sodium init", () => {
   it("initializes libsodium and exposes constants", async () => {
@@ -169,5 +170,74 @@ describe("crypto blob encryption (XChaCha20-Poly1305 IETF)", () => {
     const { ciphertext, nonce } = await encryptBlob(key, plaintext);
     const decrypted = await decryptBlob(key, ciphertext, nonce);
     expect(Buffer.from(decrypted).equals(Buffer.from(plaintext))).toBe(true);
+  });
+});
+
+describe("crypto envelope (X25519 + ChaCha20-Poly1305 IETF)", () => {
+  it("seals a content key for a recipient and the recipient unwraps it", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const contentKey = new Uint8Array(32).fill(9);
+
+    const envelope = await sealEnvelope(contentKey, recipient.publicKey, sender);
+    const opened = await openEnvelope(envelope, sender.publicKey, recipient);
+
+    expect(Buffer.from(opened).equals(Buffer.from(contentKey))).toBe(true);
+  });
+
+  it("rejects when wrong recipient tries to open", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const stranger = await generateKeypair();
+    const contentKey = new Uint8Array(32).fill(5);
+
+    const envelope = await sealEnvelope(contentKey, recipient.publicKey, sender);
+    await expect(openEnvelope(envelope, sender.publicKey, stranger)).rejects.toThrow();
+  });
+
+  it("rejects when sender pubkey claim is wrong", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const stranger = await generateKeypair();
+    const contentKey = new Uint8Array(32).fill(3);
+
+    const envelope = await sealEnvelope(contentKey, recipient.publicKey, sender);
+    // Recipient's privkey is correct, but they think the message is from
+    // `stranger` instead of `sender`. Shared secret derivation produces
+    // a different key, so the decrypt fails.
+    await expect(openEnvelope(envelope, stranger.publicKey, recipient)).rejects.toThrow();
+  });
+
+  it("envelope nonce is 12 bytes (IETF variant)", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const envelope = await sealEnvelope(
+      new Uint8Array(32).fill(1),
+      recipient.publicKey,
+      sender,
+    );
+    expect(envelope.nonce.byteLength).toBe(12);
+  });
+
+  it("envelope ciphertext is non-empty", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const envelope = await sealEnvelope(
+      new Uint8Array(32).fill(1),
+      recipient.publicKey,
+      sender,
+    );
+    // 32-byte content key + 16-byte Poly1305 tag = 48 bytes minimum
+    expect(envelope.ciphertext.byteLength).toBeGreaterThanOrEqual(48);
+  });
+
+  it("two envelopes for the same key produce different ciphertext (random nonce)", async () => {
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const contentKey = new Uint8Array(32).fill(42);
+    const a = await sealEnvelope(contentKey, recipient.publicKey, sender);
+    const b = await sealEnvelope(contentKey, recipient.publicKey, sender);
+    expect(Buffer.from(a.ciphertext).equals(Buffer.from(b.ciphertext))).toBe(false);
+    expect(Buffer.from(a.nonce).equals(Buffer.from(b.nonce))).toBe(false);
   });
 });
