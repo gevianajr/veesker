@@ -33,14 +33,32 @@ export class DuckDBHost {
 
   static async openInMemory(): Promise<DuckDBHost> {
     const instance = await DuckDBInstance.create(":memory:");
-    const conn = await instance.connect();
-    return new DuckDBHost(instance, conn);
+    try {
+      const conn = await instance.connect();
+      return new DuckDBHost(instance, conn);
+    } catch (err) {
+      try {
+        instance.closeSync();
+      } catch {
+        /* best effort */
+      }
+      throw err;
+    }
   }
 
   static async openFile(path: string): Promise<DuckDBHost> {
     const instance = await DuckDBInstance.create(path);
-    const conn = await instance.connect();
-    return new DuckDBHost(instance, conn);
+    try {
+      const conn = await instance.connect();
+      return new DuckDBHost(instance, conn);
+    } catch (err) {
+      try {
+        instance.closeSync();
+      } catch {
+        /* best effort */
+      }
+      throw err;
+    }
   }
 
   async exec(sql: string): Promise<void> {
