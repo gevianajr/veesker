@@ -593,4 +593,66 @@ describe("encrypted .vsk round-trip", () => {
       try { unlinkSync(path); } catch { /* best effort */ }
     }
   });
+
+  it("decrypts using external envelope when provided (member flow)", async () => {
+    await sodiumReady();
+    const ownerKp = await generateKeypair();
+    const memberKp = await generateKeypair();
+
+    // Owner-side: build encrypted .vsk with embedded owner envelope
+    const contentKey = randomKey();
+    const ownerEnvelope = await sealEnvelope(contentKey, ownerKp.publicKey, ownerKp);
+    const path = join(tmpdir(), `vsk-ext-env-${process.pid}-${Date.now()}.vsk`);
+    const srcHost = await DuckDBHost.openInMemory();
+    try {
+      await srcHost.exec("CREATE TABLE t (a INTEGER, b VARCHAR)");
+      await srcHost.exec("INSERT INTO t VALUES (1, 'one'), (2, 'two')");
+      await writeEncryptedVsk(srcHost, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "ext-env-test",
+        schemaName: "TEST",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{
+          name: "T",
+          rowCount: 2,
+          columns: [
+            { name: "A", type: "INTEGER", nullable: true },
+            { name: "B", type: "VARCHAR", nullable: true },
+          ],
+        }],
+        piiMasks: [],
+      }, contentKey, ownerEnvelope);
+    } finally {
+      await srcHost.close();
+    }
+
+    // Member-side: build a SEPARATE envelope addressed to the member
+    const memberEnvelope = await sealEnvelope(
+      contentKey,
+      memberKp.publicKey,
+      ownerKp,
+    );
+
+    // Member uses readEncryptedVsk with their own envelope as override
+    const dstHost = await DuckDBHost.openInMemory();
+    try {
+      const out = await readEncryptedVsk(
+        path,
+        dstHost,
+        ownerKp.publicKey,
+        memberKp,
+        {},
+        memberEnvelope,
+      );
+      expect(out.tables).toHaveLength(1);
+      const rows = await dstHost.query('SELECT a, b FROM "t" ORDER BY a');
+      expect(rows).toEqual([
+        { A: 1, B: "one" },
+        { A: 2, B: "two" },
+      ]);
+    } finally {
+      await dstHost.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
 });
