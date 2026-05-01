@@ -5,6 +5,9 @@ import { randomUUID } from "node:crypto";
 import { readHeader, HEADER_SIZE } from "./header";
 import { readManifest, type VskManifest } from "./manifest";
 import { VskFormatError, assertValidTableName } from "./errors";
+import { decryptBlob } from "../crypto/blob";
+import { openEnvelope, type Envelope } from "../crypto/envelope";
+import type { Keypair } from "../crypto/keypair";
 import type { DuckDBHost } from "../duckdb-host";
 
 const TABLE_TAG_PREFIX = "__VSK_TABLE__";
@@ -168,4 +171,63 @@ export async function readVsk(
   }
 
   return manifest;
+}
+
+/**
+ * Read an ENCRYPTED .vsk file. Verifies the envelope is addressed to
+ * `recipient`, unwraps the content key, decrypts the blob, then reads
+ * the resulting plain .vsk into the destination DuckDB host.
+ *
+ * Throws VskFormatError("BAD_TAG") if the file is plaintext (caller
+ * should use readVsk for those).
+ */
+export async function readEncryptedVsk(
+  path: string,
+  dst: DuckDBHost,
+  senderPubkey: Uint8Array,
+  recipient: Keypair,
+  opts: ReadVskOptions = {},
+): Promise<VskManifest> {
+  const file = readFileSync(path);
+  const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
+  const header = readHeader(buf.subarray(0, HEADER_SIZE));
+  if (header.envelopeLength === 0n) {
+    throw new VskFormatError("BAD_TAG", "vsk: file is plaintext, use readVsk");
+  }
+
+  const envelopeJson = new TextDecoder().decode(
+    buf.subarray(
+      Number(header.envelopeOffset),
+      Number(header.envelopeOffset + header.envelopeLength),
+    ),
+  );
+  let meta: { nonce: string; ciphertext: string; blobNonce: string };
+  try {
+    meta = JSON.parse(envelopeJson);
+  } catch {
+    throw new VskFormatError("MALFORMED_MANIFEST", "vsk: malformed envelope JSON");
+  }
+  const envelope: Envelope = {
+    nonce: new Uint8Array(Buffer.from(meta.nonce, "base64")),
+    ciphertext: new Uint8Array(Buffer.from(meta.ciphertext, "base64")),
+  };
+  const blobNonce = new Uint8Array(Buffer.from(meta.blobNonce, "base64"));
+
+  const contentKey = await openEnvelope(envelope, senderPubkey, recipient);
+  const encryptedBlob = buf.subarray(
+    Number(header.dataOffset),
+    Number(header.dataOffset + header.dataLength),
+  );
+  const plainBytes = await decryptBlob(contentKey, encryptedBlob, blobNonce);
+
+  const tmpPath = join(
+    tmpdir(),
+    `vsk-decrypt-${process.pid}-${randomUUID()}.decrypted.tmp`,
+  );
+  writeFileSync(tmpPath, Buffer.from(plainBytes));
+  try {
+    return await readVsk(tmpPath, dst, opts);
+  } finally {
+    try { unlinkSync(tmpPath); } catch { /* best effort */ }
+  }
 }

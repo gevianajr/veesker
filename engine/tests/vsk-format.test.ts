@@ -1,11 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { writeHeader, readHeader, VSK_MAGIC, VSK_VERSION } from "../src/vsk-format/header";
 import { writeManifest, readManifest, VSK_MASK_TYPES, type VskManifest } from "../src/vsk-format/manifest";
-import { writeVsk } from "../src/vsk-format/writer";
-import { readVsk } from "../src/vsk-format/reader";
+import { writeVsk, writeEncryptedVsk } from "../src/vsk-format/writer";
+import { readVsk, readEncryptedVsk } from "../src/vsk-format/reader";
 import { readVskHeader, readVskManifest } from "../src/vsk-format/reader";
 import { VskFormatError } from "../src/vsk-format/errors";
 import { DuckDBHost } from "../src/duckdb-host";
+import { generateKeypair } from "../src/crypto/keypair";
+import { randomKey } from "../src/crypto/blob";
+import { sealEnvelope } from "../src/crypto/envelope";
+import { sodiumReady } from "../src/crypto/sodium";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { unlinkSync, existsSync } from "node:fs";
@@ -467,6 +471,126 @@ describe("vsk-format safety + edge cases", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(VskFormatError);
       expect((err as VskFormatError).code).toBe("BAD_MAGIC");
+    }
+  });
+});
+
+describe("encrypted .vsk round-trip", () => {
+  it("encrypts blob, seals envelope to recipient, decrypts back", async () => {
+    await sodiumReady();
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const path = join(tmpdir(), `vsk-enc-${process.pid}-${Date.now()}.vsk`);
+
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE orders (id INTEGER, total DECIMAL(18,2))");
+      await src.exec("INSERT INTO orders VALUES (1, 100.50), (2, 250.75)");
+
+      const contentKey = randomKey();
+      const envelope = await sealEnvelope(contentKey, recipient.publicKey, sender);
+
+      await writeEncryptedVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "enc-test",
+        schemaName: "TEST",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{
+          name: "ORDERS",
+          rowCount: 2,
+          columns: [
+            { name: "ID", type: "INTEGER", nullable: false },
+            { name: "TOTAL", type: "DECIMAL(18,2)", nullable: true },
+          ],
+        }],
+        piiMasks: [],
+      }, contentKey, envelope);
+
+      const headerCheck = readVskHeader(path);
+      expect(headerCheck.envelopeLength).toBeGreaterThan(0n);
+
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        const manifest = await readEncryptedVsk(path, dst, sender.publicKey, recipient);
+        expect(manifest.tables[0]!.name).toBe("ORDERS");
+        const rows = await dst.query('SELECT id FROM "orders" ORDER BY id');
+        expect(rows.length).toBe(2);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("rejects encrypted .vsk when opened by wrong recipient", async () => {
+    await sodiumReady();
+    const sender = await generateKeypair();
+    const recipient = await generateKeypair();
+    const stranger = await generateKeypair();
+    const path = join(tmpdir(), `vsk-enc-wrong-${process.pid}-${Date.now()}.vsk`);
+
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE t (id INTEGER)");
+      const contentKey = randomKey();
+      const envelope = await sealEnvelope(contentKey, recipient.publicKey, sender);
+
+      await writeEncryptedVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "T", rowCount: 0, columns: [
+          { name: "ID", type: "INTEGER", nullable: false },
+        ] }],
+        piiMasks: [],
+      }, contentKey, envelope);
+
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await expect(readEncryptedVsk(path, dst, sender.publicKey, stranger))
+          .rejects.toThrow();
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+
+  it("readEncryptedVsk rejects a plaintext .vsk", async () => {
+    await sodiumReady();
+    const recipient = await generateKeypair();
+    const sender = await generateKeypair();
+    const path = join(tmpdir(), `vsk-plain-${process.pid}-${Date.now()}.vsk`);
+
+    const src = await DuckDBHost.openInMemory();
+    try {
+      await src.exec("CREATE TABLE t (id INTEGER)");
+      await writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "T", rowCount: 0, columns: [
+          { name: "ID", type: "INTEGER", nullable: false },
+        ] }],
+        piiMasks: [],
+      });
+
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await expect(readEncryptedVsk(path, dst, sender.publicKey, recipient))
+          .rejects.toThrow(/plaintext/i);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
     }
   });
 });
