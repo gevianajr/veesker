@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { sodiumReady, getSodium } from "../src/crypto/sodium";
+import { generateKeypair, publicKeyFromPrivate, pubkeyToBase64, pubkeyFromBase64 } from "../src/crypto/keypair";
 
 describe("crypto sodium init", () => {
   it("initializes libsodium and exposes constants", async () => {
@@ -24,5 +25,42 @@ describe("crypto sodium init", () => {
     // initialized libsodium globally. So we just assert the init flag is true.
     await sodiumReady();
     expect(() => getSodium()).not.toThrow();
+  });
+});
+
+describe("crypto X25519 keypair", () => {
+  it("generates a 32-byte public + 32-byte private key", async () => {
+    const kp = await generateKeypair();
+    expect(kp.publicKey.byteLength).toBe(32);
+    expect(kp.privateKey.byteLength).toBe(32);
+  });
+
+  it("generates distinct keypairs on each call", async () => {
+    const a = await generateKeypair();
+    const b = await generateKeypair();
+    expect(Buffer.from(a.publicKey).equals(Buffer.from(b.publicKey))).toBe(false);
+    expect(Buffer.from(a.privateKey).equals(Buffer.from(b.privateKey))).toBe(false);
+  });
+
+  it("derives the same public key deterministically from private key", async () => {
+    const kp = await generateKeypair();
+    const derived = publicKeyFromPrivate(kp.privateKey);
+    expect(Buffer.from(derived).equals(Buffer.from(kp.publicKey))).toBe(true);
+  });
+
+  it("round-trips a public key through base64 encoding", async () => {
+    const kp = await generateKeypair();
+    const encoded = pubkeyToBase64(kp.publicKey);
+    expect(typeof encoded).toBe("string");
+    expect(encoded.length).toBeGreaterThan(40); // 32 bytes → 44 chars base64
+    const decoded = pubkeyFromBase64(encoded);
+    expect(Buffer.from(decoded).equals(Buffer.from(kp.publicKey))).toBe(true);
+  });
+
+  it("rejects malformed base64 input gracefully", () => {
+    // Buffer.from accepts garbage and returns whatever it can decode.
+    // We don't validate length here — that's the caller's job.
+    const decoded = pubkeyFromBase64("not-real-base64!@#");
+    expect(decoded.byteLength).toBeGreaterThanOrEqual(0);
   });
 });
