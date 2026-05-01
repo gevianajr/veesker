@@ -187,6 +187,7 @@ export async function readEncryptedVsk(
   senderPubkey: Uint8Array,
   recipient: Keypair,
   opts: ReadVskOptions = {},
+  externalEnvelope?: Envelope,
 ): Promise<VskManifest> {
   const file = readFileSync(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
@@ -207,12 +208,13 @@ export async function readEncryptedVsk(
   } catch {
     throw new VskFormatError("MALFORMED_MANIFEST", "vsk: malformed envelope JSON");
   }
-  const envelope: Envelope = {
+  const embeddedEnvelope: Envelope = {
     nonce: new Uint8Array(Buffer.from(meta.nonce, "base64")),
     ciphertext: new Uint8Array(Buffer.from(meta.ciphertext, "base64")),
   };
   const blobNonce = new Uint8Array(Buffer.from(meta.blobNonce, "base64"));
 
+  const envelope = externalEnvelope ?? embeddedEnvelope;
   const contentKey = await openEnvelope(envelope, senderPubkey, recipient);
   const encryptedBlob = buf.subarray(
     Number(header.dataOffset),
