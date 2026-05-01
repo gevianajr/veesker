@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { sodiumReady, getSodium } from "../src/crypto/sodium";
 import { generateKeypair, publicKeyFromPrivate, pubkeyToBase64, pubkeyFromBase64 } from "../src/crypto/keypair";
+import { OsKeyringStore, InMemoryKeyStore, type KeyStore } from "../src/crypto/keystore";
 
 describe("crypto sodium init", () => {
   it("initializes libsodium and exposes constants", async () => {
@@ -62,5 +63,56 @@ describe("crypto X25519 keypair", () => {
     // We don't validate length here — that's the caller's job.
     const decoded = pubkeyFromBase64("not-real-base64!@#");
     expect(decoded.byteLength).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("crypto KeyStore", () => {
+  describe("InMemoryKeyStore", () => {
+    it("starts empty", async () => {
+      const store: KeyStore = new InMemoryKeyStore();
+      const pk = await store.getPrivateKey();
+      expect(pk).toBeNull();
+    });
+
+    it("round-trips a private key", async () => {
+      const store: KeyStore = new InMemoryKeyStore();
+      const original = new Uint8Array(32).fill(7);
+      await store.setPrivateKey(original);
+      const fetched = await store.getPrivateKey();
+      expect(fetched).not.toBeNull();
+      expect(Buffer.from(fetched!).equals(Buffer.from(original))).toBe(true);
+    });
+
+    it("clears the key on delete", async () => {
+      const store: KeyStore = new InMemoryKeyStore();
+      await store.setPrivateKey(new Uint8Array(32).fill(1));
+      await store.deletePrivateKey();
+      expect(await store.getPrivateKey()).toBeNull();
+    });
+  });
+
+  describe("OsKeyringStore", () => {
+    const TEST_SERVICE = "vsk-engine-test";
+    const TEST_ACCOUNT = `vsk-test-${process.pid}-${Date.now()}`;
+
+    it("round-trips a private key via OS keyring", async () => {
+      const store: KeyStore = new OsKeyringStore(TEST_SERVICE, TEST_ACCOUNT);
+      const original = new Uint8Array(32).fill(7);
+      await store.setPrivateKey(original);
+      const fetched = await store.getPrivateKey();
+      expect(fetched).not.toBeNull();
+      expect(Buffer.from(fetched!).equals(Buffer.from(original))).toBe(true);
+
+      // Cleanup
+      await store.deletePrivateKey();
+      const after = await store.getPrivateKey();
+      expect(after).toBeNull();
+    });
+
+    it("returns null for an unknown account", async () => {
+      const store: KeyStore = new OsKeyringStore(TEST_SERVICE, `unknown-${process.pid}-${Date.now()}`);
+      const pk = await store.getPrivateKey();
+      expect(pk).toBeNull();
+    });
   });
 });
