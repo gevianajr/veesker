@@ -1,10 +1,12 @@
 // Public API for @veesker/engine.
 export { DuckDBHost, DuckDBHostClosedError } from "./duckdb-host";
-export { writeVsk } from "./vsk-format/writer";
+export { writeVsk, writeEncryptedVsk } from "./vsk-format/writer";
 export {
   readVsk,
   readVskHeader,
   readVskManifest,
+  readEncryptedVsk,
+  type ReadVskOptions,
 } from "./vsk-format/reader";
 export {
   type VskHeader,
@@ -29,3 +31,28 @@ export {
 export { mapOracleType, mapDuckDBType } from "./oracle-shim/types";
 export { translate } from "./oracle-shim/translator";
 export { installSystemViews } from "./oracle-shim/system-views";
+// Crypto API (newly added by Phase B)
+export { sodiumReady } from "./crypto/sodium";
+export {
+  generateKeypair,
+  publicKeyFromPrivate,
+  pubkeyToBase64,
+  pubkeyFromBase64,
+  type Keypair,
+} from "./crypto/keypair";
+export {
+  type KeyStore,
+  OsKeyringStore,
+  InMemoryKeyStore,
+} from "./crypto/keystore";
+export {
+  encryptBlob,
+  decryptBlob,
+  randomKey,
+  type EncryptedBlob,
+} from "./crypto/blob";
+export {
+  sealEnvelope,
+  openEnvelope,
+  type Envelope,
+} from "./crypto/envelope";

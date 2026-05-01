@@ -16,6 +16,7 @@
     "url": "https://github.com/veesker-cloud/veesker-community-edition/issues"
   },
   "type": "module",
+  "workspaces": ["sidecar", "engine"],
   "scripts": {
     "dev": "vite dev",
     "build": "bun run copy-bindings && vite build",
