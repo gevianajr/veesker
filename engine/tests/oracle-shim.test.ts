@@ -223,6 +223,50 @@ describe("oracle-shim SQL translator", () => {
     expect(translate("SELECT * FROM t WHERE ROWNUM <= 5;"))
       .toBe("SELECT * FROM t LIMIT 5;");
   });
+
+  it("translates MONTH to %B (full month name)", () => {
+    const out = translate("SELECT TO_CHAR(d, 'MONTH') FROM t");
+    expect(out).toContain("strftime(d, '%B')");
+  });
+
+  it("translates DAY to %A (full weekday name)", () => {
+    const out = translate("SELECT TO_CHAR(d, 'DAY') FROM t");
+    expect(out).toContain("strftime(d, '%A')");
+  });
+
+  it("translates AM/PM to %p", () => {
+    expect(translate("SELECT TO_CHAR(d, 'HH:MI AM') FROM t"))
+      .toContain("strftime(d, '%I:%M %p')");
+    expect(translate("SELECT TO_CHAR(d, 'HH:MI PM') FROM t"))
+      .toContain("strftime(d, '%I:%M %p')");
+  });
+
+  it("translates DDD to %j (day of year)", () => {
+    expect(translate("SELECT TO_CHAR(d, 'DDD') FROM t"))
+      .toContain("strftime(d, '%j')");
+  });
+
+  it("translates HH12 to %I", () => {
+    expect(translate("SELECT TO_CHAR(d, 'HH12:MI') FROM t"))
+      .toContain("strftime(d, '%I:%M')");
+  });
+
+  it("preserves longer tokens (MONTH not split into MON+TH)", () => {
+    const out = translate("SELECT TO_CHAR(d, 'MONTH-DDD') FROM t");
+    expect(out).toContain("strftime(d, '%B-%j')");
+  });
+
+  it("leaves concatenated format arguments unchanged for DuckDB to reject", () => {
+    const sql = "SELECT TO_DATE('2026-04-30', 'YYYY' || '-MM-DD') FROM DUAL";
+    const out = translate(sql);
+    expect(out).toContain("TO_DATE('2026-04-30', 'YYYY' || '-MM-DD')");
+  });
+
+  it("re-doubles embedded single-quotes in format literals", () => {
+    const out = translate("SELECT TO_CHAR(d, 'It''s now HH24:MI') FROM t");
+    expect(out).toContain("strftime(d, 'It''s now %H:%M')");
+    expect(out).not.toContain("It's now %H");
+  });
 });
 
 describe("oracle-shim system views", () => {

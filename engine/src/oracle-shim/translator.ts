@@ -28,26 +28,48 @@
  *     rewrite manually for v1.
  *   - `--` line comments may have keywords translated inside (benign — DuckDB
  *     also recognizes `--` comments at execution time).
+ *   - TO_DATE/TO_CHAR with a concatenated format argument
+ *     (e.g. `TO_DATE(s, 'YYYY' || '-MM-DD')`) is intentionally left
+ *     unchanged so DuckDB raises an unsupported-function error rather
+ *     than silently using only the first placeholder.
  *
  * Plan 7 (PL/SQL deepening) will replace this with a real translator.
  */
 
-const ORACLE_TO_DUCKDB_FORMAT: Array<[RegExp, string]> = [
-  [/YYYY/g, "%Y"],
-  [/YY/g, "%y"],
-  [/MON/g, "%b"],
-  [/MM/g, "%m"],
-  [/DD/g, "%d"],
-  [/HH24/g, "%H"],
-  [/HH/g, "%I"],
-  [/MI/g, "%M"],
-  [/SS/g, "%S"],
-];
+/**
+ * Oracle date format codes → DuckDB strftime/strptime tokens.
+ * Order matters: tokenizer matches longest-first via sorted regex
+ * alternation. Adding a new token: add to the map AND keep entries
+ * sorted by length (longest first) in the alternation regex.
+ */
+const ORACLE_FORMAT_TOKENS: Record<string, string> = {
+  YYYY: "%Y",
+  MONTH: "%B",
+  HH24: "%H",
+  HH12: "%I",
+  YY: "%y",
+  MON: "%b",
+  MM: "%m",
+  DDD: "%j",
+  DAY: "%A",
+  DY: "%a",
+  DD: "%d",
+  HH: "%I",
+  MI: "%M",
+  SS: "%S",
+  AM: "%p",
+  PM: "%p",
+};
+
+const FORMAT_TOKENIZER = new RegExp(
+  Object.keys(ORACLE_FORMAT_TOKENS)
+    .sort((a, b) => b.length - a.length)
+    .join("|"),
+  "g",
+);
 
 function convertFormat(fmt: string): string {
-  let out = fmt;
-  for (const [re, rep] of ORACLE_TO_DUCKDB_FORMAT) out = out.replace(re, rep);
-  return out;
+  return fmt.replace(FORMAT_TOKENIZER, (m) => ORACLE_FORMAT_TOKENS[m] ?? m);
 }
 
 const STR_PLACEHOLDER_OPEN = "\x01VSKSTR";
@@ -222,10 +244,14 @@ function rewriteSegment(seg: string, literals: string[]): string {
     if (args.length !== 2) return `TO_DATE(${argList})`;
     const val = args[0]!.trim();
     const fmtRef = args[1]!.trim();
+    // Refuse concatenated format args — return original so DuckDB raises
+    // a clear unsupported-function error instead of silent wrong output.
+    if (!/^\x01VSKSTR\d+\x02$/.test(fmtRef)) return `TO_DATE(${argList})`;
     const fmt = literalAt("", literals, fmtRef);
     if (!fmt) return `TO_DATE(${argList})`;
     const fmtInner = fmt.slice(1, -1).replace(/''/g, "'");
-    return `strptime(${val}, '${convertFormat(fmtInner)}')`;
+    const converted = convertFormat(fmtInner).replace(/'/g, "''");
+    return `strptime(${val}, '${converted}')`;
   });
 
   // TO_CHAR — same trick
@@ -234,10 +260,12 @@ function rewriteSegment(seg: string, literals: string[]): string {
     if (args.length !== 2) return `TO_CHAR(${argList})`;
     const val = args[0]!.trim();
     const fmtRef = args[1]!.trim();
+    if (!/^\x01VSKSTR\d+\x02$/.test(fmtRef)) return `TO_CHAR(${argList})`;
     const fmt = literalAt("", literals, fmtRef);
     if (!fmt) return `TO_CHAR(${argList})`;
     const fmtInner = fmt.slice(1, -1).replace(/''/g, "'");
-    return `strftime(${val}, '${convertFormat(fmtInner)}')`;
+    const converted = convertFormat(fmtInner).replace(/'/g, "''");
+    return `strftime(${val}, '${converted}')`;
   });
 
   // ROWNUM — only translate when it's the SOLE WHERE predicate (ends the SQL
