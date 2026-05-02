@@ -358,24 +358,97 @@ For Windows code signing, see [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
 
 ## Architecture
 
+<div align="center">
+<img src="docs/architecture/datamap-hero.png" width="100%" alt="Veesker system datamap — Desktop Client (CE + CL) → Veesker Cloud API → Oracle Database, with Anthropic AI, Cloudflare R2, and Postgres" />
+<sub>System datamap — Desktop Client (Tauri 2 + SvelteKit 5 + Bun sidecar) talks to Oracle directly, while Cloud Edition routes managed features through <code>api.veesker.cloud</code></sub>
+</div>
+
+### Component map
+
+```mermaid
+flowchart TB
+    classDef ceStyle fill:#FFF1ED,stroke:#E85D3C,stroke-width:2px,color:#7C2D12
+    classDef clStyle fill:#E0EFFF,stroke:#0A84FF,stroke-width:2px,color:#0C4A6E
+    classDef apiStyle fill:#F3E8FF,stroke:#7C3AED,stroke-width:2px,color:#581C87
+    classDef extStyle fill:#F1F5F9,stroke:#475569,stroke-width:1.5px,color:#0F172A
+    classDef engineStyle fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#78350F
+
+    subgraph DESKTOP["🖥️  Desktop Client · Tauri 2 + SvelteKit 5 + Bun sidecar"]
+        direction TB
+
+        subgraph CE["📦  Community Edition · Apache 2.0 · Free forever"]
+            direction LR
+            CE_CORE["<b>Core IDE</b><br/>SQL Editor · multi-statement<br/>PL/SQL · compile · debugger<br/>Schema Browser · all object kinds<br/>Table Inspector · DDL · FKs<br/>EXPLAIN PLAN · DML safety"]
+            CE_AI["<b>AI &amp; Vector</b><br/>Sheep AI 🐑 · BYOK Anthropic<br/>Explain SQL · Generate SQL<br/>Vector Search Studio<br/>HNSW · IVF · 2D scatter"]
+            CE_TOOLS["<b>Power tools</b><br/>VRAS · no-code REST on ORDS<br/>DataFlow Graph · upstream/down<br/>Query history · audit log<br/>Auto-update · OS keychain"]
+        end
+
+        subgraph CL["☁️  Cloud Edition · Proprietary · Subscription"]
+            direction LR
+            CL_VISION["<b>Veesker Vision</b><br/>Force-directed schema graph<br/>Transitive deps · PL/SQL refs"]
+            CL_AI["<b>Schema-aware AI</b><br/>Live DB context · runs SELECTs<br/>Query exec · charts NL"]
+            CL_SANDBOX["<b>VeeskerDB Sandbox</b><br/>Owner publish · Member pull<br/>PII masks · TTL · envelopes<br/>Cloud Audit · Team workspaces"]
+        end
+
+        ENGINE["🧬  <b>@veesker/engine</b> · Open <b>.vsk</b> format<br/>libsodium · X25519 · ChaCha20-Poly1305 · DuckDB host"]
+        SIDECAR["⚡  <b>Bun sidecar</b> · JSON-RPC over stdio<br/>node-oracledb Thin → Thick auto-discovery"]
+    end
+
+    subgraph CLOUD["🌐  Veesker Cloud API · api.veesker.cloud · Hono + Bun + Postgres"]
+        direction LR
+        AUTH["🔑  /v1/auth<br/>JWT · pubkey registry"]
+        SANDBOX_API["📦  /v1/sandbox<br/>publish · pull · envelopes"]
+        AUDIT_API["📊  /v1/audit<br/>SQL log ingest"]
+        ORG["👥  /v1/orgs<br/>tenants · billing"]
+    end
+
+    subgraph EXT["🗄️  External services"]
+        direction LR
+        ORACLE["🛢️  <b>Oracle</b><br/>9i → 26ai<br/>Thin / Thick · Wallet · mTLS"]
+        R2["☁️  <b>Cloudflare R2</b><br/>encrypted .vsk blobs"]
+        PG["🐘  <b>Postgres</b><br/>tenant metadata"]
+        ANTHROPIC["🤖  <b>Anthropic</b><br/>Sheep AI brain"]
+        EMBED["🧠  <b>Embeddings</b><br/>Ollama · OpenAI · Voyage"]
+    end
+
+    CE_CORE -.-> ENGINE
+    CL_SANDBOX -.->|imports via bun link| ENGINE
+    CE_CORE --> SIDECAR
+    CE_AI --> SIDECAR
+    CE_TOOLS --> SIDECAR
+    CL_VISION --> SIDECAR
+    CL_AI --> SIDECAR
+    CL_SANDBOX --> SIDECAR
+
+    SIDECAR ==>|"SQL · PL/SQL · vector"| ORACLE
+    SIDECAR -->|"chat"| ANTHROPIC
+    SIDECAR -->|"embed"| EMBED
+
+    CL_AI -.->|"managed AI"| AUTH
+    CL_SANDBOX ==>|"publish · pull"| SANDBOX_API
+    CL_SANDBOX -.->|"audit ingest"| AUDIT_API
+    CL_VISION -.->|"team queries"| ORG
+
+    AUTH --> PG
+    SANDBOX_API --> PG
+    SANDBOX_API ==>|"presigned URLs"| R2
+    AUDIT_API --> PG
+    ORG --> PG
+
+    class CE,CE_CORE,CE_AI,CE_TOOLS ceStyle
+    class CL,CL_VISION,CL_AI,CL_SANDBOX clStyle
+    class CLOUD,AUTH,SANDBOX_API,AUDIT_API,ORG apiStyle
+    class ORACLE,R2,PG,ANTHROPIC,EMBED extStyle
+    class ENGINE,SIDECAR engineStyle
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Tauri 2 desktop shell (Rust)                            │
-│  └── WebView2 / WKWebView                                │
-│      └── SvelteKit 5 frontend (Svelte 5 runes)           │
-│          └── invoke() → Tauri commands → JSON-RPC stdio  │
-├──────────────────────────────────────────────────────────┤
-│  Bun sidecar (TypeScript, compiled to native binary)     │
-│  └── node-oracledb Thin driver → Oracle 23ai             │
-│  └── Anthropic SDK → Claude API                          │
-│  └── Embedding providers (Ollama / OpenAI / Voyage)      │
-└──────────────────────────────────────────────────────────┘
-```
+
+### Stack notes
 
 - **Frontend:** Svelte 5 with runes (`$state`, `$derived`, `$effect`), CodeMirror 6 for SQL editing, Chart.js for the dashboard, Tauri 2 for native APIs
 - **Sidecar:** Bun-compiled TypeScript binary handles all Oracle communication via JSON-RPC over stdin/stdout
 - **Rust shell:** thin Tauri command layer delegating everything to the sidecar; persistence (SQLite for connections + history) and OS keychain integration live in Rust
-- **No CGO, no JNI, no Oracle Instant Client:** node-oracledb Thin mode is pure JavaScript
+- **No CGO, no JNI, no Oracle Instant Client required for modern Oracle:** node-oracledb Thin mode is pure JavaScript; legacy 9i–11g auto-falls back to Thick mode via Instant Client auto-discovery
+- **Open core boundary:** the `.vsk` format and `@veesker/engine` are Apache 2.0 in Community Edition. Cloud Edition consumes them via `bun link` — never the reverse direction. Nothing CL-exclusive ever ships in CE.
 
 ---
 
