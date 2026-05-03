@@ -9,6 +9,7 @@ import { decryptBlob } from "../crypto/blob";
 import { openEnvelope, type Envelope } from "../crypto/envelope";
 import type { Keypair } from "../crypto/keypair";
 import type { DuckDBHost } from "../duckdb-host";
+import { mapOracleType } from "../oracle-shim/types";
 
 const TABLE_TAG_PREFIX = "__VSK_TABLE__";
 
@@ -152,7 +153,11 @@ export async function readVsk(
           .map((c) => {
             const colName = c.name.replace(/"/g, '""');
             const nullClause = c.nullable ? "" : " NOT NULL";
-            return `"${colName}" ${c.type}${nullClause}`;
+            // Manifest stores Oracle types verbatim (VARCHAR2, NUMBER, DATE…)
+            // so the owner UI can show familiar names. DuckDB rejects those,
+            // so translate before issuing CREATE TABLE on the member side —
+            // mirror of the build-side mapping in cl/sidecar/.../build.ts.
+            return `"${colName}" ${mapOracleType(c.type)}${nullClause}`;
           })
           .join(", ");
         const verb = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";

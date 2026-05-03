@@ -17,9 +17,41 @@
  *     support natively (XMLTYPE, SDO_GEOMETRY, user-defined object types).
  */
 
+// DuckDB-native types we let pass through unchanged. The .vsk reader feeds
+// `mapOracleType` with whatever the manifest carries, and at least three
+// real call sites legitimately store DuckDB types directly (engine tests,
+// member-side staging where the source already lives in DuckDB, and any
+// future non-Oracle producer). Without an explicit pass-through these would
+// fall into the VARCHAR fallback at the bottom and silently corrupt the DDL
+// — INTEGER columns becoming VARCHAR, parquet load reading them as strings.
+const DUCKDB_PASSTHROUGH = new Set([
+  "INTEGER", "INT", "INT4",
+  "BIGINT", "INT8", "LONG",
+  "SMALLINT", "INT2", "SHORT",
+  "TINYINT", "INT1",
+  "HUGEINT",
+  "UINTEGER", "UBIGINT", "USMALLINT", "UTINYINT",
+  "DOUBLE", "FLOAT8",
+  "REAL", "FLOAT4",
+  "BOOLEAN", "BOOL", "LOGICAL",
+  "TEXT", "STRING",
+  "TIME", "INTERVAL", "UUID", "JSON",
+  "TIMESTAMP_S", "TIMESTAMP_MS", "TIMESTAMP_NS",
+  "TIMESTAMPTZ",
+  "BIT", "BITSTRING",
+]);
+
 export function mapOracleType(oracleType: string): string {
   const t = oracleType.trim().toUpperCase();
   if (t === "") return "VARCHAR";
+
+  // Pass-through for DuckDB-native scalar types and parametrized DuckDB
+  // forms (DECIMAL(p,s), VARCHAR(n)) that already speak the target dialect.
+  // Oracle's NUMBER(p,s) and VARCHAR2(n) are handled below — the regexes
+  // are anchored to those exact prefixes.
+  if (DUCKDB_PASSTHROUGH.has(t)) return t;
+  if (/^DECIMAL\s*\(\s*\d+\s*(?:,\s*\d+\s*)?\)$/.test(t)) return t;
+  if (/^VARCHAR\s*\(\s*\d+\s*\)$/.test(t)) return "VARCHAR";
 
   const numberMatch = t.match(/^NUMBER\s*\(\s*(\d+)\s*(?:,\s*(-?\d+)\s*)?\)$/);
   if (numberMatch) {
@@ -30,7 +62,8 @@ export function mapOracleType(oracleType: string): string {
   }
   if (t === "NUMBER") return "DOUBLE";
 
-  if (/^N?VARCHAR2?\s*\(/.test(t)) return "VARCHAR";
+  if (/^NVARCHAR2?\s*\(/.test(t)) return "VARCHAR";
+  if (/^VARCHAR2\s*\(/.test(t)) return "VARCHAR";
   if (/^CHAR\s*\(/.test(t)) return "VARCHAR";
   if (t === "CLOB" || t === "NCLOB") return "VARCHAR";
 
