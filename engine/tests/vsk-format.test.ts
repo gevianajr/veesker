@@ -314,6 +314,55 @@ describe("vsk-format writer + reader", () => {
       try { unlinkSync(path); } catch { /* best effort */ }
     }
   });
+
+  // Regression: the manifest stores raw Oracle types (VARCHAR2, NUMBER, DATE)
+  // because the owner UI shows them and the writeVsk-time DuckDB stage already
+  // materializes the data. The reader has to translate them through
+  // mapOracleType before the CREATE TABLE statement, otherwise DuckDB rejects
+  // the DDL with "Type with name VARCHAR2 does not exist!". This locks the
+  // contract so any future refactor that bypasses mapOracleType breaks here.
+  it("translates Oracle types in the manifest to DuckDB equivalents on read", async () => {
+    const path = join(tmpdir(), `vsk-oracletype-${process.pid}-${Date.now()}.vsk`);
+    const src = await DuckDBHost.openInMemory();
+    try {
+      // The DuckDB staging table is created with DuckDB-native types so the
+      // parquet round-trip works; only the manifest carries the Oracle names.
+      await src.exec("CREATE TABLE countries (country_id VARCHAR NOT NULL, country_name VARCHAR, region_id DOUBLE)");
+      await src.exec("INSERT INTO countries VALUES ('BR', 'Brazil', 1)");
+      await writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "HR",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "COUNTRIES", rowCount: 1, columns: [
+          { name: "COUNTRY_ID", type: "CHAR(2)", nullable: false },
+          { name: "COUNTRY_NAME", type: "VARCHAR2(40)", nullable: true },
+          { name: "REGION_ID", type: "NUMBER", nullable: true },
+        ] }],
+        piiMasks: [],
+      });
+
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await readVsk(path, dst);
+        const rows = await dst.query('SELECT "COUNTRY_ID", "COUNTRY_NAME", "REGION_ID" FROM countries');
+        expect(rows).toEqual([{ COUNTRY_ID: "BR", COUNTRY_NAME: "Brazil", REGION_ID: 1 }]);
+        const cols = await dst.query(
+          "SELECT column_name, data_type FROM information_schema.columns WHERE table_name='countries' ORDER BY ordinal_position",
+        );
+        expect(cols).toEqual([
+          { column_name: "COUNTRY_ID", data_type: "VARCHAR" },
+          { column_name: "COUNTRY_NAME", data_type: "VARCHAR" },
+          { column_name: "REGION_ID", data_type: "DOUBLE" },
+        ]);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      await src.close();
+      try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
 });
 
 describe("vsk-format safety + edge cases", () => {
