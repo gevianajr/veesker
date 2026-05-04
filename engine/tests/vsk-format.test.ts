@@ -365,6 +365,90 @@ describe("vsk-format writer + reader", () => {
   });
 });
 
+describe("writer v0.2.0 — __vsk_* tables", () => {
+  it("writes __vsk_objects + __vsk_source after user tables when present", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "users" (id INTEGER, name VARCHAR)`);
+      await host.exec(`INSERT INTO "users" VALUES (1, 'Alice')`);
+      await host.exec(`CREATE TABLE "__vsk_objects" (kind VARCHAR, owner VARCHAR, name VARCHAR, status VARCHAR, ddl_size_bytes BIGINT, extracted_at TIMESTAMP, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_objects" VALUES ('PROCEDURE', 'HR', 'GET_EMP', 'VALID', 256, '2026-05-04 12:00:00')`);
+      await host.exec(`CREATE TABLE "__vsk_source" (kind VARCHAR, owner VARCHAR, name VARCHAR, ddl TEXT, spec TEXT, body TEXT, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_source" VALUES ('PROCEDURE', 'HR', 'GET_EMP', 'CREATE PROCEDURE get_emp AS BEGIN NULL; END;', NULL, NULL)`);
+
+      const out = join(tmpdir(), `vsk-write-test-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "x", schemaName: "HR",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "users", rowCount: 1, columns: [
+          { name: "id", type: "NUMBER", nullable: true },
+          { name: "name", type: "VARCHAR2", nullable: true },
+        ]}],
+        piiMasks: [],
+        engineVersion: "0.2.0",
+        plsqlObjectCount: 1,
+      };
+      try {
+        await writeVsk(host, out, m);
+        // Read back via existing readVsk, verify 3 tables (1 user + 2 system)
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await readVsk(out, dst);
+          const tablesRes = await dst.query(
+            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name`
+          );
+          // Note: the test asserts tables are present after readVsk, even though
+          // the v0.1.0 readVsk doesn't yet split user vs system. Task 3 splits
+          // them; here we just verify writer emitted bytes for both.
+          const names = tablesRes.map((r) => r["table_name"] as string);
+          expect(names).toContain("users");
+          expect(names).toContain("__vsk_objects");
+          expect(names).toContain("__vsk_source");
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("skips __vsk_* writing when source DuckDB has no __vsk_* tables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (a INT)`);
+      const out = join(tmpdir(), `vsk-write-test-v1-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "x", schemaName: "X",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "a", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await readVsk(out, dst);
+          const r = await dst.query(
+            `SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main' AND table_name LIKE '__vsk_%'`
+          );
+          expect(Number(Object.values(r[0]!)[0])).toBe(0);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+});
+
 describe("vsk-format safety + edge cases", () => {
   it("writer rejects an unsafe table name in the manifest", async () => {
     const src = await DuckDBHost.openInMemory();
