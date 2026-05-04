@@ -963,4 +963,51 @@ describe("reader v0.2.0 — system tables + version fence", () => {
       await host.close();
     }
   });
+
+  it("rejects a system-prefixed table name with path-traversal characters", async () => {
+    // Hand-craft a .vsk where the data section's __VSK_TABLE__ tag carries a
+    // crafted system table name that would otherwise be interpolated into the
+    // tmp-file path and escape tmpdir().
+    const out = join(tmpdir(), `vsk-traversal-${process.pid}-${Date.now()}.vsk`);
+    const malicious = "__vsk_x/../../etc/exploit";
+
+    const { writeHeader: writeHdr, HEADER_SIZE } = await import("../src/vsk-format/header");
+    const { writeManifest: writeMan } = await import("../src/vsk-format/manifest");
+    const manifest: VskManifest = {
+      builtAt: new Date().toISOString(),
+      sourceId: "x",
+      schemaName: "x",
+      ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+      tables: [],
+      piiMasks: [],
+    };
+    const manifestBytes = writeMan(manifest);
+    const tag = new TextEncoder().encode(`__VSK_TABLE__${malicious}\n`);
+    const sizeBuf = new Uint8Array(8);
+    new DataView(sizeBuf.buffer).setBigUint64(0, 0n, true);
+    const dataSection = Buffer.concat([Buffer.from(tag), Buffer.from(sizeBuf)]);
+
+    const header = writeHdr({
+      manifestOffset: BigInt(HEADER_SIZE),
+      manifestLength: BigInt(manifestBytes.byteLength),
+      dataOffset: BigInt(HEADER_SIZE + manifestBytes.byteLength),
+      dataLength: BigInt(dataSection.byteLength),
+      envelopeOffset: 0n,
+      envelopeLength: 0n,
+    });
+    const file = Buffer.concat([Buffer.from(header), Buffer.from(manifestBytes), dataSection]);
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(out, file);
+
+    try {
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await expect(readVsk(out, dst)).rejects.toThrow(/invalid system table name/i);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      try { unlinkSync(out); } catch { /* best effort */ }
+    }
+  });
 });

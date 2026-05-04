@@ -81,10 +81,15 @@ function checkVersionFence(m: VskManifest): void {
   // (major 0 AND minor >= 3) as forward-incompatible. v0.2.0 reader knows
   // about __vsk_objects/__vsk_source/__vsk_dependencies — anything beyond
   // is unknown territory.
-  const parts = v.split(".").map((p) => Number.parseInt(p, 10));
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+  // Use a strict digits-only check per part — `Number.parseInt("0-rc1", 10)`
+  // returns 0 (stops at the dash), which would silently coerce prerelease /
+  // tagged versions into the numeric range and bypass the fence. Same for
+  // trailing whitespace.
+  const partStrings = v.split(".");
+  if (partStrings.length !== 3 || !partStrings.every((p) => /^\d+$/.test(p))) {
     throw new VskFormatError("MALFORMED_MANIFEST", `vsk reader: unparseable engineVersion "${v}"`);
   }
+  const parts = partStrings.map((p) => Number.parseInt(p, 10));
   const [maj, min] = parts as [number, number, number];
   if (maj > 0 || (maj === 0 && min >= 3)) {
     throw new VskFormatError(
@@ -152,7 +157,22 @@ export async function readVsk(
       throw new VskFormatError("BAD_TABLE_NAME", `vsk: empty table name in tag at offset ${p}`);
     }
     const isSystem = tableName.toLowerCase().startsWith(SYSTEM_TABLE_PREFIX);
-    if (!isSystem) assertValidTableName(tableName);
+    if (!isSystem) {
+      assertValidTableName(tableName);
+    } else {
+      // System tables bypass assertValidTableName because that allowlist
+      // forbids leading underscores. We still need to enforce safe-identifier
+      // characters on the suffix — the raw tableName is interpolated into the
+      // tmp-file path below, so a crafted name like "__vsk_x/../../etc/exploit"
+      // would write parquet bytes outside tmpdir().
+      const suffix = tableName.slice(SYSTEM_TABLE_PREFIX.length);
+      if (!suffix || !/^[A-Za-z_][A-Za-z0-9_$]{0,120}$/.test(suffix)) {
+        throw new VskFormatError(
+          "BAD_TABLE_NAME",
+          `vsk: invalid system table name at offset ${p}`,
+        );
+      }
+    }
     p = newlineIdx + 1;
     if (p + 8 > dataEnd) {
       throw new VskFormatError(
@@ -199,8 +219,7 @@ export async function readVsk(
               return `"${colName}" ${mapOracleType(c.type)}${nullClause}`;
             })
             .join(", ");
-          const verb = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";
-          await dst.exec(`${verb} "${tNameSafe}" (${colDdl})`);
+          await dst.exec(`${ddl} "${tNameSafe}" (${colDdl})`);
           await dst.exec(
             `INSERT INTO "${tNameSafe}" SELECT * FROM read_parquet('${tmpEsc}')`,
           );
