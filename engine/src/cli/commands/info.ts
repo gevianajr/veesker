@@ -29,5 +29,16 @@ export function registerInfo(program: Command): void {
         console.log(`  - ${t.name} (${t.rowCount.toLocaleString()} rows, ${t.columns.length} columns)`);
       }
       console.log(`PII masks:      ${manifest.piiMasks.length}`);
+      const isV2 = (manifest.engineVersion ?? "0.1.0").startsWith("0.2");
+      if (isV2 && manifest.plsqlObjectCount !== undefined) {
+        console.log(`Plsql objects:  ${manifest.plsqlObjectCount}`);
+        if (manifest.skippedObjects && manifest.skippedObjects.length > 0) {
+          console.log(`Skipped:        ${manifest.skippedObjects.length}`);
+          for (const s of manifest.skippedObjects) {
+            const detail = s.detail ? ` (${s.detail})` : "";
+            console.log(`  - ${s.kind} ${s.owner}.${s.name} — ${s.reason}${detail}`);
+          }
+        }
+      }
     });
 }
