@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from "bun:test";
+import { describe, expect, it, afterAll } from "bun:test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync, unlinkSync } from "node:fs";
@@ -70,6 +70,7 @@ describe("cli info", () => {
     expect(joined).toContain("Engine version: 0.2.0");
     expect(joined).toMatch(/Plsql objects:\s*47/);
     expect(joined).toMatch(/Skipped:\s*1/);
+    expect(joined).toContain("- PROCEDURE HR.BAD — INVALID");
   });
 
   it("does not print PL/SQL summary for v0.1.0 manifests", async () => {
