@@ -189,7 +189,7 @@ describe("vsk-format writer + reader", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const m = await readVsk(path, dst);
+        const { manifest: m } = await readVsk(path, dst);
         expect(m.tables.length).toBe(1);
         const rows = await dst.query("SELECT * FROM customers ORDER BY id");
         expect(rows).toEqual([
@@ -267,7 +267,7 @@ describe("vsk-format writer + reader", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const recovered = await readVsk(path, dst);
+        const { manifest: recovered } = await readVsk(path, dst);
         expect(recovered).toEqual(original);
       } finally {
         await dst.close();
@@ -552,7 +552,7 @@ describe("vsk-format safety + edge cases", () => {
       });
       const dst = await DuckDBHost.openInMemory();
       try {
-        const m = await readVsk(path, dst);
+        const { manifest: m } = await readVsk(path, dst);
         expect(m.tables).toEqual([]);
       } finally {
         await dst.close();
@@ -666,7 +666,7 @@ describe("encrypted .vsk round-trip", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const manifest = await readEncryptedVsk(path, dst, sender.publicKey, recipient);
+        const { manifest } = await readEncryptedVsk(path, dst, sender.publicKey, recipient);
         expect(manifest.tables[0]!.name).toBe("ORDERS");
         const rows = await dst.query('SELECT id FROM "orders" ORDER BY id');
         expect(rows.length).toBe(2);
@@ -799,7 +799,7 @@ describe("encrypted .vsk round-trip", () => {
         {},
         memberEnvelope,
       );
-      expect(out.tables).toHaveLength(1);
+      expect(out.manifest.tables).toHaveLength(1);
       const rows = await dstHost.query('SELECT a, b FROM "t" ORDER BY a');
       expect(rows).toEqual([
         { A: 1, B: "one" },
@@ -863,5 +863,104 @@ describe("manifest v0.2.0", () => {
 
   it("exports ENGINE_VERSION constant equal to '0.2.0'", () => {
     expect(ENGINE_VERSION).toBe("0.2.0");
+  });
+});
+
+describe("reader v0.2.0 — system tables + version fence", () => {
+  it("returns systemTables list separately from userTables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      await host.exec(`INSERT INTO "u" VALUES (1)`);
+      await host.exec(`CREATE TABLE "__vsk_objects" (kind VARCHAR, owner VARCHAR, name VARCHAR, status VARCHAR, ddl_size_bytes BIGINT, extracted_at TIMESTAMP, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_objects" VALUES ('PROCEDURE', 'HR', 'P1', 'VALID', 100, '2026-05-04 00:00:00')`);
+
+      const out = join(tmpdir(), `vsk-r-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 1, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.2.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          const result = await readVsk(out, dst);
+          expect(result.manifest.engineVersion).toBe("0.2.0");
+          expect(result.userTables).toContain("u");
+          expect(result.systemTables).toContain("__vsk_objects");
+          expect(result.userTables).not.toContain("__vsk_objects");
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("rejects manifests with engineVersion >= 0.3.0", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      const out = join(tmpdir(), `vsk-fence-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.3.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await expect(readVsk(out, dst)).rejects.toThrow(/engineVersion 0\.3\.0/i);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("v0.1.0 manifest reads with empty systemTables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      const out = join(tmpdir(), `vsk-v1-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.1.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          const r = await readVsk(out, dst);
+          expect(r.systemTables).toEqual([]);
+          expect(r.userTables).toEqual(["u"]);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
   });
 });

@@ -60,14 +60,44 @@ export function readVskManifest(path: string): VskManifest {
   }
 }
 
+const SYSTEM_TABLE_PREFIX = "__vsk_";
+
 export interface ReadVskOptions {
   /** When true, emit `CREATE OR REPLACE TABLE` instead of `CREATE TABLE`. Defaults to false. */
   replace?: boolean;
 }
 
+export interface ReadVskResult {
+  manifest: VskManifest;
+  /** Lower-cased names of user tables created in `dst` (driven by manifest.tables). */
+  userTables: string[];
+  /** Lower-cased names of system tables (`__vsk_*`) created in `dst`. Empty for v0.1.0 sandboxes. */
+  systemTables: string[];
+}
+
+function checkVersionFence(m: VskManifest): void {
+  const v = m.engineVersion ?? "0.1.0";
+  // Strictly `MAJOR.MINOR.PATCH`. We treat any version with a major >= 1 OR
+  // (major 0 AND minor >= 3) as forward-incompatible. v0.2.0 reader knows
+  // about __vsk_objects/__vsk_source/__vsk_dependencies — anything beyond
+  // is unknown territory.
+  const parts = v.split(".").map((p) => Number.parseInt(p, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+    throw new VskFormatError("MALFORMED_MANIFEST", `vsk reader: unparseable engineVersion "${v}"`);
+  }
+  const [maj, min] = parts as [number, number, number];
+  if (maj > 0 || (maj === 0 && min >= 3)) {
+    throw new VskFormatError(
+      "MALFORMED_MANIFEST",
+      `vsk reader: engineVersion ${v} is newer than this reader (max 0.2.x). Upgrade @veesker/engine.`,
+    );
+  }
+}
+
 /**
  * Restore a `.vsk` file into a DuckDB host. Creates one DuckDB table per
- * manifest entry (lower-cased per DuckDB convention). Returns the manifest.
+ * manifest entry (lower-cased per DuckDB convention). Returns the manifest,
+ * plus separate lists of user tables and system (`__vsk_*`) tables created.
  *
  * Pass `{ replace: true }` to overwrite existing tables in `dst`.
  */
@@ -75,7 +105,7 @@ export async function readVsk(
   path: string,
   dst: DuckDBHost,
   opts: ReadVskOptions = {},
-): Promise<VskManifest> {
+): Promise<ReadVskResult> {
   const file = readFileSync(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));
@@ -85,12 +115,16 @@ export async function readVsk(
       Number(header.manifestOffset + header.manifestLength),
     ),
   );
+  checkVersionFence(manifest);
 
   const dataStart = Number(header.dataOffset);
   const dataEnd = dataStart + Number(header.dataLength);
   let p = dataStart;
   const tagPrefix = new TextEncoder().encode(TABLE_TAG_PREFIX);
   const ddl = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";
+
+  const userTables: string[] = [];
+  const systemTables: string[] = [];
 
   while (p < dataEnd) {
     if (buf.byteLength - p < tagPrefix.byteLength) {
@@ -117,7 +151,8 @@ export async function readVsk(
     if (!tableName) {
       throw new VskFormatError("BAD_TABLE_NAME", `vsk: empty table name in tag at offset ${p}`);
     }
-    assertValidTableName(tableName);
+    const isSystem = tableName.toLowerCase().startsWith(SYSTEM_TABLE_PREFIX);
+    if (!isSystem) assertValidTableName(tableName);
     p = newlineIdx + 1;
     if (p + 8 > dataEnd) {
       throw new VskFormatError(
@@ -146,36 +181,42 @@ export async function readVsk(
     try {
       const tmpEsc = tmp.replace(/\\/g, "/").replace(/'/g, "''");
       const tNameSafe = tableName.toLowerCase().replace(/"/g, '""');
-      const tNameUpper = tableName.toUpperCase();
-      const manifestTable = manifest.tables.find((t) => t.name.toUpperCase() === tNameUpper);
-      if (manifestTable) {
-        const colDdl = manifestTable.columns
-          .map((c) => {
-            const colName = c.name.replace(/"/g, '""');
-            const nullClause = c.nullable ? "" : " NOT NULL";
-            // Manifest stores Oracle types verbatim (VARCHAR2, NUMBER, DATE…)
-            // so the owner UI can show familiar names. DuckDB rejects those,
-            // so translate before issuing CREATE TABLE on the member side —
-            // mirror of the build-side mapping in cl/sidecar/.../build.ts.
-            return `"${colName}" ${mapOracleType(c.type)}${nullClause}`;
-          })
-          .join(", ");
-        const verb = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";
-        await dst.exec(`${verb} "${tNameSafe}" (${colDdl})`);
-        await dst.exec(
-          `INSERT INTO "${tNameSafe}" SELECT * FROM read_parquet('${tmpEsc}')`,
-        );
-      } else {
+      if (isSystem) {
+        // System tables don't appear in manifest.tables. Use the schema
+        // baked into the parquet itself via `CREATE TABLE … AS SELECT`.
         await dst.exec(
           `${ddl} "${tNameSafe}" AS SELECT * FROM read_parquet('${tmpEsc}')`,
         );
+        systemTables.push(tNameSafe);
+      } else {
+        const tNameUpper = tableName.toUpperCase();
+        const manifestTable = manifest.tables.find((t) => t.name.toUpperCase() === tNameUpper);
+        if (manifestTable) {
+          const colDdl = manifestTable.columns
+            .map((c) => {
+              const colName = c.name.replace(/"/g, '""');
+              const nullClause = c.nullable ? "" : " NOT NULL";
+              return `"${colName}" ${mapOracleType(c.type)}${nullClause}`;
+            })
+            .join(", ");
+          const verb = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";
+          await dst.exec(`${verb} "${tNameSafe}" (${colDdl})`);
+          await dst.exec(
+            `INSERT INTO "${tNameSafe}" SELECT * FROM read_parquet('${tmpEsc}')`,
+          );
+        } else {
+          await dst.exec(
+            `${ddl} "${tNameSafe}" AS SELECT * FROM read_parquet('${tmpEsc}')`,
+          );
+        }
+        userTables.push(tNameSafe);
       }
     } finally {
       try { unlinkSync(tmp); } catch { /* best effort */ }
     }
   }
 
-  return manifest;
+  return { manifest, userTables, systemTables };
 }
 
 /**
@@ -193,7 +234,7 @@ export async function readEncryptedVsk(
   recipient: Keypair,
   opts: ReadVskOptions = {},
   externalEnvelope?: Envelope,
-): Promise<VskManifest> {
+): Promise<ReadVskResult> {
   const file = readFileSync(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));

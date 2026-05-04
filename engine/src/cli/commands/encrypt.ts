@@ -42,7 +42,7 @@ export function registerEncrypt(program: Command): void {
 
         const src = await DuckDBHost.openInMemory();
         try {
-          const manifest = await readVsk(opts.in, src);
+          const { manifest } = await readVsk(opts.in, src);
           const contentKey = randomKey();
           const envelope = await sealEnvelope(contentKey, recipientPub, {
             publicKey: senderPub,

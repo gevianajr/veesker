@@ -64,7 +64,7 @@ describe("end-to-end: build → encrypt → ship → decrypt → query Oracle SQ
       // Build the encrypted variant for member
       const tmpHost = await DuckDBHost.openInMemory();
       try {
-        const manifest = await readVsk(plainPath, tmpHost);
+        const { manifest } = await readVsk(plainPath, tmpHost);
         const contentKey = randomKey();
         const envelope = await sealEnvelope(contentKey, member.publicKey, owner);
         await writeEncryptedVsk(tmpHost, encPath, manifest, contentKey, envelope);
@@ -79,7 +79,7 @@ describe("end-to-end: build → encrypt → ship → decrypt → query Oracle SQ
     const memberHost = await DuckDBHost.openInMemory();
     try {
       // Decrypt directly into memberHost
-      const recoveredManifest = await readEncryptedVsk(
+      const { manifest: recoveredManifest } = await readEncryptedVsk(
         encPath,
         memberHost,
         owner.publicKey,
