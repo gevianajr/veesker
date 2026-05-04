@@ -39,7 +39,7 @@ export function registerDecrypt(program: Command): void {
 
         const dst = await DuckDBHost.openInMemory();
         try {
-          const manifest = await readEncryptedVsk(
+          const { manifest } = await readEncryptedVsk(
             opts.in,
             dst,
             pubkeyFromBase64(opts.sender),

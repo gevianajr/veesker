@@ -10,6 +10,33 @@ import type { Envelope } from "../crypto/envelope";
 import type { DuckDBHost } from "../duckdb-host";
 
 const TABLE_TAG_PREFIX = "__VSK_TABLE__";
+const SYSTEM_TABLE_PREFIX = "__vsk_";
+const SYSTEM_TABLE_ORDER = ["__vsk_objects", "__vsk_source", "__vsk_dependencies"] as const;
+
+async function tableExists(src: DuckDBHost, name: string): Promise<boolean> {
+  const res = await src.query(
+    `SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main' AND table_name = '${name.toLowerCase().replace(/'/g, "''")}'`
+  );
+  return Number(Object.values(res[0]!)[0]) > 0;
+}
+
+async function writeOneTable(
+  src: DuckDBHost,
+  rawName: string,
+  tmpParquet: string,
+  dataParts: Buffer[],
+): Promise<void> {
+  const tNameSafe = rawName.toLowerCase().replace(/"/g, '""');
+  const tmpEsc = tmpParquet.replace(/\\/g, "/").replace(/'/g, "''");
+  await src.exec(
+    `COPY (SELECT * FROM "${tNameSafe}") TO '${tmpEsc}' (FORMAT PARQUET, COMPRESSION ZSTD)`,
+  );
+  const parquetBytes = await Bun.file(tmpParquet).bytes();
+  const tag = new TextEncoder().encode(`${TABLE_TAG_PREFIX}${rawName}\n`);
+  const sizeBuf = new Uint8Array(8);
+  new DataView(sizeBuf.buffer).setBigUint64(0, BigInt(parquetBytes.byteLength), true);
+  dataParts.push(Buffer.from(tag), Buffer.from(sizeBuf), Buffer.from(parquetBytes));
+}
 
 /**
  * Pack a DuckDB-resident sandbox into a single `.vsk` file.
@@ -37,16 +64,15 @@ export async function writeVsk(
 
   try {
     for (const table of manifest.tables) {
-      const tNameSafe = table.name.toLowerCase().replace(/"/g, '""');
-      const tmpEsc = tmpParquet.replace(/\\/g, "/").replace(/'/g, "''");
-      await src.exec(
-        `COPY (SELECT * FROM "${tNameSafe}") TO '${tmpEsc}' (FORMAT PARQUET, COMPRESSION ZSTD)`,
-      );
-      const parquetBytes = await Bun.file(tmpParquet).bytes();
-      const tag = new TextEncoder().encode(`${TABLE_TAG_PREFIX}${table.name}\n`);
-      const sizeBuf = new Uint8Array(8);
-      new DataView(sizeBuf.buffer).setBigUint64(0, BigInt(parquetBytes.byteLength), true);
-      dataParts.push(Buffer.from(tag), Buffer.from(sizeBuf), Buffer.from(parquetBytes));
+      if (table.name.toLowerCase().startsWith(SYSTEM_TABLE_PREFIX)) {
+        throw new Error(`writer: table name "${table.name}" collides with reserved __vsk_ prefix`);
+      }
+      await writeOneTable(src, table.name, tmpParquet, dataParts);
+    }
+    for (const sysName of SYSTEM_TABLE_ORDER) {
+      if (await tableExists(src, sysName)) {
+        await writeOneTable(src, sysName, tmpParquet, dataParts);
+      }
     }
   } finally {
     try { await Bun.file(tmpParquet).delete(); } catch { /* best effort */ }

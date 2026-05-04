@@ -18,6 +18,11 @@ import { VskFormatError } from "./errors";
 export const VSK_MASK_TYPES = ["hash", "redact", "static", "partial"] as const;
 export type VskMaskType = typeof VSK_MASK_TYPES[number];
 
+export const ENGINE_VERSION = "0.2.0";
+
+export const SKIPPED_REASONS = ["INVALID", "NO_PRIVILEGE", "EXTRACTION_ERROR"] as const;
+export type SkippedReason = typeof SKIPPED_REASONS[number];
+
 export interface VskColumn {
   name: string;
   type: string;
@@ -36,6 +41,14 @@ export interface VskPiiMask {
   maskType: VskMaskType;
 }
 
+export interface VskSkippedObject {
+  kind: string;
+  owner: string;
+  name: string;
+  reason: SkippedReason;
+  detail?: string;
+}
+
 export interface VskManifest {
   builtAt: string;
   sourceId: string;
@@ -51,6 +64,11 @@ export interface VskManifest {
    *  when absent (backwards compatibility). New formats add new tags here without
    *  bumping the file-header version. */
   dataFormat?: string;
+  /** Total PL/SQL objects packed into __vsk_objects. v0.2.0+. */
+  plsqlObjectCount?: number;
+  /** Objects discovered by the dependency walk but skipped during DDL
+   *  extraction. v0.2.0+. */
+  skippedObjects?: VskSkippedObject[];
 }
 
 export function writeManifest(m: VskManifest): Uint8Array {
@@ -82,8 +100,25 @@ function isManifest(x: unknown): x is VskManifest {
   if (!Array.isArray(m.piiMasks)) return false;
   if (m.engineVersion !== undefined && typeof m.engineVersion !== "string") return false;
   if (m.dataFormat !== undefined && typeof m.dataFormat !== "string") return false;
+  if (m.plsqlObjectCount !== undefined && (typeof m.plsqlObjectCount !== "number" || !Number.isInteger(m.plsqlObjectCount) || m.plsqlObjectCount < 0)) return false;
+  if (m.skippedObjects !== undefined) {
+    if (!Array.isArray(m.skippedObjects)) return false;
+    for (const s of m.skippedObjects) if (!isSkipped(s)) return false;
+  }
   for (const t of m.tables) if (!isTable(t)) return false;
   for (const p of m.piiMasks) if (!isMask(p)) return false;
+  return true;
+}
+
+function isSkipped(x: unknown): x is VskSkippedObject {
+  if (typeof x !== "object" || x === null) return false;
+  const s = x as Record<string, unknown>;
+  if (typeof s.kind !== "string") return false;
+  if (typeof s.owner !== "string") return false;
+  if (typeof s.name !== "string") return false;
+  if (typeof s.reason !== "string") return false;
+  if (!SKIPPED_REASONS.includes(s.reason as SkippedReason)) return false;
+  if (s.detail !== undefined && typeof s.detail !== "string") return false;
   return true;
 }
 

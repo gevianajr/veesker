@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { writeHeader, readHeader, VSK_MAGIC, VSK_VERSION } from "../src/vsk-format/header";
-import { writeManifest, readManifest, VSK_MASK_TYPES, type VskManifest } from "../src/vsk-format/manifest";
+import { writeManifest, readManifest, VSK_MASK_TYPES, ENGINE_VERSION, type VskManifest } from "../src/vsk-format/manifest";
 import { writeVsk, writeEncryptedVsk } from "../src/vsk-format/writer";
 import { readVsk, readEncryptedVsk } from "../src/vsk-format/reader";
 import { readVskHeader, readVskManifest } from "../src/vsk-format/reader";
@@ -189,7 +189,7 @@ describe("vsk-format writer + reader", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const m = await readVsk(path, dst);
+        const { manifest: m } = await readVsk(path, dst);
         expect(m.tables.length).toBe(1);
         const rows = await dst.query("SELECT * FROM customers ORDER BY id");
         expect(rows).toEqual([
@@ -267,7 +267,7 @@ describe("vsk-format writer + reader", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const recovered = await readVsk(path, dst);
+        const { manifest: recovered } = await readVsk(path, dst);
         expect(recovered).toEqual(original);
       } finally {
         await dst.close();
@@ -365,6 +365,90 @@ describe("vsk-format writer + reader", () => {
   });
 });
 
+describe("writer v0.2.0 — __vsk_* tables", () => {
+  it("writes __vsk_objects + __vsk_source after user tables when present", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "users" (id INTEGER, name VARCHAR)`);
+      await host.exec(`INSERT INTO "users" VALUES (1, 'Alice')`);
+      await host.exec(`CREATE TABLE "__vsk_objects" (kind VARCHAR, owner VARCHAR, name VARCHAR, status VARCHAR, ddl_size_bytes BIGINT, extracted_at TIMESTAMP, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_objects" VALUES ('PROCEDURE', 'HR', 'GET_EMP', 'VALID', 256, '2026-05-04 12:00:00')`);
+      await host.exec(`CREATE TABLE "__vsk_source" (kind VARCHAR, owner VARCHAR, name VARCHAR, ddl TEXT, spec TEXT, body TEXT, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_source" VALUES ('PROCEDURE', 'HR', 'GET_EMP', 'CREATE PROCEDURE get_emp AS BEGIN NULL; END;', NULL, NULL)`);
+
+      const out = join(tmpdir(), `vsk-write-test-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "x", schemaName: "HR",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "users", rowCount: 1, columns: [
+          { name: "id", type: "NUMBER", nullable: true },
+          { name: "name", type: "VARCHAR2", nullable: true },
+        ]}],
+        piiMasks: [],
+        engineVersion: "0.2.0",
+        plsqlObjectCount: 1,
+      };
+      try {
+        await writeVsk(host, out, m);
+        // Read back via existing readVsk, verify 3 tables (1 user + 2 system)
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await readVsk(out, dst);
+          const tablesRes = await dst.query(
+            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name`
+          );
+          // Note: the test asserts tables are present after readVsk, even though
+          // the v0.1.0 readVsk doesn't yet split user vs system. Task 3 splits
+          // them; here we just verify writer emitted bytes for both.
+          const names = tablesRes.map((r) => r["table_name"] as string);
+          expect(names).toContain("users");
+          expect(names).toContain("__vsk_objects");
+          expect(names).toContain("__vsk_source");
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("skips __vsk_* writing when source DuckDB has no __vsk_* tables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (a INT)`);
+      const out = join(tmpdir(), `vsk-write-test-v1-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "x", schemaName: "X",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "a", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await readVsk(out, dst);
+          const r = await dst.query(
+            `SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main' AND table_name LIKE '__vsk_%'`
+          );
+          expect(Number(Object.values(r[0]!)[0])).toBe(0);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+});
+
 describe("vsk-format safety + edge cases", () => {
   it("writer rejects an unsafe table name in the manifest", async () => {
     const src = await DuckDBHost.openInMemory();
@@ -378,6 +462,28 @@ describe("vsk-format safety + edge cases", () => {
         tables: [{ name: "../../../etc/passwd", rowCount: 0, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
         piiMasks: [],
       })).rejects.toThrow(/invalid table name/i);
+      expect(existsSync(path)).toBe(false);
+    } finally {
+      await src.close();
+    }
+  });
+
+  it("writer rejects a manifest user-table that collides with the __vsk_ prefix", async () => {
+    const src = await DuckDBHost.openInMemory();
+    try {
+      const path = join(tmpdir(), `vsk-collide-${process.pid}-${Date.now()}.vsk`);
+      // Today assertValidTableName already rejects names starting with "__",
+      // so this guard is unreachable through the current name validator. The
+      // explicit collision check in writeVsk hardens the invariant against
+      // future relaxations of that regex — this test pins it.
+      await expect(writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "__vsk_objects", rowCount: 0, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      })).rejects.toThrow(/(invalid table name|collides with reserved __vsk_ prefix)/i);
       expect(existsSync(path)).toBe(false);
     } finally {
       await src.close();
@@ -446,7 +552,7 @@ describe("vsk-format safety + edge cases", () => {
       });
       const dst = await DuckDBHost.openInMemory();
       try {
-        const m = await readVsk(path, dst);
+        const { manifest: m } = await readVsk(path, dst);
         expect(m.tables).toEqual([]);
       } finally {
         await dst.close();
@@ -560,7 +666,7 @@ describe("encrypted .vsk round-trip", () => {
 
       const dst = await DuckDBHost.openInMemory();
       try {
-        const manifest = await readEncryptedVsk(path, dst, sender.publicKey, recipient);
+        const { manifest } = await readEncryptedVsk(path, dst, sender.publicKey, recipient);
         expect(manifest.tables[0]!.name).toBe("ORDERS");
         const rows = await dst.query('SELECT id FROM "orders" ORDER BY id');
         expect(rows.length).toBe(2);
@@ -693,7 +799,7 @@ describe("encrypted .vsk round-trip", () => {
         {},
         memberEnvelope,
       );
-      expect(out.tables).toHaveLength(1);
+      expect(out.manifest.tables).toHaveLength(1);
       const rows = await dstHost.query('SELECT a, b FROM "t" ORDER BY a');
       expect(rows).toEqual([
         { A: 1, B: "one" },
@@ -702,6 +808,206 @@ describe("encrypted .vsk round-trip", () => {
     } finally {
       await dstHost.close();
       try { unlinkSync(path); } catch { /* best effort */ }
+    }
+  });
+});
+
+describe("manifest v0.2.0", () => {
+  it("round-trips plsqlObjectCount + skippedObjects", () => {
+    const m: VskManifest = {
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "conn-1",
+      schemaName: "HR",
+      ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [],
+      piiMasks: [],
+      engineVersion: "0.2.0",
+      dataFormat: "parquet-streams-v1",
+      plsqlObjectCount: 47,
+      skippedObjects: [
+        { kind: "PROCEDURE", owner: "HR", name: "P_BAD", reason: "INVALID" },
+        { kind: "FUNCTION",  owner: "HR", name: "F_NP",  reason: "NO_PRIVILEGE", detail: "ORA-31603" },
+      ],
+    };
+    const bytes = writeManifest(m);
+    const back = readManifest(bytes);
+    expect(back.engineVersion).toBe("0.2.0");
+    expect(back.plsqlObjectCount).toBe(47);
+    expect(back.skippedObjects).toHaveLength(2);
+    expect(back.skippedObjects?.[0]?.reason).toBe("INVALID");
+    expect(back.skippedObjects?.[1]?.detail).toBe("ORA-31603");
+  });
+
+  it("rejects malformed skippedObjects entry", () => {
+    const bad = JSON.stringify({
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "x", schemaName: "X", ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [], piiMasks: [],
+      skippedObjects: [{ kind: "PROCEDURE", owner: "HR" /* missing name + reason */ }],
+    });
+    expect(() => readManifest(new TextEncoder().encode(bad))).toThrow(/malformed/i);
+  });
+
+  it("accepts manifest without v0.2.0 fields (backward compat)", () => {
+    const v1 = JSON.stringify({
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "x", schemaName: "X", ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [], piiMasks: [],
+      engineVersion: "0.1.0",
+    });
+    const back = readManifest(new TextEncoder().encode(v1));
+    expect(back.engineVersion).toBe("0.1.0");
+    expect(back.plsqlObjectCount).toBeUndefined();
+    expect(back.skippedObjects).toBeUndefined();
+  });
+
+  it("exports ENGINE_VERSION constant equal to '0.2.0'", () => {
+    expect(ENGINE_VERSION).toBe("0.2.0");
+  });
+});
+
+describe("reader v0.2.0 — system tables + version fence", () => {
+  it("returns systemTables list separately from userTables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      await host.exec(`INSERT INTO "u" VALUES (1)`);
+      await host.exec(`CREATE TABLE "__vsk_objects" (kind VARCHAR, owner VARCHAR, name VARCHAR, status VARCHAR, ddl_size_bytes BIGINT, extracted_at TIMESTAMP, PRIMARY KEY (kind, owner, name))`);
+      await host.exec(`INSERT INTO "__vsk_objects" VALUES ('PROCEDURE', 'HR', 'P1', 'VALID', 100, '2026-05-04 00:00:00')`);
+
+      const out = join(tmpdir(), `vsk-r-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 1, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.2.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          const result = await readVsk(out, dst);
+          expect(result.manifest.engineVersion).toBe("0.2.0");
+          expect(result.userTables).toContain("u");
+          expect(result.systemTables).toContain("__vsk_objects");
+          expect(result.userTables).not.toContain("__vsk_objects");
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("rejects manifests with engineVersion >= 0.3.0", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      const out = join(tmpdir(), `vsk-fence-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.3.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          await expect(readVsk(out, dst)).rejects.toThrow(/engineVersion 0\.3\.0/i);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("v0.1.0 manifest reads with empty systemTables", async () => {
+    const host = await DuckDBHost.openInMemory();
+    try {
+      await host.exec(`CREATE TABLE "u" (id INT)`);
+      const out = join(tmpdir(), `vsk-v1-${Date.now()}.vsk`);
+      const m: VskManifest = {
+        builtAt: "2026-05-04T00:00:00.000Z",
+        sourceId: "s", schemaName: "S",
+        ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+        tables: [{ name: "u", rowCount: 0, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
+        piiMasks: [],
+        engineVersion: "0.1.0",
+      };
+      try {
+        await writeVsk(host, out, m);
+        const dst = await DuckDBHost.openInMemory();
+        try {
+          const r = await readVsk(out, dst);
+          expect(r.systemTables).toEqual([]);
+          expect(r.userTables).toEqual(["u"]);
+        } finally {
+          await dst.close();
+        }
+      } finally {
+        if (existsSync(out)) unlinkSync(out);
+      }
+    } finally {
+      await host.close();
+    }
+  });
+
+  it("rejects a system-prefixed table name with path-traversal characters", async () => {
+    // Hand-craft a .vsk where the data section's __VSK_TABLE__ tag carries a
+    // crafted system table name that would otherwise be interpolated into the
+    // tmp-file path and escape tmpdir().
+    const out = join(tmpdir(), `vsk-traversal-${process.pid}-${Date.now()}.vsk`);
+    const malicious = "__vsk_x/../../etc/exploit";
+
+    const { writeHeader: writeHdr, HEADER_SIZE } = await import("../src/vsk-format/header");
+    const { writeManifest: writeMan } = await import("../src/vsk-format/manifest");
+    const manifest: VskManifest = {
+      builtAt: new Date().toISOString(),
+      sourceId: "x",
+      schemaName: "x",
+      ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+      tables: [],
+      piiMasks: [],
+    };
+    const manifestBytes = writeMan(manifest);
+    const tag = new TextEncoder().encode(`__VSK_TABLE__${malicious}\n`);
+    const sizeBuf = new Uint8Array(8);
+    new DataView(sizeBuf.buffer).setBigUint64(0, 0n, true);
+    const dataSection = Buffer.concat([Buffer.from(tag), Buffer.from(sizeBuf)]);
+
+    const header = writeHdr({
+      manifestOffset: BigInt(HEADER_SIZE),
+      manifestLength: BigInt(manifestBytes.byteLength),
+      dataOffset: BigInt(HEADER_SIZE + manifestBytes.byteLength),
+      dataLength: BigInt(dataSection.byteLength),
+      envelopeOffset: 0n,
+      envelopeLength: 0n,
+    });
+    const file = Buffer.concat([Buffer.from(header), Buffer.from(manifestBytes), dataSection]);
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(out, file);
+
+    try {
+      const dst = await DuckDBHost.openInMemory();
+      try {
+        await expect(readVsk(out, dst)).rejects.toThrow(/invalid system table name/i);
+      } finally {
+        await dst.close();
+      }
+    } finally {
+      try { unlinkSync(out); } catch { /* best effort */ }
     }
   });
 });

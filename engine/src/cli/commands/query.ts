@@ -76,7 +76,7 @@ export function registerQuery(program: Command): void {
 
         const host = await DuckDBHost.openInMemory();
         try {
-          const manifest = await readVsk(file, host);
+          const { manifest } = await readVsk(file, host);
           await installSystemViews(host, manifest.schemaName);
 
           const finalSql = opts.translate === false ? sql : translate(sql);
