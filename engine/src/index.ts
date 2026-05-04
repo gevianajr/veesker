@@ -7,6 +7,7 @@ export {
   readVskManifest,
   readEncryptedVsk,
   type ReadVskOptions,
+  type ReadVskResult,
 } from "./vsk-format/reader";
 export {
   type VskHeader,
@@ -15,12 +16,18 @@ export {
   HEADER_SIZE,
 } from "./vsk-format/header";
 export {
+  ENGINE_VERSION,
   type VskManifest,
   type VskTable,
   type VskColumn,
   type VskPiiMask,
   type VskMaskType,
+  type VskSkippedObject,
+  type SkippedReason,
   VSK_MASK_TYPES,
+  SKIPPED_REASONS,
+  writeManifest,
+  readManifest,
 } from "./vsk-format/manifest";
 export {
   VskFormatError,

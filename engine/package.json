@@ -1,6 +1,6 @@
 {
   "name": "@veesker/engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "VeeskerDB — embedded analytical engine with Oracle SQL compatibility shim",
   "license": "Apache-2.0",
   "repository": {
