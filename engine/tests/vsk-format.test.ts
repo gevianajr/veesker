@@ -468,6 +468,28 @@ describe("vsk-format safety + edge cases", () => {
     }
   });
 
+  it("writer rejects a manifest user-table that collides with the __vsk_ prefix", async () => {
+    const src = await DuckDBHost.openInMemory();
+    try {
+      const path = join(tmpdir(), `vsk-collide-${process.pid}-${Date.now()}.vsk`);
+      // Today assertValidTableName already rejects names starting with "__",
+      // so this guard is unreachable through the current name validator. The
+      // explicit collision check in writeVsk hardens the invariant against
+      // future relaxations of that regex — this test pins it.
+      await expect(writeVsk(src, path, {
+        builtAt: new Date().toISOString(),
+        sourceId: "x",
+        schemaName: "x",
+        ttlExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+        tables: [{ name: "__vsk_objects", rowCount: 0, columns: [{ name: "ID", type: "INTEGER", nullable: false }] }],
+        piiMasks: [],
+      })).rejects.toThrow(/(invalid table name|collides with reserved __vsk_ prefix)/i);
+      expect(existsSync(path)).toBe(false);
+    } finally {
+      await src.close();
+    }
+  });
+
   it("writer rejects a table name with a newline", async () => {
     const src = await DuckDBHost.openInMemory();
     try {
