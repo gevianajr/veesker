@@ -56,7 +56,13 @@ export interface VskManifest {
   ttlExpiresAt: string;
   tables: VskTable[];
   piiMasks: VskPiiMask[];
+  /** Optional. The `@veesker/engine` version that wrote this manifest. Future
+   *  readers may use this to gate compatibility checks (e.g. SQL-translator
+   *  semantic changes). Absent in early sandboxes — readers MUST tolerate. */
   engineVersion?: string;
+  /** Optional. The on-disk data-section format. Defaults to `"parquet-streams-v1"`
+   *  when absent (backwards compatibility). New formats add new tags here without
+   *  bumping the file-header version. */
   dataFormat?: string;
   /** Total PL/SQL objects packed into __vsk_objects. v0.2.0+. */
   plsqlObjectCount?: number;
