@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { writeHeader, readHeader, VSK_MAGIC, VSK_VERSION } from "../src/vsk-format/header";
-import { writeManifest, readManifest, VSK_MASK_TYPES, type VskManifest } from "../src/vsk-format/manifest";
+import { writeManifest, readManifest, VSK_MASK_TYPES, ENGINE_VERSION, type VskManifest } from "../src/vsk-format/manifest";
 import { writeVsk, writeEncryptedVsk } from "../src/vsk-format/writer";
 import { readVsk, readEncryptedVsk } from "../src/vsk-format/reader";
 import { readVskHeader, readVskManifest } from "../src/vsk-format/reader";
@@ -703,5 +703,59 @@ describe("encrypted .vsk round-trip", () => {
       await dstHost.close();
       try { unlinkSync(path); } catch { /* best effort */ }
     }
+  });
+});
+
+describe("manifest v0.2.0", () => {
+  it("round-trips plsqlObjectCount + skippedObjects", () => {
+    const m: VskManifest = {
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "conn-1",
+      schemaName: "HR",
+      ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [],
+      piiMasks: [],
+      engineVersion: "0.2.0",
+      dataFormat: "parquet-streams-v1",
+      plsqlObjectCount: 47,
+      skippedObjects: [
+        { kind: "PROCEDURE", owner: "HR", name: "P_BAD", reason: "INVALID" },
+        { kind: "FUNCTION",  owner: "HR", name: "F_NP",  reason: "NO_PRIVILEGE", detail: "ORA-31603" },
+      ],
+    };
+    const bytes = writeManifest(m);
+    const back = readManifest(bytes);
+    expect(back.engineVersion).toBe("0.2.0");
+    expect(back.plsqlObjectCount).toBe(47);
+    expect(back.skippedObjects).toHaveLength(2);
+    expect(back.skippedObjects?.[0]?.reason).toBe("INVALID");
+    expect(back.skippedObjects?.[1]?.detail).toBe("ORA-31603");
+  });
+
+  it("rejects malformed skippedObjects entry", () => {
+    const bad = JSON.stringify({
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "x", schemaName: "X", ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [], piiMasks: [],
+      skippedObjects: [{ kind: "PROCEDURE", owner: "HR" /* missing name + reason */ }],
+    });
+    expect(() => readManifest(new TextEncoder().encode(bad))).toThrow(/malformed/i);
+  });
+
+  it("accepts manifest without v0.2.0 fields (backward compat)", () => {
+    const v1 = JSON.stringify({
+      builtAt: "2026-05-04T00:00:00.000Z",
+      sourceId: "x", schemaName: "X", ttlExpiresAt: "2026-06-04T00:00:00.000Z",
+      tables: [], piiMasks: [],
+      engineVersion: "0.1.0",
+    });
+    const back = readManifest(new TextEncoder().encode(v1));
+    expect(back.engineVersion).toBe("0.1.0");
+    expect(back.plsqlObjectCount).toBeUndefined();
+    expect(back.skippedObjects).toBeUndefined();
+  });
+
+  it("exports ENGINE_VERSION constant equal to '0.2.0'", () => {
+    expect(ENGINE_VERSION).toBe("0.2.0");
   });
 });
