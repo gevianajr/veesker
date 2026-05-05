@@ -31,6 +31,13 @@ function deriveSharedKey(myPriv: Uint8Array, theirPub: Uint8Array): Uint8Array {
   return sodium.crypto_generichash(32, shared, null);
 }
 
+export interface EnvelopeOpts {
+  /** Additional authenticated data — bound into the AEAD tag but not encrypted.
+   *  If provided at seal time, the SAME bytes MUST be provided at open time or
+   *  decryption fails. Use {@link buildAad} to construct a canonical binding. */
+  aad?: Uint8Array;
+}
+
 /**
  * Seal a 32-byte content key for `recipientPubkey`. The output envelope
  * is opaque — only someone holding the recipient's private key (and
@@ -43,6 +50,7 @@ export async function sealEnvelope(
   contentKey: Uint8Array,
   recipientPubkey: Uint8Array,
   sender: Keypair,
+  opts: EnvelopeOpts = {},
 ): Promise<Envelope> {
   await sodiumReady();
   const sodium = getSodium();
@@ -52,7 +60,7 @@ export async function sealEnvelope(
   );
   const ciphertext = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
     contentKey,
-    null,
+    opts.aad ?? null,
     null,
     nonce,
     sharedKey,
@@ -69,6 +77,7 @@ export async function openEnvelope(
   envelope: Envelope,
   senderPubkey: Uint8Array,
   recipient: Keypair,
+  opts: EnvelopeOpts = {},
 ): Promise<Uint8Array> {
   await sodiumReady();
   const sodium = getSodium();
@@ -76,7 +85,7 @@ export async function openEnvelope(
   return sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
     null,
     envelope.ciphertext,
-    null,
+    opts.aad ?? null,
     envelope.nonce,
     sharedKey,
   );

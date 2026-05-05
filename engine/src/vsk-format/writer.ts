@@ -5,7 +5,9 @@ import { randomUUID } from "node:crypto";
 import { writeHeader, HEADER_SIZE } from "./header";
 import { writeManifest, type VskManifest } from "./manifest";
 import { assertValidTableName } from "./errors";
+import { FORMAT_V1, FORMAT_V2 } from "./version";
 import { encryptBlob } from "../crypto/blob";
+import { buildAad } from "../crypto/aad";
 import type { Envelope } from "../crypto/envelope";
 import type { DuckDBHost } from "../duckdb-host";
 
@@ -87,6 +89,7 @@ export async function writeVsk(
   const dataLength = BigInt(dataSection.byteLength);
 
   const header = writeHeader({
+    formatVersion: FORMAT_V1,
     manifestOffset,
     manifestLength,
     dataOffset,
@@ -106,6 +109,15 @@ export async function writeVsk(
   }
 }
 
+export interface EncryptedVskAadContext {
+  /** Identifies the sandbox being packed — bound into AAD. */
+  sandboxId: string;
+  /** Monotonic version number of the sandbox — bound into AAD. */
+  sandboxVersion: number;
+  /** Recipient's X25519 public key (32 bytes) — bound into AAD. */
+  recipientPubkey: Uint8Array;
+}
+
 /**
  * Pack a sandbox into an ENCRYPTED .vsk file.
  *
@@ -117,10 +129,19 @@ export async function writeVsk(
  *      sealEnvelope) and stores it inline in the encrypted file.
  *   4. Writes header -> envelope-block -> encrypted-blob to outPath atomically.
  *
- * The plain manifest is NOT visible in the encrypted file - it lives
- * inside the encrypted blob. This is by design: the encryption envelope
- * tells you who can read it, but the schema is only revealed to those
- * holding the content key.
+ * When `aadContext` is supplied the file is written as FORMAT_V2: both the
+ * envelope and the blob are AEAD-bound to (sandboxId, sandboxVersion,
+ * recipientPubkey). The caller MUST have sealed `envelope` with the same AAD;
+ * this function independently computes the blob AAD and passes it to
+ * {@link encryptBlob}. The aadContext fields are stored in the plaintext
+ * envelope JSON so the reader can reconstruct AAD without decrypting.
+ *
+ * Without `aadContext` the file is FORMAT_V1 (legacy behaviour, no AAD).
+ *
+ * The plain manifest is NOT visible in the encrypted file — it lives inside
+ * the encrypted blob. This is by design: the encryption envelope tells you
+ * who can read it, but the schema is only revealed to those holding the
+ * content key.
  */
 export async function writeEncryptedVsk(
   src: DuckDBHost,
@@ -128,6 +149,7 @@ export async function writeEncryptedVsk(
   manifest: VskManifest,
   contentKey: Uint8Array,
   envelope: Envelope,
+  aadContext?: EncryptedVskAadContext,
 ): Promise<void> {
   const tmpPlain = `${outPath}.${process.pid}.${randomUUID()}.plain.tmp`;
   let plainBytes: Uint8Array;
@@ -138,13 +160,33 @@ export async function writeEncryptedVsk(
     try { await Bun.file(tmpPlain).delete(); } catch { /* best effort */ }
   }
 
-  const encrypted = await encryptBlob(contentKey, plainBytes);
+  const formatVersion = aadContext ? FORMAT_V2 : FORMAT_V1;
 
-  const envelopeBlock = JSON.stringify({
+  let blobAad: Uint8Array | undefined;
+  if (aadContext) {
+    blobAad = buildAad({
+      sandboxId: aadContext.sandboxId,
+      sandboxVersion: aadContext.sandboxVersion,
+      recipientPubkey: aadContext.recipientPubkey,
+      formatVersion: FORMAT_V2,
+    });
+  }
+
+  const encrypted = await encryptBlob(contentKey, plainBytes, blobAad ? { aad: blobAad } : {});
+
+  const envelopeBlockObj: Record<string, string | number> = {
     nonce: Buffer.from(envelope.nonce).toString("base64"),
     ciphertext: Buffer.from(envelope.ciphertext).toString("base64"),
     blobNonce: Buffer.from(encrypted.nonce).toString("base64"),
-  });
+    formatVersion,
+  };
+  if (aadContext) {
+    envelopeBlockObj.sandboxId = aadContext.sandboxId;
+    envelopeBlockObj.sandboxVersion = aadContext.sandboxVersion;
+    envelopeBlockObj.recipientPubkey = Buffer.from(aadContext.recipientPubkey).toString("base64");
+  }
+
+  const envelopeBlock = JSON.stringify(envelopeBlockObj);
   const envelopeBytes = new TextEncoder().encode(envelopeBlock);
 
   const envelopeOffset = BigInt(HEADER_SIZE);
@@ -153,6 +195,7 @@ export async function writeEncryptedVsk(
   const dataLength = BigInt(encrypted.ciphertext.byteLength);
 
   const header = writeHeader({
+    formatVersion,
     manifestOffset: 0n,
     manifestLength: 0n,
     dataOffset,

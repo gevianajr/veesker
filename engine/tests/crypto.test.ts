@@ -60,11 +60,8 @@ describe("crypto X25519 keypair", () => {
     expect(Buffer.from(decoded).equals(Buffer.from(kp.publicKey))).toBe(true);
   });
 
-  it("rejects malformed base64 input gracefully", () => {
-    // Buffer.from accepts garbage and returns whatever it can decode.
-    // We don't validate length here — that's the caller's job.
-    const decoded = pubkeyFromBase64("not-real-base64!@#");
-    expect(decoded.byteLength).toBeGreaterThanOrEqual(0);
+  it("rejects non-32-byte base64 input with an error", () => {
+    expect(() => pubkeyFromBase64("not-real-base64!@#")).toThrow(/32 bytes/);
   });
 });
 

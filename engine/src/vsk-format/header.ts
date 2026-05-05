@@ -6,7 +6,7 @@ import { VskFormatError } from "./errors";
  * Byte layout (offset · size · field · endianness):
  *   0  · 4 · magic            · BIG-endian   — `0x56534b21` reads as ASCII "VSK!" on disk
  *   4  · 2 · version          · little       — `1` for this format
- *   6  · 2 · reserved-zero    · little       — must be zero, available for future fields
+ *   6  · 2 · formatVersion    · little       — crypto/AAD version: 1 = no AAD (v1), 2 = AAD-bound (v2)
  *   8  · 8 · manifestOffset   · little       — byte offset of the manifest section
  *  16  · 8 · manifestLength   · little       — byte length of the manifest section
  *  24  · 8 · dataOffset       · little       — byte offset of the data section (parquet stream)
@@ -14,11 +14,6 @@ import { VskFormatError } from "./errors";
  *  40  · 8 · envelopeOffset   · little       — byte offset of the encryption envelope (0 if plaintext)
  *  48  · 8 · envelopeLength   · little       — byte length of the encryption envelope (0 if plaintext)
  *  56  · 8 · reserved-zero    · little       — must be zero, available for future fields
- *
- * The two reserved spans (bytes 6-7, 56-63) are forward-compat slack. Reading code MUST
- * ignore unknown bits there; writing code MUST leave them zero. New fields can be added
- * to either span without bumping the format version, as long as they remain optional and
- * unset implies "feature not present".
  *
  * The integer offsets/lengths are 64-bit unsigned to support files >4 GiB.
  */
@@ -29,6 +24,8 @@ export const HEADER_SIZE = 64;
 export interface VskHeader {
   magic: number;
   version: number;
+  /** Crypto/AAD format version. 0 or 1 = legacy (no AAD). 2 = AAD-bound. */
+  formatVersion: number;
   manifestOffset: bigint;
   manifestLength: bigint;
   dataOffset: bigint;
@@ -42,6 +39,7 @@ export function writeHeader(fields: Omit<VskHeader, "magic" | "version">): Uint8
   const view = new DataView(buf.buffer);
   view.setUint32(0, VSK_MAGIC, false);
   view.setUint16(4, VSK_VERSION, true);
+  view.setUint16(6, fields.formatVersion, true);
   view.setBigUint64(8, fields.manifestOffset, true);
   view.setBigUint64(16, fields.manifestLength, true);
   view.setBigUint64(24, fields.dataOffset, true);
@@ -64,9 +62,11 @@ export function readHeader(buf: Uint8Array): VskHeader {
   if (version !== VSK_VERSION) {
     throw new VskFormatError("BAD_VERSION", `vsk: unsupported version ${version} (engine supports ${VSK_VERSION})`);
   }
+  const formatVersion = view.getUint16(6, true);
   return {
     magic,
     version,
+    formatVersion,
     manifestOffset: view.getBigUint64(8, true),
     manifestLength: view.getBigUint64(16, true),
     dataOffset: view.getBigUint64(24, true),
