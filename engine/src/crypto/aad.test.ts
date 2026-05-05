@@ -30,4 +30,13 @@ describe("buildAad", () => {
     const b = buildAad({ ...baseArgs, sandboxVersion: 2 });
     expect(a).not.toEqual(b);
   });
+
+  it("rejects sandboxId containing NUL byte", () => {
+    expect(() => buildAad({
+      sandboxId: "abc\0def",
+      sandboxVersion: 1,
+      recipientPubkey: new Uint8Array(32),
+      formatVersion: 2,
+    })).toThrow(/NUL/);
+  });
 });

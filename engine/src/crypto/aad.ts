@@ -12,6 +12,9 @@ export function buildAad(args: {
   recipientPubkey: Uint8Array;
   formatVersion: number;
 }): Uint8Array {
+  if (args.sandboxId.includes("\0")) {
+    throw new Error("buildAad: sandboxId must not contain NUL bytes");
+  }
   const enc = new TextEncoder();
   const parts = [
     enc.encode("VSK\0AAD\0v1\0"),

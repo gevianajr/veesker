@@ -9,7 +9,7 @@ import { FORMAT_V2, isSupportedFormat } from "./version";
 import { decryptBlob } from "../crypto/blob";
 import { buildAad } from "../crypto/aad";
 import { openEnvelope, type Envelope } from "../crypto/envelope";
-import type { Keypair } from "../crypto/keypair";
+import { pubkeyFromBase64, type Keypair } from "../crypto/keypair";
 import type { DuckDBHost } from "../duckdb-host";
 import { mapOracleType } from "../oracle-shim/types";
 
@@ -337,7 +337,7 @@ export async function readEncryptedVsk(
     if (!meta.sandboxId || meta.sandboxVersion === undefined || !meta.recipientPubkey) {
       throw new VskFormatError("MALFORMED_MANIFEST", "vsk: v2 envelope missing AAD context fields");
     }
-    const recipientPubkey = new Uint8Array(Buffer.from(meta.recipientPubkey, "base64"));
+    const recipientPubkey = pubkeyFromBase64(meta.recipientPubkey);
     envelopeAad = buildAad({
       sandboxId: meta.sandboxId,
       sandboxVersion: meta.sandboxVersion,
