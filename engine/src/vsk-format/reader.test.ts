@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -81,9 +81,17 @@ describe("dual-read: v1 round-trip", () => {
 });
 
 describe("readVsk bounds-checking", () => {
+  let testDir: string;
+  beforeAll(() => {
+    testDir = mkdtempSync(join(tmpdir(), "vsk-test-"));
+  });
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
   it("rejects file with manifestLength exceeding file size", async () => {
     const corrupt = craftCorruptVsk();
-    const tmpPath = join(tmpdir(), `vsk-corrupt-${randomUUID()}.vsk`);
+    const tmpPath = join(testDir, "corrupt.vsk");
     writeFileSync(tmpPath, Buffer.from(corrupt));
     const dst = await makeDst();
     try {
@@ -94,7 +102,7 @@ describe("readVsk bounds-checking", () => {
       expect(caught).toBeDefined();
       expect((caught as { code?: string }).code ?? caught?.message).toMatch(/TRUNCATED|INVALID/);
     } finally {
-      try { unlinkSync(tmpPath); } catch { /* best effort */ }
+      try { await dst.close(); } catch { /* best effort */ }
     }
   });
 });
