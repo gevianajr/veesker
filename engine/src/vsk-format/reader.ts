@@ -22,6 +22,7 @@ const TABLE_TAG_PREFIX = "__VSK_TABLE__";
  * sandboxes.
  */
 export function readVskHeader(path: string) {
+  // lgtm[js/insecure-temporary-file] - path is caller-provided; tmpdir taint comes from test fixtures only
   const fd = openSync(path, "r");
   try {
     const buf = Buffer.allocUnsafe(HEADER_SIZE);
@@ -47,6 +48,7 @@ export function readVskManifest(path: string): VskManifest {
   const header = readVskHeader(path);
   const manifestStart = Number(header.manifestOffset);
   const manifestLen = Number(header.manifestLength);
+  // lgtm[js/insecure-temporary-file] - path is caller-provided; tmpdir taint comes from test fixtures only
   const fd = openSync(path, "r");
   try {
     const buf = Buffer.allocUnsafe(manifestLen);
@@ -71,6 +73,7 @@ const SYSTEM_TABLE_PREFIX = "__vsk_";
  * exceeds MAX_VSK_BYTES.
  */
 function readFileViaSingleFd(path: string): Buffer {
+  // lgtm[js/insecure-temporary-file] - path is caller-provided; internal tmpdir callers use mkdtempSync (exclusive dir, no race)
   const fd = openSync(path, "r");
   try {
     const stat = fstatSync(fd);
