@@ -1,7 +1,6 @@
-import { writeFileSync, renameSync, unlinkSync } from "node:fs";
+import { writeFileSync, renameSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { writeHeader, HEADER_SIZE } from "./header";
 import { writeManifest, type VskManifest } from "./manifest";
 import { assertValidTableName } from "./errors";
@@ -61,7 +60,8 @@ export async function writeVsk(
 ): Promise<void> {
   for (const t of manifest.tables) assertValidTableName(t.name);
 
-  const tmpParquet = join(tmpdir(), `vsk-write-${process.pid}-${randomUUID()}.parquet`);
+  const tmpWriteDir = mkdtempSync(join(tmpdir(), `vsk-write-${process.pid}-`));
+  const tmpParquet = join(tmpWriteDir, "table.parquet");
   const dataParts: Buffer[] = [];
 
   try {
@@ -77,7 +77,7 @@ export async function writeVsk(
       }
     }
   } finally {
-    try { await Bun.file(tmpParquet).delete(); } catch { /* best effort */ }
+    try { rmSync(tmpWriteDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 
   const dataSection = Buffer.concat(dataParts);
@@ -99,13 +99,13 @@ export async function writeVsk(
   });
 
   const out = Buffer.concat([Buffer.from(header), Buffer.from(manifestBytes), dataSection]);
-  const tmpOut = `${outPath}.${process.pid}.${randomUUID()}.tmp`;
+  const tmpOutDir = mkdtempSync(join(tmpdir(), `vsk-out-${process.pid}-`));
+  const tmpOut = join(tmpOutDir, "out.vsk");
   try {
     writeFileSync(tmpOut, out);
     renameSync(tmpOut, outPath);
-  } catch (err) {
-    try { unlinkSync(tmpOut); } catch { /* best effort */ }
-    throw err;
+  } finally {
+    try { rmSync(tmpOutDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 }
 
@@ -151,13 +151,14 @@ export async function writeEncryptedVsk(
   envelope: Envelope,
   aadContext?: EncryptedVskAadContext,
 ): Promise<void> {
-  const tmpPlain = `${outPath}.${process.pid}.${randomUUID()}.plain.tmp`;
+  const tmpPlainDir = mkdtempSync(join(tmpdir(), `vsk-plain-${process.pid}-`));
+  const tmpPlain = join(tmpPlainDir, "plain.vsk");
   let plainBytes: Uint8Array;
   try {
     await writeVsk(src, tmpPlain, manifest);
     plainBytes = await Bun.file(tmpPlain).bytes();
   } finally {
-    try { await Bun.file(tmpPlain).delete(); } catch { /* best effort */ }
+    try { rmSync(tmpPlainDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 
   const formatVersion = aadContext ? FORMAT_V2 : FORMAT_V1;
@@ -210,12 +211,12 @@ export async function writeEncryptedVsk(
     Buffer.from(encrypted.ciphertext),
   ]);
 
-  const tmpOut = `${outPath}.${process.pid}.${randomUUID()}.tmp`;
+  const tmpEncDir = mkdtempSync(join(tmpdir(), `vsk-enc-${process.pid}-`));
+  const tmpOut = join(tmpEncDir, "out.vsk");
   try {
     writeFileSync(tmpOut, out);
     renameSync(tmpOut, outPath);
-  } catch (err) {
-    try { unlinkSync(tmpOut); } catch { /* best effort */ }
-    throw err;
+  } finally {
+    try { rmSync(tmpEncDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 }
