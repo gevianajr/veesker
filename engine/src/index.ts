@@ -1,11 +1,12 @@
 // Public API for @veesker/engine.
 export { DuckDBHost, DuckDBHostClosedError } from "./duckdb-host";
-export { writeVsk, writeEncryptedVsk } from "./vsk-format/writer";
+export { writeVsk, writeEncryptedVsk, type EncryptedVskAadContext } from "./vsk-format/writer";
 export {
   readVsk,
   readVskHeader,
   readVskManifest,
   readEncryptedVsk,
+  MAX_VSK_BYTES,
   type ReadVskOptions,
   type ReadVskResult,
 } from "./vsk-format/reader";
@@ -15,6 +16,7 @@ export {
   VSK_VERSION,
   HEADER_SIZE,
 } from "./vsk-format/header";
+export { FORMAT_V1, FORMAT_V2, CURRENT_FORMAT, isSupportedFormat } from "./vsk-format/version";
 export {
   ENGINE_VERSION,
   type VskManifest,
@@ -57,12 +59,15 @@ export {
   decryptBlob,
   randomKey,
   type EncryptedBlob,
+  type BlobOpts,
 } from "./crypto/blob";
+export { buildAad } from "./crypto/aad";
 export {
   sealEnvelope,
   openEnvelope,
   sealForRecipients,
   type Envelope,
+  type EnvelopeOpts,
   type Recipient,
   type SealedRecipient,
 } from "./crypto/envelope";

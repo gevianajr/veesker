@@ -3,6 +3,7 @@ import { sodiumReady } from "./sodium";
 import { generateKeypair, publicKeyFromPrivate } from "./keypair";
 import { sealEnvelope, openEnvelope, sealForRecipients } from "./envelope";
 import { randomKey } from "./blob";
+import { buildAad } from "./aad";
 
 describe("sealForRecipients", () => {
   it("returns empty array for zero recipients", async () => {
@@ -90,6 +91,26 @@ describe("sealForRecipients", () => {
         sender,
       ),
     ).rejects.toThrow(/x25519Pubkey must be 32 bytes/);
+  });
+
+  it("v2 envelope from sandbox A cannot decrypt with sandbox B's AAD", async () => {
+    await sodiumReady();
+    const ownerKp = await generateKeypair();
+    const recipKp = await generateKeypair();
+    const recipPub = publicKeyFromPrivate(recipKp.privateKey);
+    const ownerPub = publicKeyFromPrivate(ownerKp.privateKey);
+    const contentKey = randomKey();
+
+    const aadA = buildAad({ sandboxId: "A", sandboxVersion: 1, recipientPubkey: recipPub, formatVersion: 2 });
+    const aadB = buildAad({ sandboxId: "B", sandboxVersion: 1, recipientPubkey: recipPub, formatVersion: 2 });
+
+    const envA = await sealEnvelope(contentKey, recipPub, ownerKp, { aad: aadA });
+
+    let caught: Error | undefined;
+    try {
+      await openEnvelope(envA, ownerPub, recipKp, { aad: aadB });
+    } catch (e) { caught = e as Error; }
+    expect(caught).toBeDefined();
   });
 
   it("does not corrupt envelopes if caller mutates contentKey after the call returns", async () => {

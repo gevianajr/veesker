@@ -861,8 +861,8 @@ describe("manifest v0.2.0", () => {
     expect(back.skippedObjects).toBeUndefined();
   });
 
-  it("exports ENGINE_VERSION constant equal to '0.2.0'", () => {
-    expect(ENGINE_VERSION).toBe("0.2.0");
+  it("exports ENGINE_VERSION constant equal to '0.3.0'", () => {
+    expect(ENGINE_VERSION).toBe("0.3.0");
   });
 });
 
@@ -904,7 +904,7 @@ describe("reader v0.2.0 — system tables + version fence", () => {
     }
   });
 
-  it("rejects manifests with engineVersion >= 0.3.0", async () => {
+  it("rejects manifests with engineVersion >= 0.4.0", async () => {
     const host = await DuckDBHost.openInMemory();
     try {
       await host.exec(`CREATE TABLE "u" (id INT)`);
@@ -915,13 +915,13 @@ describe("reader v0.2.0 — system tables + version fence", () => {
         ttlExpiresAt: "2026-06-04T00:00:00.000Z",
         tables: [{ name: "u", rowCount: 0, columns: [{ name: "id", type: "NUMBER", nullable: true }] }],
         piiMasks: [],
-        engineVersion: "0.3.0",
+        engineVersion: "0.4.0",
       };
       try {
         await writeVsk(host, out, m);
         const dst = await DuckDBHost.openInMemory();
         try {
-          await expect(readVsk(out, dst)).rejects.toThrow(/engineVersion 0\.3\.0/i);
+          await expect(readVsk(out, dst)).rejects.toThrow(/engineVersion 0\.4\.0/i);
         } finally {
           await dst.close();
         }

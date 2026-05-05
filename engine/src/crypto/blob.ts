@@ -5,6 +5,12 @@ export interface EncryptedBlob {
   nonce: Uint8Array;
 }
 
+export interface BlobOpts {
+  /** Additional authenticated data — bound into the AEAD tag. Must match between
+   *  encrypt and decrypt or decryption fails. */
+  aad?: Uint8Array;
+}
+
 /**
  * Encrypt a plaintext blob with XChaCha20-Poly1305 IETF (libsodium
  * WASM-friendly substitute for AES-256-GCM, since libsodium AES requires
@@ -18,6 +24,7 @@ export interface EncryptedBlob {
 export async function encryptBlob(
   key: Uint8Array,
   plaintext: Uint8Array,
+  opts: BlobOpts = {},
 ): Promise<EncryptedBlob> {
   await sodiumReady();
   const sodium = getSodium();
@@ -31,7 +38,7 @@ export async function encryptBlob(
   );
   const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
     plaintext,
-    null,
+    opts.aad ?? null,
     null,
     nonce,
     key,
@@ -44,13 +51,14 @@ export async function decryptBlob(
   key: Uint8Array,
   ciphertext: Uint8Array,
   nonce: Uint8Array,
+  opts: BlobOpts = {},
 ): Promise<Uint8Array> {
   await sodiumReady();
   const sodium = getSodium();
   return sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
     null,
     ciphertext,
-    null,
+    opts.aad ?? null,
     nonce,
     key,
   );

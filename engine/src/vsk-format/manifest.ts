@@ -18,7 +18,7 @@ import { VskFormatError } from "./errors";
 export const VSK_MASK_TYPES = ["hash", "redact", "static", "partial"] as const;
 export type VskMaskType = typeof VSK_MASK_TYPES[number];
 
-export const ENGINE_VERSION = "0.2.0";
+export const ENGINE_VERSION = "0.3.0";
 
 export const SKIPPED_REASONS = ["INVALID", "NO_PRIVILEGE", "EXTRACTION_ERROR"] as const;
 export type SkippedReason = typeof SKIPPED_REASONS[number];

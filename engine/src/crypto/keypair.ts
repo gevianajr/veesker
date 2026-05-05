@@ -31,7 +31,11 @@ export function pubkeyToBase64(pk: Uint8Array): string {
   return Buffer.from(pk).toString("base64");
 }
 
-/** Decode a base64-encoded public key. Length validation is the caller's job. */
+/** Decode a base64-encoded public key. Throws if the decoded length is not exactly 32 bytes. */
 export function pubkeyFromBase64(s: string): Uint8Array {
-  return new Uint8Array(Buffer.from(s, "base64"));
+  const bytes = Buffer.from(s, "base64");
+  if (bytes.byteLength !== 32) {
+    throw new Error(`pubkeyFromBase64: expected 32 bytes, got ${bytes.byteLength}`);
+  }
+  return new Uint8Array(bytes);
 }

@@ -9,7 +9,10 @@ export type VskFormatErrorCode =
   | "BAD_VERSION"
   | "BAD_TAG"
   | "BAD_TABLE_NAME"
-  | "MALFORMED_MANIFEST";
+  | "MALFORMED_MANIFEST"
+  | "UNSUPPORTED_FORMAT"
+  | "FILE_TOO_LARGE"
+  | `TRUNCATED_OR_INVALID:${string}`;
 
 export class VskFormatError extends Error {
   constructor(public code: VskFormatErrorCode, message: string) {

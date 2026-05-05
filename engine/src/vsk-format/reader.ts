@@ -1,15 +1,19 @@
-import { openSync, readSync, closeSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { openSync, readSync, closeSync, readFileSync, writeFileSync, unlinkSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { readHeader, HEADER_SIZE } from "./header";
 import { readManifest, type VskManifest } from "./manifest";
 import { VskFormatError, assertValidTableName } from "./errors";
+import { FORMAT_V2, isSupportedFormat } from "./version";
 import { decryptBlob } from "../crypto/blob";
+import { buildAad } from "../crypto/aad";
 import { openEnvelope, type Envelope } from "../crypto/envelope";
 import type { Keypair } from "../crypto/keypair";
 import type { DuckDBHost } from "../duckdb-host";
 import { mapOracleType } from "../oracle-shim/types";
+
+export const MAX_VSK_BYTES = 16 * 1024 * 1024 * 1024;
 
 const TABLE_TAG_PREFIX = "__VSK_TABLE__";
 
@@ -91,10 +95,10 @@ function checkVersionFence(m: VskManifest): void {
   }
   const parts = partStrings.map((p) => Number.parseInt(p, 10));
   const [maj, min] = parts as [number, number, number];
-  if (maj > 0 || (maj === 0 && min >= 3)) {
+  if (maj > 0 || (maj === 0 && min >= 4)) {
     throw new VskFormatError(
       "MALFORMED_MANIFEST",
-      `vsk reader: engineVersion ${v} is newer than this reader (max 0.2.x). Upgrade @veesker/engine.`,
+      `vsk reader: engineVersion ${v} is newer than this reader (max 0.3.x). Upgrade @veesker/engine.`,
     );
   }
 }
@@ -111,19 +115,32 @@ export async function readVsk(
   dst: DuckDBHost,
   opts: ReadVskOptions = {},
 ): Promise<ReadVskResult> {
+  const fileSize = statSync(path).size;
+  if (fileSize > MAX_VSK_BYTES) {
+    throw new VskFormatError("FILE_TOO_LARGE", `vsk: file exceeds ${MAX_VSK_BYTES} bytes`);
+  }
   const file = readFileSync(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));
+
+  const manifestOffset = Number(header.manifestOffset);
+  const manifestLength = Number(header.manifestLength);
+  if (manifestOffset + manifestLength > buf.byteLength || manifestLength > MAX_VSK_BYTES) {
+    throw new VskFormatError("TRUNCATED_OR_INVALID:manifest", "vsk: manifest section exceeds file bounds");
+  }
+  const dataOffset = Number(header.dataOffset);
+  const dataLength = Number(header.dataLength);
+  if (dataOffset + dataLength > buf.byteLength || dataLength > MAX_VSK_BYTES) {
+    throw new VskFormatError("TRUNCATED_OR_INVALID:data", "vsk: data section exceeds file bounds");
+  }
+
   const manifest = readManifest(
-    buf.subarray(
-      Number(header.manifestOffset),
-      Number(header.manifestOffset + header.manifestLength),
-    ),
+    buf.subarray(manifestOffset, manifestOffset + manifestLength),
   );
   checkVersionFence(manifest);
 
-  const dataStart = Number(header.dataOffset);
-  const dataEnd = dataStart + Number(header.dataLength);
+  const dataStart = dataOffset;
+  const dataEnd = dataStart + dataLength;
   let p = dataStart;
   const tagPrefix = new TextEncoder().encode(TABLE_TAG_PREFIX);
   const ddl = opts.replace ? "CREATE OR REPLACE TABLE" : "CREATE TABLE";
@@ -243,6 +260,11 @@ export async function readVsk(
  * `recipient`, unwraps the content key, decrypts the blob, then reads
  * the resulting plain .vsk into the destination DuckDB host.
  *
+ * Supports both FORMAT_V1 (no AAD) and FORMAT_V2 (AAD-bound). The format
+ * version is read from both the header and the envelope JSON block; they
+ * must agree. For v2, AAD is reconstructed from sandboxId/sandboxVersion/
+ * recipientPubkey stored in the plaintext envelope block.
+ *
  * Throws VskFormatError("BAD_TAG") if the file is plaintext (caller
  * should use readVsk for those).
  */
@@ -254,6 +276,10 @@ export async function readEncryptedVsk(
   opts: ReadVskOptions = {},
   externalEnvelope?: Envelope,
 ): Promise<ReadVskResult> {
+  const fileSize = statSync(path).size;
+  if (fileSize > MAX_VSK_BYTES) {
+    throw new VskFormatError("FILE_TOO_LARGE", `vsk: file exceeds ${MAX_VSK_BYTES} bytes`);
+  }
   const file = readFileSync(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));
@@ -261,18 +287,42 @@ export async function readEncryptedVsk(
     throw new VskFormatError("BAD_TAG", "vsk: file is plaintext, use readVsk");
   }
 
+  const envelopeOffset = Number(header.envelopeOffset);
+  const envelopeLength = Number(header.envelopeLength);
+  if (envelopeOffset + envelopeLength > buf.byteLength || envelopeLength > MAX_VSK_BYTES) {
+    throw new VskFormatError("TRUNCATED_OR_INVALID:envelope", "vsk: envelope section exceeds file bounds");
+  }
+  const dataOff = Number(header.dataOffset);
+  const dataLen = Number(header.dataLength);
+  if (dataOff + dataLen > buf.byteLength || dataLen > MAX_VSK_BYTES) {
+    throw new VskFormatError("TRUNCATED_OR_INVALID:data", "vsk: data section exceeds file bounds");
+  }
+
   const envelopeJson = new TextDecoder().decode(
-    buf.subarray(
-      Number(header.envelopeOffset),
-      Number(header.envelopeOffset + header.envelopeLength),
-    ),
+    buf.subarray(envelopeOffset, envelopeOffset + envelopeLength),
   );
-  let meta: { nonce: string; ciphertext: string; blobNonce: string };
+  let meta: {
+    nonce: string;
+    ciphertext: string;
+    blobNonce: string;
+    formatVersion?: number;
+    sandboxId?: string;
+    sandboxVersion?: number;
+    recipientPubkey?: string;
+  };
   try {
     meta = JSON.parse(envelopeJson);
   } catch {
     throw new VskFormatError("MALFORMED_MANIFEST", "vsk: malformed envelope JSON");
   }
+
+  const envelopeFmtVersion = meta.formatVersion ?? 1;
+  const headerFmtVersion = header.formatVersion === 0 ? 1 : header.formatVersion;
+
+  if (!isSupportedFormat(envelopeFmtVersion) || !isSupportedFormat(headerFmtVersion)) {
+    throw new VskFormatError("UNSUPPORTED_FORMAT", `vsk: unsupported format version (envelope=${envelopeFmtVersion}, header=${headerFmtVersion})`);
+  }
+
   const embeddedEnvelope: Envelope = {
     nonce: new Uint8Array(Buffer.from(meta.nonce, "base64")),
     ciphertext: new Uint8Array(Buffer.from(meta.ciphertext, "base64")),
@@ -280,12 +330,31 @@ export async function readEncryptedVsk(
   const blobNonce = new Uint8Array(Buffer.from(meta.blobNonce, "base64"));
 
   const envelope = externalEnvelope ?? embeddedEnvelope;
-  const contentKey = await openEnvelope(envelope, senderPubkey, recipient);
-  const encryptedBlob = buf.subarray(
-    Number(header.dataOffset),
-    Number(header.dataOffset + header.dataLength),
-  );
-  const plainBytes = await decryptBlob(contentKey, encryptedBlob, blobNonce);
+
+  let envelopeAad: Uint8Array | undefined;
+  let blobAad: Uint8Array | undefined;
+  if (envelopeFmtVersion === FORMAT_V2) {
+    if (!meta.sandboxId || meta.sandboxVersion === undefined || !meta.recipientPubkey) {
+      throw new VskFormatError("MALFORMED_MANIFEST", "vsk: v2 envelope missing AAD context fields");
+    }
+    const recipientPubkey = new Uint8Array(Buffer.from(meta.recipientPubkey, "base64"));
+    envelopeAad = buildAad({
+      sandboxId: meta.sandboxId,
+      sandboxVersion: meta.sandboxVersion,
+      recipientPubkey,
+      formatVersion: FORMAT_V2,
+    });
+    blobAad = buildAad({
+      sandboxId: meta.sandboxId,
+      sandboxVersion: meta.sandboxVersion,
+      recipientPubkey,
+      formatVersion: FORMAT_V2,
+    });
+  }
+
+  const contentKey = await openEnvelope(envelope, senderPubkey, recipient, envelopeAad ? { aad: envelopeAad } : {});
+  const encryptedBlob = buf.subarray(dataOff, dataOff + dataLen);
+  const plainBytes = await decryptBlob(contentKey, encryptedBlob, blobNonce, blobAad ? { aad: blobAad } : {});
 
   const tmpPath = join(
     tmpdir(),
