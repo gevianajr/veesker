@@ -12,7 +12,7 @@ import { sealEnvelope } from "../src/crypto/envelope";
 import { sodiumReady } from "../src/crypto/sodium";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { unlinkSync, existsSync } from "node:fs";
+import { unlinkSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 
 describe("vsk-format header", () => {
   it("round-trips a header", () => {
@@ -968,7 +968,8 @@ describe("reader v0.2.0 — system tables + version fence", () => {
     // Hand-craft a .vsk where the data section's __VSK_TABLE__ tag carries a
     // crafted system table name that would otherwise be interpolated into the
     // tmp-file path and escape tmpdir().
-    const out = join(tmpdir(), `vsk-traversal-${process.pid}-${Date.now()}.vsk`);
+    const tmpTestDir = mkdtempSync(join(tmpdir(), `vsk-traversal-${process.pid}-`));
+    const out = join(tmpTestDir, "traversal.vsk");
     const malicious = "__vsk_x/../../etc/exploit";
 
     const { writeHeader: writeHdr, HEADER_SIZE } = await import("../src/vsk-format/header");
@@ -1007,7 +1008,7 @@ describe("reader v0.2.0 — system tables + version fence", () => {
         await dst.close();
       }
     } finally {
-      try { unlinkSync(out); } catch { /* best effort */ }
+      try { rmSync(tmpTestDir, { recursive: true, force: true }); } catch { /* best effort */ }
     }
   });
 });

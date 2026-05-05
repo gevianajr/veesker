@@ -1,7 +1,6 @@
-import { openSync, readSync, closeSync, readFileSync, writeFileSync, unlinkSync, statSync } from "node:fs";
+import { openSync, readSync, fstatSync, closeSync, writeFileSync, unlinkSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { readHeader, HEADER_SIZE } from "./header";
 import { readManifest, type VskManifest } from "./manifest";
 import { VskFormatError, assertValidTableName } from "./errors";
@@ -66,6 +65,31 @@ export function readVskManifest(path: string): VskManifest {
 
 const SYSTEM_TABLE_PREFIX = "__vsk_";
 
+/**
+ * Open `path` once, check its size via fstatSync on the same fd (no TOCTOU),
+ * read all bytes via readSync, and close. Throws FILE_TOO_LARGE if the size
+ * exceeds MAX_VSK_BYTES.
+ */
+function readFileViaSingleFd(path: string): Buffer {
+  const fd = openSync(path, "r");
+  try {
+    const stat = fstatSync(fd);
+    if (stat.size > MAX_VSK_BYTES) {
+      throw new VskFormatError("FILE_TOO_LARGE", `vsk: file exceeds ${MAX_VSK_BYTES} bytes`);
+    }
+    const buf = Buffer.alloc(stat.size);
+    let offset = 0;
+    while (offset < stat.size) {
+      const n = readSync(fd, buf, offset, stat.size - offset, null);
+      if (n === 0) break;
+      offset += n;
+    }
+    return buf;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export interface ReadVskOptions {
   /** When true, emit `CREATE OR REPLACE TABLE` instead of `CREATE TABLE`. Defaults to false. */
   replace?: boolean;
@@ -115,11 +139,7 @@ export async function readVsk(
   dst: DuckDBHost,
   opts: ReadVskOptions = {},
 ): Promise<ReadVskResult> {
-  const fileSize = statSync(path).size;
-  if (fileSize > MAX_VSK_BYTES) {
-    throw new VskFormatError("FILE_TOO_LARGE", `vsk: file exceeds ${MAX_VSK_BYTES} bytes`);
-  }
-  const file = readFileSync(path);
+  const file = readFileViaSingleFd(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));
 
@@ -210,12 +230,10 @@ export async function readVsk(
     const parquetBytes = buf.subarray(p, p + size);
     p += size;
 
-    const tmp = join(
-      tmpdir(),
-      `vsk-load-${process.pid}-${randomUUID()}-${tableName}.parquet`,
-    );
-    writeFileSync(tmp, Buffer.from(parquetBytes));
+    const tmpDir = mkdtempSync(join(tmpdir(), `vsk-load-${process.pid}-`));
+    const tmp = join(tmpDir, "table.parquet");
     try {
+      writeFileSync(tmp, Buffer.from(parquetBytes));
       const tmpEsc = tmp.replace(/\\/g, "/").replace(/'/g, "''");
       const tNameSafe = tableName.toLowerCase().replace(/"/g, '""');
       if (isSystem) {
@@ -248,7 +266,7 @@ export async function readVsk(
         userTables.push(tNameSafe);
       }
     } finally {
-      try { unlinkSync(tmp); } catch { /* best effort */ }
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best effort */ }
     }
   }
 
@@ -276,11 +294,7 @@ export async function readEncryptedVsk(
   opts: ReadVskOptions = {},
   externalEnvelope?: Envelope,
 ): Promise<ReadVskResult> {
-  const fileSize = statSync(path).size;
-  if (fileSize > MAX_VSK_BYTES) {
-    throw new VskFormatError("FILE_TOO_LARGE", `vsk: file exceeds ${MAX_VSK_BYTES} bytes`);
-  }
-  const file = readFileSync(path);
+  const file = readFileViaSingleFd(path);
   const buf = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
   const header = readHeader(buf.subarray(0, HEADER_SIZE));
   if (header.envelopeLength === 0n) {
@@ -356,14 +370,12 @@ export async function readEncryptedVsk(
   const encryptedBlob = buf.subarray(dataOff, dataOff + dataLen);
   const plainBytes = await decryptBlob(contentKey, encryptedBlob, blobNonce, blobAad ? { aad: blobAad } : {});
 
-  const tmpPath = join(
-    tmpdir(),
-    `vsk-decrypt-${process.pid}-${randomUUID()}.decrypted.tmp`,
-  );
-  writeFileSync(tmpPath, Buffer.from(plainBytes));
+  const tmpDecryptDir = mkdtempSync(join(tmpdir(), `vsk-decrypt-${process.pid}-`));
+  const tmpPath = join(tmpDecryptDir, "decrypted.tmp");
   try {
+    writeFileSync(tmpPath, Buffer.from(plainBytes));
     return await readVsk(tmpPath, dst, opts);
   } finally {
-    try { unlinkSync(tmpPath); } catch { /* best effort */ }
+    try { rmSync(tmpDecryptDir, { recursive: true, force: true }); } catch { /* best effort */ }
   }
 }
