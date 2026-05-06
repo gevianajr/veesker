@@ -21,11 +21,28 @@ export type ServerStatementResult =
 
 export type MultiQueryResult = { multi: true; results: ServerStatementResult[] };
 
+// L2.2 Origin attribution: tag of who/what initiated this SQL. Defaults to
+// "user_typed" when omitted. Known values: user_typed, user_clicked,
+// ai_approved, system_background, schema_browser, autocomplete_prep,
+// sandbox_internal, embed_batch, system_identification.
+export type SqlOrigin =
+  | "user_typed"
+  | "user_clicked"
+  | "ai_approved"
+  | "system_background"
+  | "schema_browser"
+  | "autocomplete_prep"
+  | "sandbox_internal"
+  | "embed_batch"
+  | "system_identification";
+
 export async function queryExecute(
   sql: string,
   requestId: string,
   fetchAll: boolean = false,
   acknowledgeUnsafe: boolean = false,
+  origin: SqlOrigin = "user_typed",
+  originDetail?: string,
 ): Promise<Result<QueryResult>> {
   try {
     const data = await invoke<QueryResult>("query_execute", {
@@ -34,6 +51,8 @@ export async function queryExecute(
       splitMulti: false,
       fetchAll,
       acknowledgeUnsafe,
+      origin,
+      originDetail,
     });
     return { ok: true, data };
   } catch (err) {
@@ -45,6 +64,8 @@ export async function queryExecuteMulti(
   sql: string,
   requestId: string,
   acknowledgeUnsafe: boolean = false,
+  origin: SqlOrigin = "user_typed",
+  originDetail?: string,
 ): Promise<Result<MultiQueryResult>> {
   try {
     const data = await invoke<MultiQueryResult>("query_execute", {
@@ -52,6 +73,8 @@ export async function queryExecuteMulti(
       requestId,
       splitMulti: true,
       acknowledgeUnsafe,
+      origin,
+      originDetail,
     });
     return { ok: true, data };
   } catch (err) {

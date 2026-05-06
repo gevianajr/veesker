@@ -59,6 +59,7 @@
   import { FEATURES } from "$lib/services/features";
   import LoginModal from "$lib/workspace/LoginModal.svelte";
   import AuditLogPanel from "$lib/workspace/AuditLogPanel.svelte";
+  import ActivityLedger from "$lib/workspace/ActivityLedger.svelte";
 
   const authCtx = getContext<{ tier: "ce" | "cloud"; email: string }>("auth");
 
@@ -124,6 +125,8 @@
   let showOAuthPanel = $state(false);
   let showLogin = $state(false);
   let showAuditLog = $state(false);
+  // L2.5 Activity Ledger panel — toggleable via Ctrl/Cmd+Shift+L or floating button.
+  let showActivityLedger = $state(false);
 
   // ── Panel resize (persisted) ─────────────────────────────────────────────────
   function loadPanelWidth(key: string, def: number): number {
@@ -606,6 +609,11 @@
       e.preventDefault();
       void sqlEditor.cancelActive();
     }
+    // L2.5: Cmd+Shift+L (or Ctrl+Shift+L) toggles the Activity Ledger panel.
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "l") {
+      e.preventDefault();
+      showActivityLedger = !showActivityLedger;
+    }
   }
 
   onMount(() => {
@@ -933,6 +941,22 @@
   {#if showAuditLog}
     <AuditLogPanel onClose={() => { showAuditLog = false; }} />
   {/if}
+  <!-- L2.5 Activity Ledger panel: real-time view of every SQL Veesker has issued in this session. -->
+  {#if showActivityLedger}
+    <div class="activity-ledger-wrap">
+      <ActivityLedger onClose={() => { showActivityLedger = false; }} />
+    </div>
+  {:else}
+    <button
+      class="activity-ledger-toggle"
+      onclick={() => { showActivityLedger = true; }}
+      title="Show Activity Ledger (Ctrl+Shift+L)"
+      aria-label="Show Activity Ledger"
+    >
+      <span class="al-dot"></span>
+      Activity
+    </button>
+  {/if}
   {#if ddlLoading}
     <div class="ddl-toast" role="status" aria-live="polite">
       <span class="ddl-spinner"></span>
@@ -1095,5 +1119,56 @@
   :global([data-tier="cloud"]) .resize-handle:hover,
   :global([data-tier="cloud"]) .resize-handle:active {
     background: rgba(43, 180, 238, 0.25);
+  }
+
+  /* ── L2.5 Activity Ledger panel + floating toggle ──────────────── */
+  .activity-ledger-wrap {
+    position: fixed;
+    top: 32px;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    max-width: 50vw;
+    z-index: 90;
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.18);
+    animation: slide-in-r 0.18s ease-out;
+  }
+  .activity-ledger-toggle {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 80;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-radius: 18px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  .activity-ledger-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+  .al-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
+    animation: al-pulse 2s ease-in-out infinite;
+  }
+  @keyframes al-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+  }
+  @keyframes slide-in-r {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
   }
 </style>

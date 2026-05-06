@@ -46,6 +46,14 @@ pub struct HistorySaveInput {
     pub error_message: Option<String>,
     pub username: Option<String>,
     pub host: Option<String>,
+    // L2.2 Origin attribution: source of the SQL statement
+    // (user_typed, user_clicked, ai_approved, system_background,
+    //  schema_browser, autocomplete_prep, sandbox_internal,
+    //  embed_batch, system_identification). Optional for backwards compat.
+    #[serde(default)]
+    pub origin: Option<String>,
+    #[serde(default)]
+    pub origin_detail: Option<String>,
 }
 
 fn has_column_history(conn: &SqliteConnection, column: &str) -> rusqlite::Result<bool> {
@@ -201,6 +209,8 @@ mod tests {
             error_message: None,
             username: Some("testuser".into()),
             host: Some("localhost".into()),
+            origin: None,
+            origin_detail: None,
         }
     }
 
@@ -215,6 +225,8 @@ mod tests {
             error_message: Some("ORA-00942: table or view does not exist".into()),
             username: None,
             host: None,
+            origin: None,
+            origin_detail: None,
         }
     }
 
