@@ -56,10 +56,7 @@ pub struct ConnectionTestErr {
 //
 // HIGH-002 also re-validates host/serviceName/connect_alias as belt-and-
 // suspenders even though connection_save already does so via persistence layer.
-fn config_to_params(
-    app: &AppHandle,
-    config: ConnectionConfig,
-) -> Result<Value, ConnectionError> {
+fn config_to_params(app: &AppHandle, config: ConnectionConfig) -> Result<Value, ConnectionError> {
     use crate::persistence::connection_config::{basic_params, wallet_params};
     use crate::persistence::connections::{
         validate_connect_alias, validate_host, validate_service_name,
@@ -74,7 +71,13 @@ fn config_to_params(
         } => {
             validate_host(&host)?;
             validate_service_name(&service_name)?;
-            Ok(basic_params(&host, port, &service_name, &username, &password))
+            Ok(basic_params(
+                &host,
+                port,
+                &service_name,
+                &username,
+                &password,
+            ))
         }
         ConnectionConfig::Wallet {
             wallet_dir,
@@ -599,7 +602,11 @@ pub async fn query_execute(
             origin: Some(final_origin),
             origin_detail,
         };
-        let source = if request_id.starts_with("ai:") { "ai" } else { "user" };
+        let source = if request_id.starts_with("ai:") {
+            "ai"
+        } else {
+            "user"
+        };
         let env_val = app.state::<ActiveSessionEnv>().0.lock().await.clone();
         let entry = write_audit_entry(&data_dir, &synthetic_input, source, env_val.as_deref());
         // L2.5 Activity Ledger: emit the just-written entry to the renderer for
@@ -725,7 +732,18 @@ fn write_audit_entry(
         "origin":       input.origin.clone().unwrap_or_else(|| "user_typed".to_string()),
         "originDetail": input.origin_detail,
     });
-    let mut line = entry.to_string();
+    // L1.4 (Sprint C, Onda 1.B): envelope each line in AES-256-GCM. Legacy
+    // plaintext lines (`{...}`) and encrypted lines (`02:<base64>`) coexist
+    // in the same file — read paths detect by prefix. Rendering to the
+    // Activity Ledger uses the plain entry, so the renderer never sees
+    // ciphertext.
+    let body = entry.to_string();
+    let cipher_key = crate::crypto::get_or_create_audit_cipher_key();
+    let line_payload = match crate::crypto::encrypt_audit_line(&cipher_key, &body) {
+        Ok(s) => s,
+        Err(_) => body.clone(),
+    };
+    let mut line = line_payload;
     line.push('\n');
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
         if file.write_all(line.as_bytes()).is_err() {
@@ -775,10 +793,22 @@ pub async fn audit_recent(app: AppHandle, limit: Option<i64>) -> Vec<Value> {
         Ok(t) => t,
         Err(_) => return Vec::new(),
     };
+    // L1.4 (Sprint C, Onda 1.B): lines may be plaintext JSON (legacy) or
+    // `02:<base64>` AES-GCM envelopes — decrypt envelopes using the audit
+    // cipher key, then JSON-parse the result. Single corrupted records are
+    // skipped silently so a single tampered byte doesn't black out the
+    // whole panel.
+    let cipher_key = crate::crypto::get_or_create_audit_cipher_key();
     let mut entries: Vec<Value> = text
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .filter_map(
+            |l| match crate::crypto::decrypt_audit_line_if_envelope(&cipher_key, l) {
+                Ok(Some(plain)) => serde_json::from_str::<Value>(&plain).ok(),
+                Ok(None) => serde_json::from_str::<Value>(l).ok(),
+                Err(_) => None,
+            },
+        )
         .collect();
     // newest-first
     entries.reverse();
@@ -890,9 +920,19 @@ pub async fn object_ddl_get(
         json!({ "owner": owner, "objectType": object_type, "objectName": object_name }),
     )
     .await?;
-    let ddl = res.get("ddl").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let spec = res.get("spec").and_then(|v| v.as_str()).map(|s| s.to_string());
-    let body = res.get("body").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let ddl = res
+        .get("ddl")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let spec = res
+        .get("spec")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let body = res
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     Ok(ObjectDdlResult { ddl, spec, body })
 }
 
@@ -1497,7 +1537,10 @@ pub async fn dml_preview(app: AppHandle, sql: String) -> Result<Value, Connectio
 }
 
 #[tauri::command]
-pub async fn unsafe_dml_confirm(app: AppHandle, summary: String) -> Result<bool, ConnectionTestErr> {
+pub async fn unsafe_dml_confirm(
+    app: AppHandle,
+    summary: String,
+) -> Result<bool, ConnectionTestErr> {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
     let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
     let safe_summary = summary.chars().take(300).collect::<String>();
@@ -1541,7 +1584,14 @@ pub async fn object_version_capture(
     reason: String,
 ) -> CaptureResult {
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
-    let captured = svc.object_version_capture(&connection_id, &owner, &object_type, &object_name, &ddl, &reason);
+    let captured = svc.object_version_capture(
+        &connection_id,
+        &owner,
+        &object_type,
+        &object_name,
+        &ddl,
+        &reason,
+    );
     CaptureResult { captured }
 }
 
@@ -1555,7 +1605,10 @@ pub async fn object_version_list(
 ) -> Result<Vec<crate::persistence::object_versions::ObjectVersionEntry>, ConnectionTestErr> {
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_list(&connection_id, &owner, &object_type, &object_name)
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[derive(Serialize)]
@@ -1575,7 +1628,10 @@ pub async fn object_version_diff(
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_diff(&connection_id, &sha_a, &sha_b, &file_path)
         .map(|diff| DiffResult { diff })
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[derive(Serialize)]
@@ -1593,7 +1649,10 @@ pub async fn object_version_load(
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_load(&connection_id, &commit_sha, &file_path)
         .map(|ddl| LoadResult { ddl })
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[tauri::command]
@@ -1607,8 +1666,18 @@ pub async fn object_version_label(
     label: Option<String>,
 ) -> Result<(), ConnectionTestErr> {
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
-    svc.object_version_set_label(&connection_id, version_id, &owner, &object_type, &object_name, label.as_deref())
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+    svc.object_version_set_label(
+        &connection_id,
+        version_id,
+        &owner,
+        &object_type,
+        &object_name,
+        label.as_deref(),
+    )
+    .map_err(|e| ConnectionTestErr {
+        code: e.code,
+        message: e.message,
+    })
 }
 
 #[tauri::command]
@@ -1620,7 +1689,10 @@ pub async fn object_version_set_remote(
 ) -> Result<(), ConnectionTestErr> {
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_set_remote(&connection_id, &remote_url, &pat)
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[derive(Serialize)]
@@ -1640,7 +1712,10 @@ pub async fn object_version_push(
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_push(&connection_id)
         .map(|pushed_commits| PushResult { pushed_commits })
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[derive(Serialize)]
@@ -1660,7 +1735,10 @@ pub async fn object_version_get_remote(
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_get_remote(&connection_id)
         .map(|url| GetRemoteResult { url })
-        .map_err(|e| ConnectionTestErr { code: e.code, message: e.message })
+        .map_err(|e| ConnectionTestErr {
+            code: e.code,
+            message: e.message,
+        })
 }
 
 #[tauri::command]
@@ -1688,7 +1766,11 @@ pub async fn auth_token_clear(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn cloud_api_get(app: AppHandle, path: String, params: Option<std::collections::HashMap<String, String>>) -> Result<Value, String> {
+pub async fn cloud_api_get(
+    app: AppHandle,
+    path: String,
+    params: Option<std::collections::HashMap<String, String>>,
+) -> Result<Value, String> {
     if airgap_active(&app).await {
         return Err(airgap_blocked_string());
     }
@@ -1737,7 +1819,13 @@ pub async fn cloud_api_post(app: AppHandle, path: String, body: Value) -> Result
         .build()
         .map_err(|e| e.to_string())?;
 
-    let res = client.post(&url).bearer_auth(&token).json(&body).send().await.map_err(|e| e.to_string())?;
+    let res = client
+        .post(&url)
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
     let status = res.status().as_u16();
     if status >= 400 {
         return Err(format!("server_error_{}", status));

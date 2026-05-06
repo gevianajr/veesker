@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // https://github.com/veesker-cloud/veesker-community-edition
 
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
@@ -76,9 +76,7 @@ pub fn terminal_create(
     let mut cmd = CommandBuilder::new(shell);
     cmd.cwd(home_dir());
 
-    pair.slave
-        .spawn_command(cmd)
-        .map_err(|e| e.to_string())?;
+    pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -145,10 +143,7 @@ pub fn terminal_resize(
 }
 
 #[tauri::command]
-pub fn terminal_close(
-    store: tauri::State<'_, TerminalStore>,
-    id: String,
-) -> Result<(), String> {
+pub fn terminal_close(store: tauri::State<'_, TerminalStore>, id: String) -> Result<(), String> {
     store.lock().unwrap().remove(&id);
     Ok(())
 }

@@ -3,6 +3,7 @@
 // https://github.com/veesker-cloud/veesker-community-edition
 
 mod commands;
+mod crypto;
 mod persistence;
 mod sidecar;
 mod terminal;

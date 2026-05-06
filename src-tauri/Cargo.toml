@@ -31,10 +31,13 @@ serde_json = "1"
 tauri-plugin-shell = "2"
 tokio = { version = "1", features = ["rt", "sync", "io-util", "macros"] }
 uuid = { version = "1", features = ["v4"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 git2 = { version = "0.20", default-features = false, features = ["https", "vendored-openssl"] }
 sha2 = "0.11"
+aes-gcm = "0.10"
+base64 = "0.22"
+rand = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 zip = "2"
 tauri-plugin-dialog = "2"
