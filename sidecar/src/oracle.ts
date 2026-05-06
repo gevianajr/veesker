@@ -348,6 +348,14 @@ export type ConnectionSafety = {
   statementTimeoutMs?: number;
   warnUnsafeDml?: boolean;
   autoPerfAnalysis?: boolean;
+  /**
+   * L2.1 PSDPM (PL/SQL Developer Parity Mode). When true, only user-initiated
+   * RPCs (origin: user_typed / user_clicked) are allowed to execute SQL on the
+   * connection. AI tool runs (CL only), embed batches (CL only), and any
+   * background pre-fetches are blocked. Propagated from `workspace.open`
+   * params; enforced by `enforcePsdpmForOrigin`.
+   */
+  psdpm?: boolean;
 };
 
 export type ConnectionTestParams =
@@ -364,6 +372,7 @@ export type ConnectionTestParams =
       statementTimeoutMs?: number;
       warnUnsafeDml?: boolean;
       autoPerfAnalysis?: boolean;
+      psdpm?: boolean;
     }
   | {
       authType: "wallet";
@@ -377,6 +386,7 @@ export type ConnectionTestParams =
       statementTimeoutMs?: number;
       warnUnsafeDml?: boolean;
       autoPerfAnalysis?: boolean;
+      psdpm?: boolean;
     };
 
 function safetyFromParams(p: ConnectionTestParams): ConnectionSafety {
@@ -386,6 +396,7 @@ function safetyFromParams(p: ConnectionTestParams): ConnectionSafety {
     statementTimeoutMs: p.statementTimeoutMs,
     warnUnsafeDml: p.warnUnsafeDml === true,
     autoPerfAnalysis: p.autoPerfAnalysis !== false,
+    psdpm: p.psdpm === true,
   };
 }
 
@@ -456,6 +467,7 @@ import {
   READ_ONLY_BLOCKED,
   UNSAFE_DML_WARNING,
   AUTOCOMMIT_VIOLATION,
+  PSDPM_BLOCKED,
 } from "./errors";
 import { classifySql, isReadOnlySafe, isUnsafeBulkDml } from "./sql-kind";
 
@@ -956,6 +968,30 @@ async function executeSingleStatement(
 }
 
 /**
+ * L2.1 PSDPM (PL/SQL Developer Parity Mode). When the active connection has
+ * PSDPM on, only RPC origins matching {user_typed, user_clicked} may execute
+ * SQL — every other code path (AI tools, embed batches, schema pre-fetches,
+ * sandbox auto-tasks) is rejected. When PSDPM is off, this is a no-op.
+ *
+ * The renderer signals origin via the `origin` field on `query.execute` params.
+ * If the field is missing (legacy callers), we treat the call as user-initiated
+ * to keep existing flows working — Agent D is wiring origin into the params on
+ * a sibling branch, and the gate becomes load-bearing once that lands.
+ */
+export function enforcePsdpmForOrigin(origin: string | undefined): void {
+  const safety = getSessionSafety();
+  if (safety?.psdpm !== true) return;
+  const allowed = ["user_typed", "user_clicked"];
+  const o = origin ?? "user_typed";
+  if (!allowed.includes(o)) {
+    throw new RpcCodedError(
+      PSDPM_BLOCKED,
+      `PSDPM active: only user-initiated statements allowed (origin: ${origin ?? "unspecified"})`
+    );
+  }
+}
+
+/**
  * Apply the read-only and unsafe-DML guards to a single statement.
  * Throws RpcCodedError on block, returns void on pass.
  *
@@ -989,7 +1025,18 @@ export async function queryExecute(p: {
   splitMulti?: boolean;
   fetchAll?: boolean;
   acknowledgeUnsafe?: boolean;
+  /**
+   * L2.1: caller-tagged provenance for the request. Allowed user origins:
+   * "user_typed" | "user_clicked". When PSDPM is active any other origin (or
+   * a missing origin from a non-user code path) is rejected. Undefined is
+   * treated as user-initiated for backwards compatibility — Agent D's branch
+   * makes this load-bearing for non-user callers.
+   */
+  origin?: string;
 }): Promise<QueryResult | MultiQueryResult> {
+  // L2.1 PSDPM gate runs first so non-user RPCs short-circuit before any
+  // session / cancellation bookkeeping touches the connection.
+  enforcePsdpmForOrigin(p.origin);
   if (_running !== null) {
     throw new RpcCodedError(ORACLE_ERR, "Another query is already running on this connection");
   }

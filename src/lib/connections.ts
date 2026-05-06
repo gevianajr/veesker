@@ -23,16 +23,24 @@ export type ConnectionSafety = {
    * this connection is active. Default-on for prod connections at save time.
    */
   airgapMode: boolean;
+  /**
+   * L2.1 PSDPM (PL/SQL Developer Parity Mode). When true, AI tools, embed
+   * batches and any non-user-initiated SQL are blocked. Schema browser
+   * remains purely lazy. Defaults true for env=prod / env=staging at save.
+   */
+  psdpmMode?: boolean;
 };
 
 /**
- * Save-time variant of {@link ConnectionSafety}. When `airgapMode` is left
- * undefined the Rust persistence layer derives the default (`true` for prod,
- * `false` otherwise). The form sends a concrete `boolean` only when the user
- * has explicitly touched the toggle or is editing an existing record.
+ * Save-time variant of {@link ConnectionSafety}. When `airgapMode` or
+ * `psdpmMode` is left undefined the Rust persistence layer derives defaults
+ * (`true` for prod airgap, `true` for prod/staging PSDPM, `false` otherwise).
+ * The form sends a concrete `boolean` when the user has explicitly touched
+ * the toggle or is editing an existing record.
  */
-export type ConnectionSafetyInput = Omit<ConnectionSafety, "airgapMode"> & {
+export type ConnectionSafetyInput = Omit<ConnectionSafety, "airgapMode" | "psdpmMode"> & {
   airgapMode?: boolean;
+  psdpmMode?: boolean;
 };
 
 export const DEFAULT_SAFETY: ConnectionSafety = {
@@ -42,6 +50,7 @@ export const DEFAULT_SAFETY: ConnectionSafety = {
   warnUnsafeDml: false,
   autoPerfAnalysis: true,
   airgapMode: false,
+  psdpmMode: false,
 };
 
 type SafetyFields = ConnectionSafety;
@@ -122,3 +131,9 @@ export const saveConnection = (input: ConnectionInput) =>
 export const deleteConnection = (id: string) => call<void>("connection_delete", { id });
 export const walletInspect = (zipPath: string) =>
   call<WalletInfo>("wallet_inspect", { zipPath });
+
+/**
+ * L2.1: read the active PSDPM flag from the Tauri-side per-session state.
+ * Returns false when no workspace is open or the connection has PSDPM off.
+ */
+export const psdpmActive = () => call<boolean>("psdpm_active");

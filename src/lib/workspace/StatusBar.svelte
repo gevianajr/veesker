@@ -25,6 +25,8 @@
     readOnly?: boolean;
     /** L1.2 (Sprint C): when true, render the air-gap badge. */
     airgap?: boolean;
+    /** L2.1 PSDPM (PL/SQL Developer Parity Mode) — surfaces a 🔐 PSDPM badge. */
+    psdpm?: boolean;
     onSignIn?: () => void;
     onAuditLog?: () => void;
     onSignOut?: () => void;
@@ -34,7 +36,7 @@
     hasPendingTx = false, chatOpen = false, onToggleChat,
     onDisconnect, onSwitchConnection,
     theme = "light", onToggleTheme,
-    env, readOnly = false, airgap = false,
+    env, readOnly = false, airgap = false, psdpm = false,
     onSignIn, onAuditLog, onSignOut,
   }: Props = $props();
 
@@ -76,6 +78,12 @@
         title="Air-gap mode is active for this connection. Outbound network calls (AI, cloud sync, version remote) are disabled."
       >
         🔒 AIR-GAPPED
+      </span>
+    {/if}
+    <!-- L2.1 PSDPM badge -->
+    {#if psdpm}
+      <span class="bar-psdpm" title="PSDPM active: only user-initiated SQL runs against this connection">
+        🔐 PSDPM
       </span>
     {/if}
     {#if hasPendingTx}
@@ -271,6 +279,18 @@
     background: #14181f;
     border: 1px solid #2a3142;
     border-radius: 3px; padding: 1px 6px;
+    flex-shrink: 0;
+  }
+  /* L2.1 PSDPM badge — medium-emphasis lock indicator. Solid violet so it
+     reads against both env-tinted (PROD/STAGING) and neutral status bars. */
+  .bar-psdpm {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em;
+    color: #fff;
+    background: #6d4ae8;
+    border: 1px solid #5a39d6;
+    border-radius: 3px; padding: 1px 7px;
     flex-shrink: 0;
   }
 

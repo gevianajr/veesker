@@ -59,6 +59,11 @@ pub struct ConnectionRow {
     /// short-circuit with a -32099 error while this connection is active.
     /// Default-on for prod connections, off otherwise.
     pub airgap_mode: bool,
+    /// L2.1 PSDPM (PL/SQL Developer Parity Mode): when true, only user-initiated
+    /// SQL is allowed against this connection. AI tools (CL), embed batches,
+    /// and any non-user RPC origins are blocked. Schema browser still
+    /// lazy-loads on expand. Defaults ON for env=prod / env=staging at save.
+    pub psdpm_mode: bool,
 }
 
 #[derive(Debug)]
@@ -98,7 +103,9 @@ CREATE TABLE IF NOT EXISTS connections (
     auto_perf_analysis   INTEGER NOT NULL DEFAULT 1
                            CHECK (auto_perf_analysis IN (0, 1)),
     airgap_mode          INTEGER NOT NULL DEFAULT 0
-                           CHECK (airgap_mode IN (0, 1))
+                           CHECK (airgap_mode IN (0, 1)),
+    psdpm_mode           INTEGER NOT NULL DEFAULT 0
+                           CHECK (psdpm_mode IN (0, 1))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS connections_name_unique
     ON connections (LOWER(name));
@@ -129,13 +136,15 @@ CREATE TABLE connections_new (
     auto_perf_analysis   INTEGER NOT NULL DEFAULT 1
                            CHECK (auto_perf_analysis IN (0, 1)),
     airgap_mode          INTEGER NOT NULL DEFAULT 0
-                           CHECK (airgap_mode IN (0, 1))
+                           CHECK (airgap_mode IN (0, 1)),
+    psdpm_mode           INTEGER NOT NULL DEFAULT 0
+                           CHECK (psdpm_mode IN (0, 1))
 );
 INSERT INTO connections_new
     (id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at,
-     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode)
+     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode, psdpm_mode)
     SELECT id, name, 'basic', host, port, service_name, NULL, username, created_at, updated_at,
-           NULL, 0, NULL, 0, 1, 0
+           NULL, 0, NULL, 0, 1, 0, 0
     FROM connections;
 DROP TABLE connections;
 ALTER TABLE connections_new RENAME TO connections;
@@ -185,6 +194,17 @@ fn add_safety_columns_if_missing(conn: &Connection) -> rusqlite::Result<()> {
                CHECK (airgap_mode IN (0, 1));",
         )?;
     }
+    // L2.1 PSDPM (PL/SQL Developer Parity Mode) — separate migration step so it
+    // doesn't collide with the parallel airgap_mode addition. Default 0 (off);
+    // the connection-save layer flips it on for env=prod / env=staging at save
+    // time. Existing rows keep PSDPM off until the user explicitly toggles or
+    // re-saves.
+    if !has_column(conn, "connections", "psdpm_mode")? {
+        conn.execute_batch(
+            "ALTER TABLE connections ADD COLUMN psdpm_mode INTEGER NOT NULL DEFAULT 0 \
+               CHECK (psdpm_mode IN (0, 1));",
+        )?;
+    }
     Ok(())
 }
 
@@ -216,8 +236,8 @@ pub fn create(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
     let res = conn.execute(
         "INSERT INTO connections \
          (id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
-          env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode, psdpm_mode) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             row.id,
             row.name,
@@ -235,6 +255,7 @@ pub fn create(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
             row.warn_unsafe_dml as i32,
             row.auto_perf_analysis as i32,
             row.airgap_mode as i32,
+            row.psdpm_mode as i32,
         ],
     );
     match res {
@@ -270,11 +291,12 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ConnectionRow> {
         warn_unsafe_dml: row.get::<_, i64>(13)? != 0,
         auto_perf_analysis: row.get::<_, i64>(14)? != 0,
         airgap_mode: row.get::<_, i64>(15)? != 0,
+        psdpm_mode: row.get::<_, i64>(16)? != 0,
     })
 }
 
 const SELECT_COLS: &str = "id, name, auth_type, host, port, service_name, connect_alias, username, created_at, updated_at, \
-     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode";
+     env, read_only, statement_timeout_ms, warn_unsafe_dml, auto_perf_analysis, airgap_mode, psdpm_mode";
 
 pub fn list(conn: &Connection) -> Result<Vec<ConnectionRow>, StoreError> {
     let sql = format!("SELECT {SELECT_COLS} FROM connections ORDER BY LOWER(name)");
@@ -298,7 +320,7 @@ pub fn update(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
          name = ?, auth_type = ?, host = ?, port = ?, service_name = ?, \
          connect_alias = ?, username = ?, updated_at = ?, \
          env = ?, read_only = ?, statement_timeout_ms = ?, warn_unsafe_dml = ?, \
-         auto_perf_analysis = ?, airgap_mode = ? \
+         auto_perf_analysis = ?, airgap_mode = ?, psdpm_mode = ? \
          WHERE id = ?",
         params![
             row.name,
@@ -315,6 +337,7 @@ pub fn update(conn: &Connection, row: &ConnectionRow) -> Result<(), StoreError> 
             row.warn_unsafe_dml as i32,
             row.auto_perf_analysis as i32,
             row.airgap_mode as i32,
+            row.psdpm_mode as i32,
             row.id
         ],
     );
@@ -370,6 +393,7 @@ mod tests {
             warn_unsafe_dml: false,
             auto_perf_analysis: true,
             airgap_mode: false,
+            psdpm_mode: false,
         }
     }
 
@@ -531,6 +555,7 @@ mod tests {
             warn_unsafe_dml: false,
             auto_perf_analysis: true,
             airgap_mode: false,
+            psdpm_mode: false,
         };
         create(&c, &row).unwrap();
         let got = get(&c, "w1").unwrap().unwrap();
@@ -654,7 +679,28 @@ mod tests {
     }
 
     #[test]
-    fn migration_adds_airgap_mode_column() {
+    fn psdpm_mode_round_trips() {
+        // L2.1: PSDPM column persists across save/load cycles.
+        let c = fresh();
+        let mut row = sample("p1", "Psdpm");
+        row.psdpm_mode = true;
+        create(&c, &row).unwrap();
+        let got = get(&c, "p1").unwrap().unwrap();
+        assert!(got.psdpm_mode, "psdpm_mode should round-trip true");
+
+        // Toggle off via update.
+        let mut updated = got;
+        updated.psdpm_mode = false;
+        updated.updated_at = "2026-05-06T00:00:00Z".into();
+        update(&c, &updated).unwrap();
+        let after = get(&c, "p1").unwrap().unwrap();
+        assert!(!after.psdpm_mode, "psdpm_mode should round-trip false");
+    }
+
+    #[test]
+    fn migration_adds_safety_columns_to_v4_schema() {
+        // V4 schema (post-auto_perf_analysis) — both airgap_mode AND psdpm_mode
+        // are added by add_safety_columns_if_missing.
         let c = Connection::open_in_memory().unwrap();
         c.execute_batch(
             "CREATE TABLE connections (
@@ -679,6 +725,7 @@ mod tests {
         init_db(&c).unwrap();
 
         let row = get(&c, "v4-1").unwrap().unwrap();
-        assert!(!row.airgap_mode, "default should be false");
+        assert!(!row.airgap_mode, "airgap default should be false");
+        assert!(!row.psdpm_mode, "psdpm default should be false (off)");
     }
 }

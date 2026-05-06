@@ -32,6 +32,11 @@ pub struct ConnectionSafety {
     /// sandbox_* in CL) short-circuit with -32099 while this connection is
     /// active. Default-on for prod, off elsewhere; user can flip after save.
     pub airgap_mode: bool,
+    /// L2.1 PSDPM (PL/SQL Developer Parity Mode): when true, only user-initiated
+    /// SQL is allowed. AI tools (CL only), embed batches (CL only), and any
+    /// non-user RPC origins are blocked. Defaults ON when env=prod or
+    /// env=staging, OFF for env=dev / unspecified at save time.
+    pub psdpm_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -73,6 +78,7 @@ impl TryFrom<ConnectionRow> for ConnectionMeta {
             warn_unsafe_dml: r.warn_unsafe_dml,
             auto_perf_analysis: r.auto_perf_analysis,
             airgap_mode: r.airgap_mode,
+            psdpm_mode: r.psdpm_mode,
         };
         match r.auth_type {
             AuthType::Basic => Ok(ConnectionMeta::Basic {
@@ -134,6 +140,18 @@ pub struct ConnectionSafetyInput {
     /// toggling explicitly in the form), persistence is the truth.
     #[serde(default)]
     pub airgap_mode: Option<bool>,
+    /// L2.1 PSDPM mode override. When None, the save layer chooses a default
+    /// based on `env`: prod / staging → true, dev / unspecified → false.
+    /// Existing UIs that don't send this field get the env-derived default.
+    #[serde(default)]
+    pub psdpm_mode: Option<bool>,
+}
+
+/// Default policy for the L2.1 PSDPM toggle when the renderer omits the
+/// explicit value: ON for env=prod / env=staging, OFF otherwise. Centralised
+/// here so the rule lives in one place across CE / CL.
+pub(crate) fn default_psdpm_for_env(env: Option<&str>) -> bool {
+    matches!(env, Some("prod") | Some("staging"))
 }
 
 #[derive(Debug, Deserialize)]
@@ -606,6 +624,10 @@ impl ConnectionService {
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
         let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
+        // L2.1: explicit psdpm_mode wins; otherwise default by env.
+        let psdpm_mode = safety
+            .psdpm_mode
+            .unwrap_or_else(|| default_psdpm_for_env(safety.env.as_deref()));
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -624,6 +646,7 @@ impl ConnectionService {
                 warn_unsafe_dml: safety.warn_unsafe_dml,
                 auto_perf_analysis: safety.auto_perf_analysis,
                 airgap_mode,
+                psdpm_mode,
             }),
             Some(id) => {
                 let existing = {
@@ -652,6 +675,7 @@ impl ConnectionService {
                     warn_unsafe_dml: safety.warn_unsafe_dml,
                     auto_perf_analysis: safety.auto_perf_analysis,
                     airgap_mode,
+                    psdpm_mode,
                 })
             }
         }
@@ -667,6 +691,10 @@ impl ConnectionService {
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
         let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
+        // L2.1: explicit psdpm_mode wins; otherwise default by env.
+        let psdpm_mode = safety
+            .psdpm_mode
+            .unwrap_or_else(|| default_psdpm_for_env(safety.env.as_deref()));
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -685,6 +713,7 @@ impl ConnectionService {
                 warn_unsafe_dml: safety.warn_unsafe_dml,
                 auto_perf_analysis: safety.auto_perf_analysis,
                 airgap_mode,
+                psdpm_mode,
             }),
             Some(id) => {
                 let existing = {
@@ -713,6 +742,7 @@ impl ConnectionService {
                     warn_unsafe_dml: safety.warn_unsafe_dml,
                     auto_perf_analysis: safety.auto_perf_analysis,
                     airgap_mode,
+                    psdpm_mode,
                 })
             }
         }

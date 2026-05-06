@@ -19,6 +19,10 @@ fn merge_safety(mut base: Value, safety: Option<&ConnectionSafety>) -> Value {
         }
         obj.insert("warnUnsafeDml".into(), Value::Bool(s.warn_unsafe_dml));
         obj.insert("autoPerfAnalysis".into(), Value::Bool(s.auto_perf_analysis));
+        // L2.1: PSDPM (PL/SQL Developer Parity Mode) — propagated as `psdpm`
+        // so the sidecar's session-safety state can gate non-user-initiated
+        // SQL, AI tool execution, and embed batches.
+        obj.insert("psdpm".into(), Value::Bool(s.psdpm_mode));
     }
     base
 }

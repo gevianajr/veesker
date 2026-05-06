@@ -648,6 +648,7 @@
       env={meta.env}
       readOnly={meta.readOnly ?? false}
       airgap={meta.airgapMode ?? false}
+      psdpm={meta.psdpmMode ?? (meta.env === "prod" || meta.env === "staging")}
       onSignIn={() => { showLogin = true; }}
       onAuditLog={() => { showAuditLog = true; }}
       onSignOut={handleLogout}

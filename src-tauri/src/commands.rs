@@ -178,6 +178,12 @@ async fn airgap_active(app: &AppHandle) -> bool {
     *app.state::<AirGapState>().0.lock().await
 }
 
+// L2.1 PSDPM (PL/SQL Developer Parity Mode) — per-session active flag mirrored
+// from the saved connection. Workspace_open populates it from the connection
+// row; workspace_close clears it. The sidecar enforces the gate on incoming
+// non-user-initiated RPCs.
+pub struct PsdpmState(pub tokio::sync::Mutex<bool>);
+
 /// Returns the canonicalized path if `path` (as supplied by the renderer) resolves to a
 /// location under one of the user-data scopes ($DOCUMENT, $DESKTOP, $DOWNLOAD, $HOME,
 /// app data dir, app config dir). Anything else is rejected to prevent a compromised
@@ -337,24 +343,24 @@ pub async fn workspace_open(
     app: AppHandle,
     connection_id: String,
 ) -> Result<WorkspaceInfo, ConnectionTestErr> {
-    let (params, conn_name, conn_env, conn_airgap) = {
+    let (params, conn_name, conn_env, conn_airgap, conn_psdpm) = {
         let svc = app.state::<ConnectionService>();
         let params = svc.sidecar_params(&connection_id).map_err(map_err)?;
         let full = svc.get(&connection_id).ok();
-        let (name, env, airgap) = full
+        let (name, env, airgap, psdpm) = full
             .map(|f| {
                 use crate::persistence::connections::ConnectionMeta;
                 match f.meta {
                     ConnectionMeta::Basic { name, safety, .. } => {
-                        (name, safety.env, safety.airgap_mode)
+                        (name, safety.env, safety.airgap_mode, safety.psdpm_mode)
                     }
                     ConnectionMeta::Wallet { name, safety, .. } => {
-                        (name, safety.env, safety.airgap_mode)
+                        (name, safety.env, safety.airgap_mode, safety.psdpm_mode)
                     }
                 }
             })
-            .unwrap_or_else(|| (connection_id.clone(), None, false));
-        (params, name, env, airgap)
+            .unwrap_or_else(|| (connection_id.clone(), None, false, false));
+        (params, name, env, airgap, psdpm)
     };
 
     tray::update_tray(&app, TrayState::Connecting).await;
@@ -372,6 +378,9 @@ pub async fn workspace_open(
     // L1.2 (Sprint C): activate air-gap immediately after the Oracle session
     // opens. Outbound HTTPS commands now short-circuit until workspace_close.
     *app.state::<AirGapState>().0.lock().await = conn_airgap;
+    // L2.1: mirror the connection's PSDPM flag to the per-session state so
+    // status-bar / diagnostic queries can read it without re-loading the row.
+    *app.state::<PsdpmState>().0.lock().await = conn_psdpm;
     tray::update_tray(&app, TrayState::Connected).await;
 
     let server_version = res
@@ -390,6 +399,13 @@ pub async fn workspace_open(
     })
 }
 
+/// L2.1: expose the active PSDPM flag so the StatusBar badge and diagnostic
+/// surfaces can render the lock without re-loading the connection row.
+#[tauri::command]
+pub async fn psdpm_active(app: AppHandle) -> bool {
+    *app.state::<PsdpmState>().0.lock().await
+}
+
 #[tauri::command]
 pub async fn workspace_close(app: AppHandle) -> Result<(), ConnectionTestErr> {
     call_sidecar(&app, "workspace.close", json!({})).await?;
@@ -398,6 +414,8 @@ pub async fn workspace_close(app: AppHandle) -> Result<(), ConnectionTestErr> {
     // L1.2 (Sprint C): clear air-gap when the workspace closes so the next
     // connection picks up its own setting.
     *app.state::<AirGapState>().0.lock().await = false;
+    // L2.1: PSDPM flag is per-session — reset to off when the workspace closes.
+    *app.state::<PsdpmState>().0.lock().await = false;
     tray::update_tray(&app, TrayState::Idle).await;
     Ok(())
 }
