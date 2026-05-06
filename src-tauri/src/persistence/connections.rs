@@ -27,6 +27,11 @@ pub struct ConnectionSafety {
     pub warn_unsafe_dml: bool,
     /// when true, frontend runs background EXPLAIN PLAN + stats analysis
     pub auto_perf_analysis: bool,
+    /// L1.2 (Sprint C): when true, all renderer-initiated outbound HTTPS
+    /// commands (cloud_api_*, auth_token_*, ai_*, embed_*, object_version_push,
+    /// sandbox_* in CL) short-circuit with -32099 while this connection is
+    /// active. Default-on for prod, off elsewhere; user can flip after save.
+    pub airgap_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,6 +72,7 @@ impl TryFrom<ConnectionRow> for ConnectionMeta {
             statement_timeout_ms: r.statement_timeout_ms,
             warn_unsafe_dml: r.warn_unsafe_dml,
             auto_perf_analysis: r.auto_perf_analysis,
+            airgap_mode: r.airgap_mode,
         };
         match r.auth_type {
             AuthType::Basic => Ok(ConnectionMeta::Basic {
@@ -123,6 +129,11 @@ pub struct ConnectionSafetyInput {
     pub warn_unsafe_dml: bool,
     #[serde(default = "default_true")]
     pub auto_perf_analysis: bool,
+    /// L1.2 (Sprint C). Optional — when not provided, the save path defaults
+    /// to `true` for prod and `false` otherwise. When provided (e.g. user
+    /// toggling explicitly in the form), persistence is the truth.
+    #[serde(default)]
+    pub airgap_mode: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -152,6 +163,19 @@ pub enum ConnectionInput {
         #[serde(default)]
         safety: ConnectionSafetyInput,
     },
+}
+
+/// L1.2 (Sprint C): resolve the persisted `airgap_mode` value. When the input
+/// supplies an explicit `Some(bool)`, persistence honors it (so the user can
+/// flip the toggle off on a prod connection if they really want AI on it).
+/// When the input is `None` (e.g. legacy callers, or the form didn't render
+/// the toggle), default to `true` iff env is `prod`. This implements the
+/// brief's "default policy: ON for any connection auto-detected as PROD".
+fn resolve_airgap_default(env: &Option<String>, explicit: Option<bool>) -> bool {
+    if let Some(v) = explicit {
+        return v;
+    }
+    matches!(env.as_deref(), Some("prod"))
 }
 
 fn validate_env(env: &Option<String>) -> Result<(), ConnectionError> {
@@ -581,6 +605,7 @@ impl ConnectionService {
         now: &str,
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
+        let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -598,6 +623,7 @@ impl ConnectionService {
                 statement_timeout_ms: safety.statement_timeout_ms,
                 warn_unsafe_dml: safety.warn_unsafe_dml,
                 auto_perf_analysis: safety.auto_perf_analysis,
+                airgap_mode,
             }),
             Some(id) => {
                 let existing = {
@@ -625,6 +651,7 @@ impl ConnectionService {
                     statement_timeout_ms: safety.statement_timeout_ms,
                     warn_unsafe_dml: safety.warn_unsafe_dml,
                     auto_perf_analysis: safety.auto_perf_analysis,
+                    airgap_mode,
                 })
             }
         }
@@ -639,6 +666,7 @@ impl ConnectionService {
         now: &str,
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
+        let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -656,6 +684,7 @@ impl ConnectionService {
                 statement_timeout_ms: safety.statement_timeout_ms,
                 warn_unsafe_dml: safety.warn_unsafe_dml,
                 auto_perf_analysis: safety.auto_perf_analysis,
+                airgap_mode,
             }),
             Some(id) => {
                 let existing = {
@@ -683,6 +712,7 @@ impl ConnectionService {
                     statement_timeout_ms: safety.statement_timeout_ms,
                     warn_unsafe_dml: safety.warn_unsafe_dml,
                     auto_perf_analysis: safety.auto_perf_analysis,
+                    airgap_mode,
                 })
             }
         }

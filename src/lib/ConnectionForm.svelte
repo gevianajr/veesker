@@ -72,9 +72,13 @@
   }));
   let warnUnsafeDml = $state<boolean>(untrack(() => initial.safety?.warnUnsafeDml ?? false));
   let autoPerfAnalysis = $state<boolean>(untrack(() => initial.safety?.autoPerfAnalysis ?? true));
+  // L1.2 air-gap toggle — explicit user choice when set; undefined falls
+  // through to Rust's prod-default policy on save.
+  let airgapMode = $state<boolean>(untrack(() => initial.safety?.airgapMode ?? false));
+  let airgapTouched = $state<boolean>(untrack(() => initial.safety?.airgapMode !== undefined));
   let showSafety = $state<boolean>(untrack(() => {
     const s = initial.safety;
-    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml || s.autoPerfAnalysis === false));
+    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml || s.autoPerfAnalysis === false || s.airgapMode));
   }));
   let walletPick = $state<WalletPick>(
     untrack(() =>
@@ -130,12 +134,17 @@
     const timeoutSec = Number.parseInt(statementTimeoutSec, 10);
     const statementTimeoutMs =
       Number.isFinite(timeoutSec) && timeoutSec > 0 ? timeoutSec * 1000 : undefined;
+    // L1.2: send airgapMode whenever the user has either explicitly touched
+    // the toggle OR is editing an existing record. For brand-new connections
+    // where the user left the toggle alone, omit the field so Rust applies
+    // its prod-default policy.
     return {
       env: env === "" ? undefined : env,
       readOnly,
       statementTimeoutMs,
       warnUnsafeDml,
       autoPerfAnalysis,
+      airgapMode: airgapTouched || isEdit ? airgapMode : undefined,
     };
   }
 
@@ -291,13 +300,14 @@
     onclick={() => (showSafety = !showSafety)}
   >
     {showSafety ? "▼" : "▶"} Safety guards
-    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml || !autoPerfAnalysis}
+    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml || !autoPerfAnalysis || airgapMode}
       <span class="safety-summary">
         {#if env}<span class="badge badge-{env}">{env}</span>{/if}
         {#if readOnly}<span class="badge badge-ro">read-only</span>{/if}
         {#if statementTimeoutSec}<span class="badge">{statementTimeoutSec}s timeout</span>{/if}
         {#if warnUnsafeDml}<span class="badge badge-warn">warn DML</span>{/if}
         {#if !autoPerfAnalysis}<span class="badge">no auto-perf</span>{/if}
+        {#if airgapMode}<span class="badge badge-airgap">air-gapped</span>{/if}
       </span>
     {:else}
       <span class="safety-hint">all off · click to configure</span>
@@ -357,6 +367,20 @@
           <strong>Auto-perf analysis</strong> — background EXPLAIN PLAN + table stats
           to surface red flags as you type. When off, the cost badge / red flags / stats
           freshness disappear, but the "Why slow?" button keeps working on demand.
+        </span>
+      </label>
+
+      <!-- L1.2 air-gap toggle -->
+      <label class="safety-check airgap-toggle">
+        <input
+          type="checkbox"
+          bind:checked={airgapMode}
+          onchange={() => { airgapTouched = true; }}
+        />
+        <span>
+          <strong>🔒 Air-gap mode</strong> — hard-disable AI, cloud sync, version remote,
+          and any other outbound HTTPS while this connection is active. Recommended for
+          client production engagements; defaults on for connections tagged <em>prod</em>.
         </span>
       </label>
     </div>
@@ -504,6 +528,8 @@
   .badge-dev { background: rgba(74, 158, 218, 0.18); color: #4a9eda; border-color: rgba(74, 158, 218, 0.4); }
   .badge-ro { background: rgba(106, 110, 119, 0.2); color: var(--text-secondary); }
   .badge-warn { background: rgba(217, 153, 42, 0.18); color: #d99c2a; border-color: rgba(217, 153, 42, 0.4); }
+  .badge-airgap { background: rgba(20, 24, 32, 0.85); color: #f6f1e8; border-color: rgba(20, 24, 32, 1); }
+  .airgap-toggle strong { letter-spacing: 0.02em; }
 
   .safety-panel {
     display: flex; flex-direction: column; gap: 0.85rem;

@@ -140,6 +140,44 @@ use crate::persistence::history::{HistoryEntry, HistorySaveInput};
 
 pub struct ActiveSessionEnv(pub tokio::sync::Mutex<Option<String>>);
 
+/// L1.2 (Sprint C — Air-gap mode). When `true`, every Tauri command that makes
+/// outbound HTTPS calls (cloud_api_*, auth_token_*, ai_*, embed_*,
+/// object_version_push, object_version_get_remote) short-circuits with the
+/// shared `-32099` JSON-RPC error. The state is loaded from
+/// `connection.airgap_mode` on `workspace_open` and reset on `workspace_close`,
+/// so toggling is per-connection and resets between sessions.
+///
+/// Note: `tauri-plugin-updater` runs its own check on app start. Air-gap mode
+/// does NOT disable that startup check; it only gates renderer-initiated
+/// network commands. True air-gap requires running the app with
+/// `VEESKER_DISABLE_UPDATER=1` set; the env-var support is tracked separately.
+/// This struct gates renderer-controllable egress only.
+pub struct AirGapState(pub tokio::sync::Mutex<bool>);
+
+/// Shared error message and code for every air-gap-blocked command. -32099 is
+/// outside the standard JSON-RPC reserved range so the renderer can match it
+/// reliably.
+pub(crate) const AIRGAP_ERR_CODE: i32 = -32099;
+pub(crate) const AIRGAP_ERR_MSG: &str =
+    "Air-gap mode active: outbound network calls are disabled for this connection";
+
+pub(crate) fn airgap_blocked_err() -> ConnectionTestErr {
+    ConnectionTestErr {
+        code: AIRGAP_ERR_CODE,
+        message: AIRGAP_ERR_MSG.to_string(),
+    }
+}
+
+pub(crate) fn airgap_blocked_string() -> String {
+    format!("airgap_blocked: {AIRGAP_ERR_MSG}")
+}
+
+/// Read the current air-gap state. Awaits the lock briefly and returns the
+/// inner bool — callers should use this at the top of every gated command.
+async fn airgap_active(app: &AppHandle) -> bool {
+    *app.state::<AirGapState>().0.lock().await
+}
+
 /// Returns the canonicalized path if `path` (as supplied by the renderer) resolves to a
 /// location under one of the user-data scopes ($DOCUMENT, $DESKTOP, $DOWNLOAD, $HOME,
 /// app data dir, app config dir). Anything else is rejected to prevent a compromised
@@ -299,20 +337,24 @@ pub async fn workspace_open(
     app: AppHandle,
     connection_id: String,
 ) -> Result<WorkspaceInfo, ConnectionTestErr> {
-    let (params, conn_name, conn_env) = {
+    let (params, conn_name, conn_env, conn_airgap) = {
         let svc = app.state::<ConnectionService>();
         let params = svc.sidecar_params(&connection_id).map_err(map_err)?;
         let full = svc.get(&connection_id).ok();
-        let (name, env) = full
+        let (name, env, airgap) = full
             .map(|f| {
                 use crate::persistence::connections::ConnectionMeta;
                 match f.meta {
-                    ConnectionMeta::Basic { name, safety, .. } => (name, safety.env),
-                    ConnectionMeta::Wallet { name, safety, .. } => (name, safety.env),
+                    ConnectionMeta::Basic { name, safety, .. } => {
+                        (name, safety.env, safety.airgap_mode)
+                    }
+                    ConnectionMeta::Wallet { name, safety, .. } => {
+                        (name, safety.env, safety.airgap_mode)
+                    }
                 }
             })
-            .unwrap_or_else(|| (connection_id.clone(), None));
-        (params, name, env)
+            .unwrap_or_else(|| (connection_id.clone(), None, false));
+        (params, name, env, airgap)
     };
 
     tray::update_tray(&app, TrayState::Connecting).await;
@@ -327,6 +369,9 @@ pub async fn workspace_open(
 
     *app.state::<ActiveConnection>().0.lock().await = Some(conn_name);
     *app.state::<ActiveSessionEnv>().0.lock().await = conn_env;
+    // L1.2 (Sprint C): activate air-gap immediately after the Oracle session
+    // opens. Outbound HTTPS commands now short-circuit until workspace_close.
+    *app.state::<AirGapState>().0.lock().await = conn_airgap;
     tray::update_tray(&app, TrayState::Connected).await;
 
     let server_version = res
@@ -350,6 +395,9 @@ pub async fn workspace_close(app: AppHandle) -> Result<(), ConnectionTestErr> {
     call_sidecar(&app, "workspace.close", json!({})).await?;
     *app.state::<ActiveConnection>().0.lock().await = None;
     *app.state::<ActiveSessionEnv>().0.lock().await = None;
+    // L1.2 (Sprint C): clear air-gap when the workspace closes so the next
+    // connection picks up its own setting.
+    *app.state::<AirGapState>().0.lock().await = false;
     tray::update_tray(&app, TrayState::Idle).await;
     Ok(())
 }
@@ -814,6 +862,9 @@ pub async fn schema_kind_counts(app: AppHandle, owner: String) -> Result<Value, 
 
 #[tauri::command]
 pub async fn ai_chat(app: AppHandle, payload: Value) -> Result<Value, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let res = call_sidecar(&app, "ai.chat", payload).await?;
     Ok(res)
 }
@@ -823,6 +874,9 @@ pub async fn ai_suggest_endpoint(
     app: AppHandle,
     params: Value,
 ) -> Result<Value, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let res = call_sidecar(&app, "ai.suggest_endpoint", params).await?;
     Ok(res)
 }
@@ -847,23 +901,35 @@ pub async fn embed_count_pending(
     app: AppHandle,
     payload: Value,
 ) -> Result<Value, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let res = call_sidecar(&app, "embed.count_pending", payload).await?;
     Ok(res)
 }
 
 #[tauri::command]
 pub async fn embed_batch(app: AppHandle, payload: Value) -> Result<Value, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let res = call_sidecar(&app, "embed.batch", payload).await?;
     Ok(res)
 }
 
 #[tauri::command]
-pub async fn ai_key_save(service: String, key: String) -> Result<(), String> {
+pub async fn ai_key_save(app: AppHandle, service: String, key: String) -> Result<(), String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     crate::persistence::secrets::set_api_key(&service, &key).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn ai_key_get(service: String) -> Result<Option<String>, String> {
+pub async fn ai_key_get(app: AppHandle, service: String) -> Result<Option<String>, String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     crate::persistence::secrets::get_api_key(&service).map_err(|e| e.to_string())
 }
 
@@ -1468,6 +1534,9 @@ pub async fn object_version_push(
     app: AppHandle,
     connection_id: String,
 ) -> Result<PushResult, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_push(&connection_id)
         .map(|pushed_commits| PushResult { pushed_commits })
@@ -1485,6 +1554,9 @@ pub async fn object_version_get_remote(
     app: AppHandle,
     connection_id: String,
 ) -> Result<GetRemoteResult, ConnectionTestErr> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_err());
+    }
     let svc = app.state::<crate::persistence::connections::ConnectionService>();
     svc.object_version_get_remote(&connection_id)
         .map(|url| GetRemoteResult { url })
@@ -1492,22 +1564,34 @@ pub async fn object_version_get_remote(
 }
 
 #[tauri::command]
-pub async fn auth_token_get() -> Result<Option<String>, String> {
+pub async fn auth_token_get(app: AppHandle) -> Result<Option<String>, String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     crate::persistence::secrets::get_auth_token().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn auth_token_set(token: String) -> Result<(), String> {
+pub async fn auth_token_set(app: AppHandle, token: String) -> Result<(), String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     crate::persistence::secrets::set_auth_token(&token).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn auth_token_clear() -> Result<(), String> {
+pub async fn auth_token_clear(app: AppHandle) -> Result<(), String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     crate::persistence::secrets::delete_auth_token().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn cloud_api_get(path: String, params: Option<std::collections::HashMap<String, String>>) -> Result<Value, String> {
+pub async fn cloud_api_get(app: AppHandle, path: String, params: Option<std::collections::HashMap<String, String>>) -> Result<Value, String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     let token = crate::persistence::secrets::get_auth_token()
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "not_authenticated".to_string())?;
@@ -1538,7 +1622,10 @@ pub async fn cloud_api_get(path: String, params: Option<std::collections::HashMa
 }
 
 #[tauri::command]
-pub async fn cloud_api_post(path: String, body: Value) -> Result<(), String> {
+pub async fn cloud_api_post(app: AppHandle, path: String, body: Value) -> Result<(), String> {
+    if airgap_active(&app).await {
+        return Err(airgap_blocked_string());
+    }
     let token = crate::persistence::secrets::get_auth_token()
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "not_authenticated".to_string())?;

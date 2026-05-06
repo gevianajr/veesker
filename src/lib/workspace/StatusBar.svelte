@@ -23,6 +23,8 @@
     onToggleTheme?: () => void;
     env?: "dev" | "staging" | "prod";
     readOnly?: boolean;
+    /** L1.2 (Sprint C): when true, render the air-gap badge. */
+    airgap?: boolean;
     onSignIn?: () => void;
     onAuditLog?: () => void;
     onSignOut?: () => void;
@@ -32,7 +34,7 @@
     hasPendingTx = false, chatOpen = false, onToggleChat,
     onDisconnect, onSwitchConnection,
     theme = "light", onToggleTheme,
-    env, readOnly = false,
+    env, readOnly = false, airgap = false,
     onSignIn, onAuditLog, onSignOut,
   }: Props = $props();
 
@@ -65,6 +67,15 @@
           <path d="M3 3.5V2.5a1.5 1.5 0 013 0v1" stroke="currentColor" stroke-width="1" fill="none"/>
         </svg>
         RO
+      </span>
+    {/if}
+    <!-- L1.2 air-gap badge -->
+    {#if airgap}
+      <span
+        class="bar-airgap"
+        title="Air-gap mode is active for this connection. Outbound network calls (AI, cloud sync, version remote) are disabled."
+      >
+        🔒 AIR-GAPPED
       </span>
     {/if}
     {#if hasPendingTx}
@@ -247,6 +258,18 @@
     color: rgba(255,255,255,0.8);
     background: rgba(106,110,119,0.22);
     border: 1px solid rgba(106,110,119,0.4);
+    border-radius: 3px; padding: 1px 6px;
+    flex-shrink: 0;
+  }
+  /* L1.2 (Sprint C) air-gap badge — solid dark, no animation so it doesn't
+     compete with the prod-pulse stripe above. */
+  .bar-airgap {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+    color: #f6f1e8;
+    background: #14181f;
+    border: 1px solid #2a3142;
     border-radius: 3px; padding: 1px 6px;
     flex-shrink: 0;
   }

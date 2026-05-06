@@ -17,6 +17,22 @@ export type ConnectionSafety = {
   warnUnsafeDml: boolean;
   /** when true, frontend runs background EXPLAIN PLAN + stats analysis */
   autoPerfAnalysis: boolean;
+  /**
+   * L1.2 (Sprint C): when true, every Tauri command that makes outbound HTTPS
+   * calls (cloud sync, AI, GitHub object versioning) returns -32099 while
+   * this connection is active. Default-on for prod connections at save time.
+   */
+  airgapMode: boolean;
+};
+
+/**
+ * Save-time variant of {@link ConnectionSafety}. When `airgapMode` is left
+ * undefined the Rust persistence layer derives the default (`true` for prod,
+ * `false` otherwise). The form sends a concrete `boolean` only when the user
+ * has explicitly touched the toggle or is editing an existing record.
+ */
+export type ConnectionSafetyInput = Omit<ConnectionSafety, "airgapMode"> & {
+  airgapMode?: boolean;
 };
 
 export const DEFAULT_SAFETY: ConnectionSafety = {
@@ -25,6 +41,7 @@ export const DEFAULT_SAFETY: ConnectionSafety = {
   statementTimeoutMs: undefined,
   warnUnsafeDml: false,
   autoPerfAnalysis: true,
+  airgapMode: false,
 };
 
 type SafetyFields = ConnectionSafety;
@@ -67,7 +84,7 @@ export type ConnectionInput =
       serviceName: string;
       username: string;
       password: string;
-      safety?: ConnectionSafety;
+      safety?: ConnectionSafetyInput;
     }
   | {
       authType: "wallet";
@@ -78,7 +95,7 @@ export type ConnectionInput =
       connectAlias: string;
       username: string;
       password: string;
-      safety?: ConnectionSafety;
+      safety?: ConnectionSafetyInput;
     };
 
 export type WalletInfo = { aliases: string[] };
