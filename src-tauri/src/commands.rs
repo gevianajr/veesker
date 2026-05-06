@@ -1331,6 +1331,26 @@ pub async fn dml_preview(app: AppHandle, sql: String) -> Result<Value, Connectio
 }
 
 #[tauri::command]
+pub async fn unsafe_dml_confirm(app: AppHandle, summary: String) -> Result<bool, ConnectionTestErr> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+    let safe_summary = summary.chars().take(300).collect::<String>();
+    app.dialog()
+        .message(format!(
+            "You are about to execute a potentially unsafe SQL statement:\n\n{safe_summary}\n\nThis operation cannot be automatically rolled back. Proceed?"
+        ))
+        .title("Unsafe SQL — Confirm Execution")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Execute Anyway".into(),
+            "Cancel".into(),
+        ))
+        .show(move |confirmed| {
+            let _ = tx.send(confirmed);
+        });
+    Ok(rx.await.unwrap_or(false))
+}
+
+#[tauri::command]
 pub async fn perf_stats(app: AppHandle, sql: String) -> Result<Value, ConnectionTestErr> {
     let res = call_sidecar(&app, "perf.stats", json!({ "sql": sql })).await?;
     Ok(res)

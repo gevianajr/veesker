@@ -5,6 +5,7 @@
 -->
 
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import type { DestructiveOp } from "$lib/sql-safety";
 
   type Props = {
@@ -41,6 +42,7 @@
   let previewTimedOut = $state(false);
   let previewWarning: string | undefined = $state(undefined);
   let previewReady = $state(false);
+  let confirming = $state(false);
 
   $effect(() => {
     if (!onPreview) { previewReady = true; return; }
@@ -117,10 +119,24 @@
       <button class="btn-cancel" onclick={onCancel}>Cancel</button>
       <button
         class="btn-execute"
-        onclick={onConfirm}
-        disabled={env === "prod" && !previewReady}
+        onclick={async () => {
+          confirming = true;
+          try {
+            const ok = await invoke<boolean>("unsafe_dml_confirm", { summary: sql.slice(0, 300) });
+            if (ok) onConfirm();
+          } finally {
+            confirming = false;
+          }
+        }}
+        disabled={confirming || (env === "prod" && !previewReady)}
       >
-        {env === "prod" && !previewReady ? "Checking..." : "Execute Anyway"}
+        {#if confirming}
+          Confirming…
+        {:else if env === "prod" && !previewReady}
+          Checking...
+        {:else}
+          Execute Anyway
+        {/if}
       </button>
     </div>
   </div>
