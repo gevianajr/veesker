@@ -657,3 +657,15 @@ export const flowTraceSql = (payload: {
   sql: string;
   withRuntimeStats?: boolean;
 }) => call<FlowTraceResult>("flow_trace_sql", { payload });
+
+// ── DML dry-run preview ───────────────────────────────────────────────────────
+
+export type DmlPreviewResult = {
+  estimatedRows: number | null;
+  timedOut: boolean;
+  warning?: string;
+  tableName?: string;
+};
+
+export const dmlPreviewRpc = (sql: string) =>
+  call<DmlPreviewResult>("dml_preview", { sql });

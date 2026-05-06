@@ -107,7 +107,9 @@ export function isUnsafeBulkDml(sql: string): boolean {
     .trim();
   const isUpdate = s.startsWith("UPDATE ");
   const isDelete = s.startsWith("DELETE ");
-  if (!isUpdate && !isDelete) return false;
+  const isTruncate = s.startsWith("TRUNCATE ");
+  if (!isUpdate && !isDelete && !isTruncate) return false;
+  if (isTruncate) return true;
 
   const whereIdx = findToplevelWhere(s);
   if (whereIdx === -1) {

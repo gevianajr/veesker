@@ -1899,6 +1899,78 @@ export function convertInputValue(v: string, dataType: string): unknown {
   return v;
 }
 
+export async function dmlPreview(sql: string): Promise<{
+  estimatedRows: number | null;
+  timedOut: boolean;
+  warning?: string;
+  tableName?: string;
+}> {
+  const normalized = sql.trim().replace(/\s+/g, " ");
+  const upper = normalized.toUpperCase();
+
+  let tableName: string | null = null;
+  let countQuery: string | null = null;
+
+  if (upper.startsWith("MERGE")) {
+    return { estimatedRows: null, timedOut: false, warning: "merge-not-analyzable" };
+  }
+  if (upper.startsWith("TRUNCATE")) {
+    const m = normalized.match(/^TRUNCATE\s+(?:TABLE\s+)?([A-Za-z0-9_$#"]+)/i);
+    if (m) {
+      tableName = m[1];
+      countQuery = `SELECT COUNT(*) AS n FROM ${quoteIdent(m[1])}`;
+    }
+  } else if (upper.startsWith("DELETE")) {
+    const m = normalized.match(/^DELETE\s+(?:FROM\s+)?([A-Za-z0-9_$#"]+)(.*)/is);
+    if (m) {
+      tableName = m[1];
+      const rest = (m[2] ?? "").trim();
+      const whereMatch = rest.match(/\bWHERE\b.+/is);
+      countQuery = whereMatch
+        ? `SELECT COUNT(*) AS n FROM ${quoteIdent(m[1])} ${whereMatch[0]}`
+        : `SELECT COUNT(*) AS n FROM ${quoteIdent(m[1])}`;
+    }
+  } else if (upper.startsWith("UPDATE")) {
+    const m = normalized.match(/^UPDATE\s+([A-Za-z0-9_$#"]+)\s+SET\b(.+)/is);
+    if (m) {
+      tableName = m[1];
+      const afterSet = m[2] ?? "";
+      const whereMatch = afterSet.match(/\bWHERE\b.+/is);
+      countQuery = whereMatch
+        ? `SELECT COUNT(*) AS n FROM ${quoteIdent(m[1])} ${whereMatch[0]}`
+        : `SELECT COUNT(*) AS n FROM ${quoteIdent(m[1])}`;
+    }
+  }
+
+  if (!countQuery) {
+    return { estimatedRows: null, timedOut: false, warning: "parse-failed", tableName: tableName ?? undefined };
+  }
+
+  try {
+    const result = await withActiveSession(async (conn) => {
+      const prevTimeout = conn.callTimeout;
+      conn.callTimeout = 5000;
+      try {
+        const r = await conn.execute(countQuery!, [], {
+          outFormat: oracledb.OUT_FORMAT_OBJECT,
+          maxRows: 1,
+        });
+        const row = (r.rows as Record<string, unknown>[] | undefined)?.[0];
+        return row ? Number(row["N"]) : null;
+      } finally {
+        conn.callTimeout = prevTimeout;
+      }
+    });
+    return { estimatedRows: result, timedOut: false, tableName: tableName ?? undefined };
+  } catch (e: unknown) {
+    const msg = String(e instanceof Error ? e.message : e);
+    if (/DPI-1067|callTimeout|timed out/i.test(msg)) {
+      return { estimatedRows: null, timedOut: true, tableName: tableName ?? undefined };
+    }
+    return { estimatedRows: null, timedOut: false, warning: "query-failed", tableName: tableName ?? undefined };
+  }
+}
+
 export async function procExecute(p: {
   owner: string;
   name: string;

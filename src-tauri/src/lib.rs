@@ -14,6 +14,7 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tokio::sync::Mutex;
 
+use crate::commands::ActiveSessionEnv;
 use crate::persistence::connections::ConnectionService;
 use crate::sidecar::SidecarState;
 use crate::tray::{ActiveConnection, TrayHandle, TrayState};
@@ -70,6 +71,7 @@ pub fn run() {
         .manage(SidecarState(Mutex::new(None)))
         .manage(TrayHandle(std::sync::Mutex::new(None)))
         .manage(ActiveConnection(tokio::sync::Mutex::new(None)))
+        .manage(ActiveSessionEnv(tokio::sync::Mutex::new(None)))
         .setup(|app| {
             let app_data = app.path().app_data_dir().expect("app data dir");
             let db_path = app_data.join("veesker.db");
@@ -282,6 +284,7 @@ pub fn run() {
             commands::ords_clients_list,
             commands::ords_clients_create,
             commands::ords_clients_revoke,
+            commands::dml_preview,
             commands::perf_stats,
             commands::object_version_capture,
             commands::object_version_list,

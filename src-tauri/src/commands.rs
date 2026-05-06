@@ -138,6 +138,8 @@ use crate::persistence::connections::{
 };
 use crate::persistence::history::{HistoryEntry, HistorySaveInput};
 
+pub struct ActiveSessionEnv(pub tokio::sync::Mutex<Option<String>>);
+
 /// Returns the canonicalized path if `path` (as supplied by the renderer) resolves to a
 /// location under one of the user-data scopes ($DOCUMENT, $DESKTOP, $DOWNLOAD, $HOME,
 /// app data dir, app config dir). Anything else is rejected to prevent a compromised
@@ -297,18 +299,20 @@ pub async fn workspace_open(
     app: AppHandle,
     connection_id: String,
 ) -> Result<WorkspaceInfo, ConnectionTestErr> {
-    let (params, conn_name) = {
+    let (params, conn_name, conn_env) = {
         let svc = app.state::<ConnectionService>();
         let params = svc.sidecar_params(&connection_id).map_err(map_err)?;
-        let name = svc
-            .get(&connection_id)
-            .ok()
-            .map(|f| match f.meta {
-                crate::persistence::connections::ConnectionMeta::Basic { name, .. } => name,
-                crate::persistence::connections::ConnectionMeta::Wallet { name, .. } => name,
+        let full = svc.get(&connection_id).ok();
+        let (name, env) = full
+            .map(|f| {
+                use crate::persistence::connections::ConnectionMeta;
+                match f.meta {
+                    ConnectionMeta::Basic { name, safety, .. } => (name, safety.env),
+                    ConnectionMeta::Wallet { name, safety, .. } => (name, safety.env),
+                }
             })
-            .unwrap_or_else(|| connection_id.clone());
-        (params, name)
+            .unwrap_or_else(|| (connection_id.clone(), None));
+        (params, name, env)
     };
 
     tray::update_tray(&app, TrayState::Connecting).await;
@@ -322,6 +326,7 @@ pub async fn workspace_open(
     };
 
     *app.state::<ActiveConnection>().0.lock().await = Some(conn_name);
+    *app.state::<ActiveSessionEnv>().0.lock().await = conn_env;
     tray::update_tray(&app, TrayState::Connected).await;
 
     let server_version = res
@@ -344,6 +349,7 @@ pub async fn workspace_open(
 pub async fn workspace_close(app: AppHandle) -> Result<(), ConnectionTestErr> {
     call_sidecar(&app, "workspace.close", json!({})).await?;
     *app.state::<ActiveConnection>().0.lock().await = None;
+    *app.state::<ActiveSessionEnv>().0.lock().await = None;
     tray::update_tray(&app, TrayState::Idle).await;
     Ok(())
 }
@@ -503,7 +509,9 @@ pub async fn query_execute(
             username: Some(username),
             host: Some(host),
         };
-        write_audit_entry(&data_dir, &synthetic_input);
+        let source = if request_id.starts_with("ai:") { "ai" } else { "user" };
+        let env_val = app.state::<ActiveSessionEnv>().0.lock().await.clone();
+        write_audit_entry(&data_dir, &synthetic_input, source, env_val.as_deref());
     }
 
     result
@@ -587,7 +595,12 @@ pub async fn history_list(
     svc.history_list(&connection_id, limit, offset, search.as_deref())
 }
 
-fn write_audit_entry(app_data_dir: &std::path::Path, input: &HistorySaveInput) {
+fn write_audit_entry(
+    app_data_dir: &std::path::Path,
+    input: &HistorySaveInput,
+    source: &str,
+    env: Option<&str>,
+) {
     let audit_dir = app_data_dir.join("audit");
     if std::fs::create_dir_all(&audit_dir).is_err() {
         return;
@@ -604,6 +617,10 @@ fn write_audit_entry(app_data_dir: &std::path::Path, input: &HistorySaveInput) {
         "success":      input.success,
         "rowCount":     input.row_count,
         "elapsedMs":    input.elapsed_ms,
+        "errorCode":    input.error_code,
+        "errorMessage": input.error_message,
+        "source":       source,
+        "env":          env.unwrap_or(""),
     });
     let mut line = entry.to_string();
     line.push('\n');
@@ -615,7 +632,7 @@ fn write_audit_entry(app_data_dir: &std::path::Path, input: &HistorySaveInput) {
 #[tauri::command]
 pub async fn history_save(app: AppHandle, input: HistorySaveInput) -> Result<i64, ConnectionError> {
     if let Ok(data_dir) = app.path().app_data_dir() {
-        write_audit_entry(&data_dir, &input);
+        write_audit_entry(&data_dir, &input, "user", None);
     }
     let svc = app.state::<ConnectionService>();
     svc.history_save(input)
@@ -1306,6 +1323,11 @@ pub async fn ords_clients_create(
 pub async fn ords_clients_revoke(app: AppHandle, name: String) -> Result<(), ConnectionTestErr> {
     call_sidecar(&app, "ords.clients.revoke", json!({ "name": name })).await?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn dml_preview(app: AppHandle, sql: String) -> Result<Value, ConnectionTestErr> {
+    call_sidecar(&app, "dml.preview", json!({ "sql": sql })).await
 }
 
 #[tauri::command]

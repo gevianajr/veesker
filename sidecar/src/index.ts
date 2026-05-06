@@ -37,6 +37,7 @@ import {
   explainPlan,
   procDescribe,
   procExecute,
+  dmlPreview,
 } from "./oracle";
 import { aiChat, aiSuggestEndpoint } from "./ai";
 import { chartConfigure, chartReset } from "./chart";
@@ -123,6 +124,7 @@ const handlers: HandlerMap = {
   "flow.trace_proc": (params) => traceProc(params as any),
   "flow.trace_sql":  (params) => explainPlanFlow(params as any),
   "perf.stats": (params) => tablesStats(params as any),
+  "dml.preview": async (p) => dmlPreview((p as any).sql ?? ""),
   "driver.mode": async () => ({ mode: getDriverMode() }),
   ping: async () => ({ pong: true }),
 };
