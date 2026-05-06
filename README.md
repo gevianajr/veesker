@@ -303,6 +303,18 @@ A no-code REST API builder using Oracle ORDS:
 
 ---
 
+## Security
+
+- **No auto-commit** — every transaction requires an explicit COMMIT or ROLLBACK.
+- **User-initiated execution** — Veesker never runs SQL in the background or automatically.
+- **OS keychain credentials** — passwords are stored in Windows Credential Manager / macOS Keychain / Linux libsecret, never in plain files.
+- **Local audit trail** — every executed statement is logged to `<app_data>/audit/YYYY-MM-DD.jsonl` by the native host process.
+- **AI never executes** — Sheep (AI assistant) only suggests SQL. Execution always requires your explicit approval.
+
+See [SECURITY.md](SECURITY.md) for the full security policy, vulnerability disclosure, and AI data disclosure details.
+
+---
+
 ## Install
 
 ### Windows
