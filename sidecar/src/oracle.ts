@@ -3,13 +3,119 @@
 // https://github.com/veesker-cloud/veesker-community-edition
 
 import oracledb from "oracledb";
+import os from "node:os";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { embedText, type EmbedParams } from "./embedding";
 import { log } from "./logger";
+import { SESSION_UUID } from "./state";
 
 // Guarantee DML never auto-commits regardless of driver version or future defaults.
 oracledb.autoCommit = false;
+
+// ── Application identification (DBMS_APPLICATION_INFO + DBMS_SESSION) ────────
+// Resolved once at startup. Surfaced to Oracle on every fresh connection so
+// V$SESSION rows show "Veesker IDE x.y.z" / user@host / vsk-<uuid> instead of
+// NULL — recognized-IDE posture for compliance / forensic auditors.
+const APP_NAME = "Veesker IDE";
+const ORACLE_MODULE_MAX = 48;
+const ORACLE_CLIENT_INFO_MAX = 64;
+const ORACLE_CLIENT_ID_MAX = 64;
+const ORACLE_ACTION_MAX = 32;
+const DEFAULT_ACTION = "SQL Editor";
+
+let _appVersion: string | null = null;
+function getAppVersion(): string {
+  if (_appVersion !== null) return _appVersion;
+  const candidates = [
+    join(import.meta.dir, "..", "..", "package.json"),
+    join(import.meta.dir, "..", "package.json"),
+  ];
+  for (const p of candidates) {
+    try {
+      const raw = readFileSync(p, "utf8");
+      const pkg = JSON.parse(raw) as { version?: string; name?: string };
+      if (pkg.name === "veesker" && typeof pkg.version === "string") {
+        _appVersion = pkg.version;
+        return _appVersion;
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  _appVersion = "unknown";
+  return _appVersion;
+}
+
+export function buildModuleString(version: string): string {
+  return `${APP_NAME} ${version}`.slice(0, ORACLE_MODULE_MAX);
+}
+
+export function buildClientInfoString(username: string, hostname: string): string {
+  return `${username}@${hostname}`.slice(0, ORACLE_CLIENT_INFO_MAX);
+}
+
+export function buildClientIdentifierString(uuid: string): string {
+  return `vsk-${uuid}`.slice(0, ORACLE_CLIENT_ID_MAX);
+}
+
+const SET_APP_INFO_SQL =
+  `BEGIN
+     DBMS_APPLICATION_INFO.SET_MODULE(:module, :action);
+     DBMS_APPLICATION_INFO.SET_CLIENT_INFO(:clientInfo);
+     DBMS_SESSION.SET_IDENTIFIER(:clientId);
+   END;`;
+
+/**
+ * Best-effort: brand the connection in V$SESSION so audits recognize the IDE.
+ * If the user lacks privilege on DBMS_SESSION.SET_IDENTIFIER (e.g. some 9i/10g
+ * roles) the PL/SQL block raises and we just log + continue — connection
+ * usability must not depend on this.
+ */
+async function applySessionIdentification(conn: oracledb.Connection): Promise<void> {
+  const username = (() => {
+    try { return os.userInfo().username; } catch { return "unknown"; }
+  })();
+  const hostname = (() => {
+    try { return os.hostname(); } catch { return "unknown"; }
+  })();
+  const binds = {
+    module: buildModuleString(getAppVersion()),
+    action: DEFAULT_ACTION,
+    clientInfo: buildClientInfoString(username, hostname),
+    clientId: buildClientIdentifierString(SESSION_UUID),
+  };
+  try {
+    await conn.execute(SET_APP_INFO_SQL, binds);
+  } catch (err) {
+    log.warn(
+      `[oracle.identification] DBMS_APPLICATION_INFO/SET_IDENTIFIER failed (continuing): ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+}
+
+/** Update only the ACTION on the active session — module + client_info stay. */
+export async function setSessionAction(action: string): Promise<void> {
+  const trimmed = String(action ?? DEFAULT_ACTION).slice(0, ORACLE_ACTION_MAX);
+  const conn = getActiveSession();
+  try {
+    await conn.execute(
+      `BEGIN DBMS_APPLICATION_INFO.SET_MODULE(:module, :action); END;`,
+      {
+        module: buildModuleString(getAppVersion()),
+        action: trimmed,
+      }
+    );
+  } catch (err) {
+    log.warn(
+      `[oracle.identification] SET_MODULE failed (continuing): ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+}
 
 /** Validate and quote an Oracle identifier for use in double-quoted SQL interpolation. */
 export function quoteIdent(name: string): string {
@@ -316,6 +422,7 @@ export async function connectionTest(
     throw decorateOracleError(err);
   }
   try {
+    await applySessionIdentification(conn);
     const result = await conn.execute<{ V: string }>(
       "SELECT BANNER_FULL AS V FROM V$VERSION WHERE ROWNUM = 1",
       [],
@@ -348,8 +455,35 @@ import {
   ORACLE_ERR,
   READ_ONLY_BLOCKED,
   UNSAFE_DML_WARNING,
+  AUTOCOMMIT_VIOLATION,
 } from "./errors";
 import { classifySql, isReadOnlySafe, isUnsafeBulkDml } from "./sql-kind";
+
+/**
+ * Belt-and-suspenders runtime assertion that mirrors the global
+ * `oracledb.autoCommit = false` pinned at module load. If a refactor or future
+ * driver upgrade ever flips it back, every code path that goes through
+ * withActiveSession (or directly through this helper) raises a coded RPC error
+ * instead of silently committing user DML.
+ */
+export function assertAutoCommitFalse(conn: oracledb.Connection): void {
+  // `autoCommit` is a writable property on oracledb.Connection — undefined ≠ false.
+  // We treat anything other than literal `false` as a violation.
+  const ac = (conn as unknown as { autoCommit?: unknown }).autoCommit;
+  if (ac === undefined || ac === false) return;
+  try {
+    (conn as unknown as { autoCommit: boolean }).autoCommit = false;
+  } catch {
+    /* property may be non-writable in some driver versions; assertion still fires */
+  }
+  log.warn(
+    "[veesker.safety] AUTOCOMMIT_ASSERT_FAILED: connection had autoCommit=true on checkout — forced back to false"
+  );
+  throw new RpcCodedError(
+    AUTOCOMMIT_VIOLATION,
+    "Internal safety violation: autoCommit was true on connection checkout. This should never happen."
+  );
+}
 
 export type OpenSessionParams = ConnectionTestParams;
 export type OpenSessionResult = { serverVersion: string; currentSchema: string };
@@ -406,6 +540,10 @@ export async function openSession(p: OpenSessionParams): Promise<OpenSessionResu
 
     const conn = await buildConnection(p);
     try {
+      // Brand the session in V$SESSION before any user query can run on it.
+      // Best-effort: failures here must not abort the open.
+      await applySessionIdentification(conn);
+
       const safety = safetyFromParams(p);
       // Apply per-statement timeout. Setting to 0 means no timeout (oracledb default).
       // We only set if > 0, so existing sessions are unaffected.
@@ -462,6 +600,7 @@ export async function withActiveSession<T>(
   fn: (conn: oracledb.Connection) => Promise<T>
 ): Promise<T> {
   const conn = getActiveSession();
+  assertAutoCommitFalse(conn);
   try {
     return await fn(conn);
   } catch (err) {

@@ -12,6 +12,7 @@ import {
   connectionTest,
   openSession,
   closeSession,
+  setSessionAction,
   schemaList,
   objectsList,
   tableDescribe,
@@ -64,6 +65,11 @@ const handlers: HandlerMap = {
   "connection.test": (params) => connectionTest(params as any),
   "workspace.open": (params) => openSession(params as any),
   "workspace.close": () => closeSession(),
+  "session.setAction": async (params: any) => {
+    const action = String(params?.action ?? "SQL Editor");
+    await setSessionAction(action);
+    return { ok: true };
+  },
   "schema.list": () => schemaList(),
   "objects.list": (params) => objectsList(params as any),
   "table.describe": (params) => tableDescribe(params as any),
