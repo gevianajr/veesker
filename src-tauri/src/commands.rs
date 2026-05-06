@@ -8,6 +8,7 @@ use std::fs::OpenOptions;
 use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri::Manager;
 
 use crate::sidecar::acquire;
@@ -449,6 +450,7 @@ pub async fn table_related(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn query_execute(
     app: AppHandle,
     sql: String,
@@ -456,6 +458,10 @@ pub async fn query_execute(
     split_multi: Option<bool>,
     fetch_all: Option<bool>,
     acknowledge_unsafe: Option<bool>,
+    // L2.2 Origin attribution: tags the source of this SQL so the
+    // Activity Ledger can color-code and filter by who/what initiated it.
+    origin: Option<String>,
+    origin_detail: Option<String>,
 ) -> Result<Value, ConnectionTestErr> {
     let started = std::time::Instant::now();
     let result = call_sidecar(
@@ -498,6 +504,15 @@ pub async fn query_execute(
             }
             Err(e) => (false, Some(e.message.clone())),
         };
+        // L2.2: if the renderer didn't pass an origin, infer ai_approved from
+        // the requestId convention ("ai:*"). Falls back to user_typed otherwise.
+        let final_origin = origin.unwrap_or_else(|| {
+            if request_id.starts_with("ai:") {
+                "ai_approved".to_string()
+            } else {
+                "user_typed".to_string()
+            }
+        });
         let synthetic_input = HistorySaveInput {
             connection_id: conn_id,
             sql: sql.clone(),
@@ -508,10 +523,17 @@ pub async fn query_execute(
             error_message,
             username: Some(username),
             host: Some(host),
+            origin: Some(final_origin),
+            origin_detail,
         };
         let source = if request_id.starts_with("ai:") { "ai" } else { "user" };
         let env_val = app.state::<ActiveSessionEnv>().0.lock().await.clone();
-        write_audit_entry(&data_dir, &synthetic_input, source, env_val.as_deref());
+        let entry = write_audit_entry(&data_dir, &synthetic_input, source, env_val.as_deref());
+        // L2.5 Activity Ledger: emit the just-written entry to the renderer for
+        // real-time updates. Best-effort — emit failure does not affect the query.
+        if let Some(ref e) = entry {
+            let _ = app.emit("audit:append", e);
+        }
     }
 
     result
@@ -595,15 +617,18 @@ pub async fn history_list(
     svc.history_list(&connection_id, limit, offset, search.as_deref())
 }
 
+// L2.5: returns the JSON entry that was just written so callers can emit it
+// to the renderer (Activity Ledger). Returns None if the audit dir or file
+// could not be created/opened — emit is then skipped.
 fn write_audit_entry(
     app_data_dir: &std::path::Path,
     input: &HistorySaveInput,
     source: &str,
     env: Option<&str>,
-) {
+) -> Option<Value> {
     let audit_dir = app_data_dir.join("audit");
     if std::fs::create_dir_all(&audit_dir).is_err() {
-        return;
+        return None;
     }
     let now = chrono::Utc::now();
     let date = now.format("%Y-%m-%d").to_string();
@@ -621,21 +646,71 @@ fn write_audit_entry(
         "errorMessage": input.error_message,
         "source":       source,
         "env":          env.unwrap_or(""),
+        // L2.2 Origin attribution. Defaults to "user_typed" when missing so
+        // legacy callers (history_save) still produce a valid origin for the
+        // Activity Ledger filter UI.
+        "origin":       input.origin.clone().unwrap_or_else(|| "user_typed".to_string()),
+        "originDetail": input.origin_detail,
     });
     let mut line = entry.to_string();
     line.push('\n');
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
-        let _ = file.write_all(line.as_bytes());
+        if file.write_all(line.as_bytes()).is_err() {
+            return None;
+        }
+    } else {
+        return None;
     }
+    Some(entry)
 }
 
 #[tauri::command]
 pub async fn history_save(app: AppHandle, input: HistorySaveInput) -> Result<i64, ConnectionError> {
     if let Ok(data_dir) = app.path().app_data_dir() {
-        write_audit_entry(&data_dir, &input, "user", None);
+        // L2.5 Activity Ledger: emit the entry so the renderer panel updates
+        // even when the SQL was logged through history_save (e.g. background
+        // jobs that don't go through query_execute).
+        let entry = write_audit_entry(&data_dir, &input, "user", None);
+        if let Some(ref e) = entry {
+            let _ = app.emit("audit:append", e);
+        }
     }
     let svc = app.state::<ConnectionService>();
     svc.history_save(input)
+}
+
+// L2.5 Activity Ledger: read the last `limit` audit entries from today's
+// JSONL log and return them in chronological-newest-first order. Used by the
+// frontend on mount to populate the panel before live `audit:append` events
+// take over. Lines that fail to parse as JSON are skipped silently.
+#[tauri::command]
+pub async fn audit_recent(app: AppHandle, limit: Option<i64>) -> Vec<Value> {
+    let limit = limit.unwrap_or(200).clamp(1, 1000) as usize;
+    let data_dir = match app.path().app_data_dir() {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+    let audit_dir = data_dir.join("audit");
+    let now = chrono::Utc::now();
+    let date = now.format("%Y-%m-%d").to_string();
+    let path = audit_dir.join(format!("{date}.jsonl"));
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(_) => return Vec::new(),
+    };
+    let text = match std::str::from_utf8(&bytes) {
+        Ok(t) => t,
+        Err(_) => return Vec::new(),
+    };
+    let mut entries: Vec<Value> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .collect();
+    // newest-first
+    entries.reverse();
+    entries.truncate(limit);
+    entries
 }
 
 #[tauri::command]

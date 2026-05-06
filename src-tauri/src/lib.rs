@@ -232,6 +232,7 @@ pub fn run() {
             commands::history_list,
             commands::history_save,
             commands::history_clear,
+            commands::audit_recent,
             commands::compile_errors_get,
             commands::object_ddl_get,
             commands::object_dataflow_get,
