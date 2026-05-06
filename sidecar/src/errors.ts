@@ -14,6 +14,11 @@ export const SPLITTER_ERROR    = -32014;
 export const READ_ONLY_BLOCKED  = -32030;
 export const UNSAFE_DML_WARNING = -32031;
 
+// Internal safety violation: a connection arrived at execute time with autoCommit=true.
+// This should never happen given oracledb.autoCommit is pinned to false at module load —
+// the assertion exists so a refactor or future driver default cannot silently re-enable it.
+export const AUTOCOMMIT_VIOLATION = -32077;
+
 // Domain code for user-initiated query cancellation.
 // Intentionally outside the JSON-RPC reserved range.
 export const QUERY_CANCELLED = -2;

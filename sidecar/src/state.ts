@@ -2,9 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 // https://github.com/veesker-cloud/veesker-community-edition
 
+import { randomUUID } from "node:crypto";
 import type oracledb from "oracledb";
 import type { ConnectionSafety, OpenSessionParams } from "./oracle";
 import { RpcCodedError, NO_ACTIVE_SESSION } from "./errors";
+
+// Process-lifetime stable identifier surfaced to Oracle via DBMS_SESSION.SET_IDENTIFIER.
+// Each sidecar process gets exactly one — used to correlate V$SESSION rows back to a
+// specific Veesker run for forensic / audit purposes.
+export const SESSION_UUID: string = randomUUID();
 
 let currentSession: oracledb.Connection | null = null;
 let currentSchema: string | null = null;
