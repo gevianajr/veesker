@@ -14,7 +14,7 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tokio::sync::Mutex;
 
-use crate::commands::ActiveSessionEnv;
+use crate::commands::{ActiveSessionEnv, PsdpmState};
 use crate::persistence::connections::ConnectionService;
 use crate::sidecar::SidecarState;
 use crate::tray::{ActiveConnection, TrayHandle, TrayState};
@@ -72,6 +72,9 @@ pub fn run() {
         .manage(TrayHandle(std::sync::Mutex::new(None)))
         .manage(ActiveConnection(tokio::sync::Mutex::new(None)))
         .manage(ActiveSessionEnv(tokio::sync::Mutex::new(None)))
+        // L2.1 PSDPM (PL/SQL Developer Parity Mode) — initially off; flipped
+        // to the active connection's psdpm_mode at workspace_open time.
+        .manage(PsdpmState(tokio::sync::Mutex::new(false)))
         .setup(|app| {
             let app_data = app.path().app_data_dir().expect("app data dir");
             let db_path = app_data.join("veesker.db");
@@ -222,6 +225,7 @@ pub fn run() {
             commands::wallet_inspect,
             commands::workspace_open,
             commands::workspace_close,
+            commands::psdpm_active,
             commands::schema_list,
             commands::objects_list,
             commands::table_describe,

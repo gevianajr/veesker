@@ -13,6 +13,9 @@ export const SPLITTER_ERROR    = -32014;
 // Connection refused the statement because of a per-connection safety guard.
 export const READ_ONLY_BLOCKED  = -32030;
 export const UNSAFE_DML_WARNING = -32031;
+// L2.1 PSDPM (PL/SQL Developer Parity Mode) — request was blocked because the
+// connection only accepts user-initiated SQL.
+export const PSDPM_BLOCKED      = -32032;
 
 // Domain code for user-initiated query cancellation.
 // Intentionally outside the JSON-RPC reserved range.

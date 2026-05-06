@@ -23,6 +23,8 @@
     onToggleTheme?: () => void;
     env?: "dev" | "staging" | "prod";
     readOnly?: boolean;
+    /** L2.1 PSDPM (PL/SQL Developer Parity Mode) — surfaces a 🔐 PSDPM badge. */
+    psdpm?: boolean;
     onSignIn?: () => void;
     onAuditLog?: () => void;
     onSignOut?: () => void;
@@ -32,7 +34,7 @@
     hasPendingTx = false, chatOpen = false, onToggleChat,
     onDisconnect, onSwitchConnection,
     theme = "light", onToggleTheme,
-    env, readOnly = false,
+    env, readOnly = false, psdpm = false,
     onSignIn, onAuditLog, onSignOut,
   }: Props = $props();
 
@@ -65,6 +67,12 @@
           <path d="M3 3.5V2.5a1.5 1.5 0 013 0v1" stroke="currentColor" stroke-width="1" fill="none"/>
         </svg>
         RO
+      </span>
+    {/if}
+    <!-- L2.1 PSDPM badge -->
+    {#if psdpm}
+      <span class="bar-psdpm" title="PSDPM active: only user-initiated SQL runs against this connection">
+        🔐 PSDPM
       </span>
     {/if}
     {#if hasPendingTx}
@@ -248,6 +256,18 @@
     background: rgba(106,110,119,0.22);
     border: 1px solid rgba(106,110,119,0.4);
     border-radius: 3px; padding: 1px 6px;
+    flex-shrink: 0;
+  }
+  /* L2.1 PSDPM badge — medium-emphasis lock indicator. Solid violet so it
+     reads against both env-tinted (PROD/STAGING) and neutral status bars. */
+  .bar-psdpm {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em;
+    color: #fff;
+    background: #6d4ae8;
+    border: 1px solid #5a39d6;
+    border-radius: 3px; padding: 1px 7px;
     flex-shrink: 0;
   }
 

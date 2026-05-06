@@ -72,9 +72,18 @@
   }));
   let warnUnsafeDml = $state<boolean>(untrack(() => initial.safety?.warnUnsafeDml ?? false));
   let autoPerfAnalysis = $state<boolean>(untrack(() => initial.safety?.autoPerfAnalysis ?? true));
+  // L2.1 PSDPM toggle — when the persisted row has no explicit value yet, the
+  // displayed default mirrors the backend env-derived rule (prod/staging on,
+  // else off) so the form preview matches what the backend would persist.
+  let psdpmMode = $state<boolean>(untrack(() => {
+    const explicit = initial.safety?.psdpmMode;
+    if (typeof explicit === "boolean") return explicit;
+    const e = initial.safety?.env;
+    return e === "prod" || e === "staging";
+  }));
   let showSafety = $state<boolean>(untrack(() => {
     const s = initial.safety;
-    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml || s.autoPerfAnalysis === false));
+    return !!(s && (s.env || s.readOnly || s.statementTimeoutMs || s.warnUnsafeDml || s.autoPerfAnalysis === false || s.psdpmMode));
   }));
   let walletPick = $state<WalletPick>(
     untrack(() =>
@@ -136,6 +145,10 @@
       statementTimeoutMs,
       warnUnsafeDml,
       autoPerfAnalysis,
+      // L2.1 PSDPM — always send the explicit value the user picked so the
+      // backend doesn't second-guess. Backend default-by-env still applies on
+      // legacy callers that omit this field entirely.
+      psdpmMode,
     };
   }
 
@@ -291,13 +304,14 @@
     onclick={() => (showSafety = !showSafety)}
   >
     {showSafety ? "▼" : "▶"} Safety guards
-    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml || !autoPerfAnalysis}
+    {#if env || readOnly || statementTimeoutSec || warnUnsafeDml || !autoPerfAnalysis || psdpmMode}
       <span class="safety-summary">
         {#if env}<span class="badge badge-{env}">{env}</span>{/if}
         {#if readOnly}<span class="badge badge-ro">read-only</span>{/if}
         {#if statementTimeoutSec}<span class="badge">{statementTimeoutSec}s timeout</span>{/if}
         {#if warnUnsafeDml}<span class="badge badge-warn">warn DML</span>{/if}
         {#if !autoPerfAnalysis}<span class="badge">no auto-perf</span>{/if}
+        {#if psdpmMode}<span class="badge badge-psdpm">PSDPM</span>{/if}
       </span>
     {:else}
       <span class="safety-hint">all off · click to configure</span>
@@ -357,6 +371,17 @@
           <strong>Auto-perf analysis</strong> — background EXPLAIN PLAN + table stats
           to surface red flags as you type. When off, the cost badge / red flags / stats
           freshness disappear, but the "Why slow?" button keeps working on demand.
+        </span>
+      </label>
+
+      <!-- L2.1 PSDPM toggle -->
+      <label class="safety-check psdpm-toggle">
+        <input type="checkbox" bind:checked={psdpmMode} />
+        <span>
+          <strong>🔐 PL/SQL Developer Parity Mode</strong> — block AI tools, embed batches,
+          schema pre-fetch, and any non-user-initiated SQL. Veesker behaves like PL/SQL Developer:
+          nothing runs unless you click. Recommended for client production engagements.
+          <span class="muted">Defaults on for prod / staging environments.</span>
         </span>
       </label>
     </div>
@@ -504,6 +529,11 @@
   .badge-dev { background: rgba(74, 158, 218, 0.18); color: #4a9eda; border-color: rgba(74, 158, 218, 0.4); }
   .badge-ro { background: rgba(106, 110, 119, 0.2); color: var(--text-secondary); }
   .badge-warn { background: rgba(217, 153, 42, 0.18); color: #d99c2a; border-color: rgba(217, 153, 42, 0.4); }
+  .badge-psdpm { background: rgba(122, 90, 248, 0.18); color: #a78bfa; border-color: rgba(122, 90, 248, 0.4); }
+  .psdpm-toggle .muted {
+    display: block; margin-top: 0.2rem;
+    color: var(--text-muted); font-size: 11.5px; font-weight: 400;
+  }
 
   .safety-panel {
     display: flex; flex-direction: column; gap: 0.85rem;

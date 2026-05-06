@@ -17,6 +17,13 @@ export type ConnectionSafety = {
   warnUnsafeDml: boolean;
   /** when true, frontend runs background EXPLAIN PLAN + stats analysis */
   autoPerfAnalysis: boolean;
+  /**
+   * L2.1 PSDPM (PL/SQL Developer Parity Mode). When true, AI tools, embed
+   * batches and any non-user-initiated SQL are blocked. Schema browser
+   * remains purely lazy. Defaults true for env=prod / env=staging at save.
+   * Optional on save — backend fills the env-derived default when omitted.
+   */
+  psdpmMode?: boolean;
 };
 
 export const DEFAULT_SAFETY: ConnectionSafety = {
@@ -25,6 +32,7 @@ export const DEFAULT_SAFETY: ConnectionSafety = {
   statementTimeoutMs: undefined,
   warnUnsafeDml: false,
   autoPerfAnalysis: true,
+  psdpmMode: false,
 };
 
 type SafetyFields = ConnectionSafety;
@@ -105,3 +113,9 @@ export const saveConnection = (input: ConnectionInput) =>
 export const deleteConnection = (id: string) => call<void>("connection_delete", { id });
 export const walletInspect = (zipPath: string) =>
   call<WalletInfo>("wallet_inspect", { zipPath });
+
+/**
+ * L2.1: read the active PSDPM flag from the Tauri-side per-session state.
+ * Returns false when no workspace is open or the connection has PSDPM off.
+ */
+export const psdpmActive = () => call<boolean>("psdpm_active");
