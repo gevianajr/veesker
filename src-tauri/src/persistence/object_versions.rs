@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use chrono::Utc;
 use rusqlite::{Connection as SqliteConnection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -42,15 +42,21 @@ impl std::fmt::Display for VersionError {
 }
 
 impl From<rusqlite::Error> for VersionError {
-    fn from(e: rusqlite::Error) -> Self { VersionError::Sqlite(e) }
+    fn from(e: rusqlite::Error) -> Self {
+        VersionError::Sqlite(e)
+    }
 }
 
 impl From<git2::Error> for VersionError {
-    fn from(e: git2::Error) -> Self { VersionError::Git(e) }
+    fn from(e: git2::Error) -> Self {
+        VersionError::Git(e)
+    }
 }
 
 impl From<keyring::Error> for VersionError {
-    fn from(e: keyring::Error) -> Self { VersionError::Keyring(e) }
+    fn from(e: keyring::Error) -> Self {
+        VersionError::Keyring(e)
+    }
 }
 
 pub fn init_db_object_versions(conn: &SqliteConnection) -> rusqlite::Result<()> {
@@ -131,16 +137,19 @@ pub fn list_versions(
          ORDER BY id DESC",
     )?;
     let rows = stmt
-        .query_map(params![connection_id, owner, object_type, object_name], |r| {
-            Ok(ObjectVersionEntry {
-                id: r.get(0)?,
-                commit_sha: r.get(1)?,
-                ddl_hash: r.get(2)?,
-                capture_reason: r.get(3)?,
-                label: r.get(4)?,
-                captured_at: r.get(5)?,
-            })
-        })?
+        .query_map(
+            params![connection_id, owner, object_type, object_name],
+            |r| {
+                Ok(ObjectVersionEntry {
+                    id: r.get(0)?,
+                    commit_sha: r.get(1)?,
+                    ddl_hash: r.get(2)?,
+                    capture_reason: r.get(3)?,
+                    label: r.get(4)?,
+                    captured_at: r.get(5)?,
+                })
+            },
+        )?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
@@ -172,7 +181,11 @@ pub fn get_commit_sha(
 pub fn sha256_hex(data: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data.as_bytes());
-    hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect()
 }
 
 pub fn repo_path(data_dir: &Path, conn_id: &str) -> PathBuf {
@@ -247,7 +260,16 @@ pub fn capture(
         }
     };
 
-    insert_version(conn, connection_id, owner, object_type, object_name, &commit_sha, &ddl_hash, reason)?;
+    insert_version(
+        conn,
+        connection_id,
+        owner,
+        object_type,
+        object_name,
+        &commit_sha,
+        &ddl_hash,
+        reason,
+    )?;
     Ok(true)
 }
 
@@ -265,7 +287,10 @@ fn git_commit(
     let tree_id = index.write_tree()?;
     let tree = repo.find_tree(tree_id)?;
     let sig = git2::Signature::now("Veesker", "local")?;
-    let msg = format!("[{reason}] {owner}.{}.{object_name}", object_type.replace(' ', "_"));
+    let msg = format!(
+        "[{reason}] {owner}.{}.{object_name}",
+        object_type.replace(' ', "_")
+    );
     let commit_id = if repo.is_empty()? {
         repo.commit(Some("HEAD"), &sig, &sig, &msg, &tree, &[])?
     } else {
@@ -331,7 +356,10 @@ pub fn load_at_commit(
 
 /// Tag name for a labeled version.
 fn tag_name(owner: &str, object_type: &str, object_name: &str, label: &str) -> String {
-    format!("veesker/{owner}.{}.{object_name}/{label}", object_type.replace(' ', "_"))
+    format!(
+        "veesker/{owner}.{}.{object_name}/{label}",
+        object_type.replace(' ', "_")
+    )
 }
 
 /// Set or clear the label on a version. Creates/removes a lightweight git tag.
@@ -385,7 +413,9 @@ pub fn set_remote(
     let repo = open_or_init_repo(&root)?;
     match repo.find_remote("origin") {
         Ok(_) => repo.remote_set_url("origin", remote_url)?,
-        Err(_) => { repo.remote("origin", remote_url)?; }
+        Err(_) => {
+            repo.remote("origin", remote_url)?;
+        }
     }
     crate::persistence::secrets::set_git_pat(connection_id, pat)?;
     Ok(())
@@ -423,8 +453,7 @@ pub fn push(data_dir: &Path, connection_id: &str) -> Result<u32, VersionError> {
         Err(_) => return Ok(0),
     };
 
-    let remote_count_before: u32 = count_remote_commits(&repo, "origin", &pat)
-        .unwrap_or(u32::MAX);
+    let remote_count_before: u32 = count_remote_commits(&repo, "origin", &pat).unwrap_or(u32::MAX);
 
     let mut remote = repo.find_remote("origin")?;
     let mut push_opts = git2::PushOptions::new();
@@ -459,7 +488,11 @@ fn count_remote_commits(
     });
     let mut fetch_opts = git2::FetchOptions::new();
     fetch_opts.remote_callbacks(callbacks);
-    let _ = remote.fetch(&["refs/heads/main:refs/remotes/origin/main"], Some(&mut fetch_opts), None);
+    let _ = remote.fetch(
+        &["refs/heads/main:refs/remotes/origin/main"],
+        Some(&mut fetch_opts),
+        None,
+    );
     match repo.find_reference("refs/remotes/origin/main") {
         Ok(r) => count_local_commits(repo, r.peel_to_commit()?.id()),
         Err(_) => Ok(0),
@@ -487,8 +520,28 @@ mod tests {
     #[test]
     fn insert_and_list_returns_newest_first() {
         let c = fresh();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-a", "hash-a", "baseline").unwrap();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-b", "hash-b", "compile").unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-a",
+            "hash-a",
+            "baseline",
+        )
+        .unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-b",
+            "hash-b",
+            "compile",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].commit_sha, "sha-b");
@@ -507,8 +560,28 @@ mod tests {
     #[test]
     fn last_ddl_hash_returns_most_recent() {
         let c = fresh();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-a", "hash-a", "baseline").unwrap();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-b", "hash-b", "compile").unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-a",
+            "hash-a",
+            "baseline",
+        )
+        .unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-b",
+            "hash-b",
+            "compile",
+        )
+        .unwrap();
         let h = last_ddl_hash(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(h.as_deref(), Some("hash-b"));
     }
@@ -516,7 +589,17 @@ mod tests {
     #[test]
     fn dedup_does_not_apply_across_different_objects() {
         let c = fresh();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "PROC_A", "sha-a", "same-hash", "baseline").unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "PROC_A",
+            "sha-a",
+            "same-hash",
+            "baseline",
+        )
+        .unwrap();
         let h = last_ddl_hash(&c, "conn1", "SCOTT", "PROCEDURE", "PROC_B").unwrap();
         assert!(h.is_none());
     }
@@ -524,7 +607,17 @@ mod tests {
     #[test]
     fn update_label_sets_and_clears() {
         let c = fresh();
-        let id = insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-a", "hash-a", "baseline").unwrap();
+        let id = insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-a",
+            "hash-a",
+            "baseline",
+        )
+        .unwrap();
         update_label(&c, id, Some("release-1.0")).unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(rows[0].label.as_deref(), Some("release-1.0"));
@@ -536,7 +629,17 @@ mod tests {
     #[test]
     fn list_is_empty_for_unknown_connection() {
         let c = fresh();
-        insert_version(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC", "sha-a", "hash-a", "baseline").unwrap();
+        insert_version(
+            &c,
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "sha-a",
+            "hash-a",
+            "baseline",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn-unknown", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert!(rows.is_empty());
     }
@@ -579,8 +682,17 @@ mod tests {
     fn capture_creates_commit_and_sqlite_row() {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
-        let captured = capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC",
-            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;", "baseline").unwrap();
+        let captured = capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;",
+            "baseline",
+        )
+        .unwrap();
         assert!(captured);
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(rows.len(), 1);
@@ -593,8 +705,32 @@ mod tests {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
         let ddl = "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;";
-        assert!(capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl, "baseline").unwrap());
-        assert!(!capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl, "compile").unwrap());
+        assert!(
+            capture(
+                &c,
+                dir.path(),
+                "conn1",
+                "SCOTT",
+                "PROCEDURE",
+                "MY_PROC",
+                ddl,
+                "baseline"
+            )
+            .unwrap()
+        );
+        assert!(
+            !capture(
+                &c,
+                dir.path(),
+                "conn1",
+                "SCOTT",
+                "PROCEDURE",
+                "MY_PROC",
+                ddl,
+                "compile"
+            )
+            .unwrap()
+        );
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(rows.len(), 1);
     }
@@ -604,8 +740,32 @@ mod tests {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
         let ddl = "CREATE OR REPLACE PROCEDURE P IS BEGIN NULL; END;";
-        assert!(capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "PROC_A", ddl, "baseline").unwrap());
-        assert!(capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "PROC_B", ddl, "baseline").unwrap());
+        assert!(
+            capture(
+                &c,
+                dir.path(),
+                "conn1",
+                "SCOTT",
+                "PROCEDURE",
+                "PROC_A",
+                ddl,
+                "baseline"
+            )
+            .unwrap()
+        );
+        assert!(
+            capture(
+                &c,
+                dir.path(),
+                "conn1",
+                "SCOTT",
+                "PROCEDURE",
+                "PROC_B",
+                ddl,
+                "baseline"
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -614,8 +774,17 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let repo_root = dir.path().join("object-history").join("conn1");
         assert!(!repo_root.exists());
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC",
-            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;", "baseline").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;",
+            "baseline",
+        )
+        .unwrap();
         assert!(repo_root.join(".git").exists());
     }
 
@@ -623,9 +792,20 @@ mod tests {
     fn package_body_uses_underscore_directory() {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PACKAGE BODY", "MY_PKG",
-            "CREATE OR REPLACE PACKAGE BODY MY_PKG IS END;", "baseline").unwrap();
-        let file = dir.path().join("object-history/conn1/SCOTT/PACKAGE_BODY/MY_PKG.sql");
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PACKAGE BODY",
+            "MY_PKG",
+            "CREATE OR REPLACE PACKAGE BODY MY_PKG IS END;",
+            "baseline",
+        )
+        .unwrap();
+        let file = dir
+            .path()
+            .join("object-history/conn1/SCOTT/PACKAGE_BODY/MY_PKG.sql");
         assert!(file.exists());
     }
 
@@ -635,12 +815,39 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let ddl1 = "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;";
         let ddl2 = "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN DBMS_OUTPUT.PUT_LINE('hi'); END;";
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl1, "baseline").unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl2, "compile").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            ddl1,
+            "baseline",
+        )
+        .unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            ddl2,
+            "compile",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         let sha_a = &rows[1].commit_sha;
         let sha_b = &rows[0].commit_sha;
-        let diff = diff_commits(dir.path(), "conn1", sha_a, sha_b, "SCOTT/PROCEDURE/MY_PROC.sql").unwrap();
+        let diff = diff_commits(
+            dir.path(),
+            "conn1",
+            sha_a,
+            sha_b,
+            "SCOTT/PROCEDURE/MY_PROC.sql",
+        )
+        .unwrap();
         assert!(diff.contains('-'), "expected removal line in diff: {diff}");
         assert!(diff.contains('+'), "expected addition line in diff: {diff}");
     }
@@ -651,11 +858,37 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let ddl1 = "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;";
         let ddl2 = "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN DBMS_OUTPUT.PUT_LINE('v2'); END;";
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl1, "baseline").unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC", ddl2, "compile").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            ddl1,
+            "baseline",
+        )
+        .unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            ddl2,
+            "compile",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         let sha_first = &rows[1].commit_sha;
-        let loaded = load_at_commit(dir.path(), "conn1", sha_first, "SCOTT/PROCEDURE/MY_PROC.sql").unwrap();
+        let loaded = load_at_commit(
+            dir.path(),
+            "conn1",
+            sha_first,
+            "SCOTT/PROCEDURE/MY_PROC.sql",
+        )
+        .unwrap();
         assert_eq!(loaded, ddl1);
     }
 
@@ -663,29 +896,83 @@ mod tests {
     fn label_updates_sqlite_and_creates_git_tag() {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC",
-            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;", "baseline").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;",
+            "baseline",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
-        set_label(&c, dir.path(), "conn1", rows[0].id, "SCOTT", "PROCEDURE", "MY_PROC", Some("release-1.0")).unwrap();
+        set_label(
+            &c,
+            dir.path(),
+            "conn1",
+            rows[0].id,
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            Some("release-1.0"),
+        )
+        .unwrap();
         let rows2 = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
         assert_eq!(rows2[0].label.as_deref(), Some("release-1.0"));
         let root = repo_path(dir.path(), "conn1");
         let repo = git2::Repository::open(&root).unwrap();
-        assert!(repo.find_reference("refs/tags/veesker/SCOTT.PROCEDURE.MY_PROC/release-1.0").is_ok());
+        assert!(
+            repo.find_reference("refs/tags/veesker/SCOTT.PROCEDURE.MY_PROC/release-1.0")
+                .is_ok()
+        );
     }
 
     #[test]
     fn label_clear_removes_git_tag() {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC",
-            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;", "baseline").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;",
+            "baseline",
+        )
+        .unwrap();
         let rows = list_versions(&c, "conn1", "SCOTT", "PROCEDURE", "MY_PROC").unwrap();
-        set_label(&c, dir.path(), "conn1", rows[0].id, "SCOTT", "PROCEDURE", "MY_PROC", Some("v1")).unwrap();
-        set_label(&c, dir.path(), "conn1", rows[0].id, "SCOTT", "PROCEDURE", "MY_PROC", None).unwrap();
+        set_label(
+            &c,
+            dir.path(),
+            "conn1",
+            rows[0].id,
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            Some("v1"),
+        )
+        .unwrap();
+        set_label(
+            &c,
+            dir.path(),
+            "conn1",
+            rows[0].id,
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            None,
+        )
+        .unwrap();
         let root = repo_path(dir.path(), "conn1");
         let repo = git2::Repository::open(&root).unwrap();
-        assert!(repo.find_reference("refs/tags/veesker/SCOTT.PROCEDURE.MY_PROC/v1").is_err());
+        assert!(
+            repo.find_reference("refs/tags/veesker/SCOTT.PROCEDURE.MY_PROC/v1")
+                .is_err()
+        );
     }
 
     #[test]
@@ -699,8 +986,17 @@ mod tests {
     fn push_returns_error_when_no_remote_configured() {
         let c = fresh();
         let dir = tempfile::TempDir::new().unwrap();
-        capture(&c, dir.path(), "conn1", "SCOTT", "PROCEDURE", "MY_PROC",
-            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;", "baseline").unwrap();
+        capture(
+            &c,
+            dir.path(),
+            "conn1",
+            "SCOTT",
+            "PROCEDURE",
+            "MY_PROC",
+            "CREATE OR REPLACE PROCEDURE MY_PROC IS BEGIN NULL; END;",
+            "baseline",
+        )
+        .unwrap();
         let err = push(dir.path(), "conn1").unwrap_err();
         assert!(matches!(err, VersionError::Other(_)));
     }

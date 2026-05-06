@@ -241,8 +241,13 @@ pub(crate) fn validate_host(host: &str) -> Result<(), ConnectionError> {
     if host.len() > 253 {
         return Err(ConnectionError::invalid("host too long (max 253 chars)"));
     }
-    let invalid_chars = ['(', ')', '?', '=', '/', '\\', ' ', '\t', '\n', '"', '\'', '@', '&', '%'];
-    if host.chars().any(|c| invalid_chars.contains(&c) || c.is_control()) {
+    let invalid_chars = [
+        '(', ')', '?', '=', '/', '\\', ' ', '\t', '\n', '"', '\'', '@', '&', '%',
+    ];
+    if host
+        .chars()
+        .any(|c| invalid_chars.contains(&c) || c.is_control())
+    {
         return Err(ConnectionError::invalid(
             "host contains invalid characters (allowed: letters, digits, hyphens, dots, colons, brackets for IPv6)",
         ));
@@ -255,7 +260,9 @@ pub(crate) fn validate_service_name(svc: &str) -> Result<(), ConnectionError> {
         return Err(ConnectionError::invalid("service name is required"));
     }
     if svc.len() > 128 {
-        return Err(ConnectionError::invalid("service name too long (max 128 chars)"));
+        return Err(ConnectionError::invalid(
+            "service name too long (max 128 chars)",
+        ));
     }
     if !svc
         .chars()
@@ -273,7 +280,9 @@ pub(crate) fn validate_connect_alias(alias: &str) -> Result<(), ConnectionError>
         return Err(ConnectionError::invalid("connect alias is required"));
     }
     if alias.len() > 128 {
-        return Err(ConnectionError::invalid("connect alias too long (max 128 chars)"));
+        return Err(ConnectionError::invalid(
+            "connect alias too long (max 128 chars)",
+        ));
     }
     if !alias
         .chars()
@@ -367,8 +376,13 @@ impl ConnectionService {
         }
         std::fs::create_dir_all(&wallets_root)
             .map_err(|e| ConnectionError::internal(format!("mkdir {wallets_root:?}: {e}")))?;
-        let conn = SqliteConnection::open(db_path)
-            .map_err(|e| ConnectionError::internal(format!("open {db_path:?}: {e}")))?;
+        // L1.4 (Sprint C, Onda 1.B) — encryption-at-rest for veesker.db.
+        // The first time the user runs a build that has SQLCipher linked,
+        // any pre-existing plaintext DB at this path is migrated in place
+        // to an encrypted copy keyed off the OS keychain. Once migrated,
+        // every subsequent open requires the keychain key — laptop theft
+        // alone no longer leaks the connection metadata.
+        let conn = open_encrypted_or_migrate(db_path)?;
         store::init_db(&conn)?;
         history::init_db_history(&conn).map_err(|e| match e {
             history::HistoryError::Sqlite(s) => ConnectionError::from(StoreError::from(s)),
@@ -872,8 +886,17 @@ impl ConnectionService {
             Ok(c) => c,
             Err(_) => return false,
         };
-        object_versions::capture(&conn, &self.data_dir, connection_id, owner, object_type, object_name, ddl, reason)
-            .unwrap_or(false)
+        object_versions::capture(
+            &conn,
+            &self.data_dir,
+            connection_id,
+            owner,
+            object_type,
+            object_name,
+            ddl,
+            reason,
+        )
+        .unwrap_or(false)
     }
 
     pub fn object_version_list(
@@ -919,8 +942,17 @@ impl ConnectionService {
         label: Option<&str>,
     ) -> Result<(), ConnectionError> {
         let conn = self.lock()?;
-        object_versions::set_label(&conn, &self.data_dir, connection_id, version_id, owner, object_type, object_name, label)
-            .map_err(|e| ConnectionError::internal(format!("object_version_set_label: {e}")))
+        object_versions::set_label(
+            &conn,
+            &self.data_dir,
+            connection_id,
+            version_id,
+            owner,
+            object_type,
+            object_name,
+            label,
+        )
+        .map_err(|e| ConnectionError::internal(format!("object_version_set_label: {e}")))
     }
 
     pub fn object_version_set_remote(
@@ -945,6 +977,111 @@ impl ConnectionService {
         object_versions::push(&self.data_dir, connection_id)
             .map_err(|e| ConnectionError::internal(format!("object_version_push: {e}")))
     }
+}
+
+// L1.4 (Sprint C, Onda 1.B) — encryption-at-rest helpers.
+//
+// Migration policy: a fresh install gets an SQLCipher-encrypted DB from
+// the start. An upgrade from an older Veesker (plaintext SQLite) detects
+// the plaintext file on first start, copies the contents into a new
+// encrypted DB via `sqlcipher_export`, renames the old file aside as
+// `<stem>.legacy.<ts>.db`, and swaps the new encrypted file into place.
+// The legacy backup is left for the user to delete after they verify the
+// app still works — we do not auto-delete it.
+fn open_encrypted_or_migrate(db_path: &Path) -> Result<SqliteConnection, ConnectionError> {
+    let key = crate::crypto::get_or_create_db_key();
+    let pragma_arg = crate::crypto::db_key_as_sqlcipher_pragma_arg(&key);
+
+    if !db_path.exists() {
+        return open_with_pragma_key(db_path, &pragma_arg);
+    }
+
+    if is_plaintext_sqlite(db_path)? {
+        eprintln!(
+            "veesker: detected plaintext veesker.db at {} — migrating to SQLCipher",
+            db_path.display()
+        );
+        migrate_plaintext_to_encrypted(db_path, &pragma_arg)?;
+    }
+
+    open_with_pragma_key(db_path, &pragma_arg)
+}
+
+fn open_with_pragma_key(
+    db_path: &Path,
+    pragma_arg: &str,
+) -> Result<SqliteConnection, ConnectionError> {
+    let conn = SqliteConnection::open(db_path)
+        .map_err(|e| ConnectionError::internal(format!("open {db_path:?}: {e}")))?;
+    conn.execute_batch(&format!("PRAGMA key = {pragma_arg};"))
+        .map_err(|e| ConnectionError::internal(format!("set sqlcipher key: {e}")))?;
+    // Verify the key by forcing SQLCipher to decrypt the header. Wrong key
+    // surfaces here as "file is encrypted or is not a database".
+    conn.query_row::<i64, _, _>("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))
+        .map_err(|e| {
+            ConnectionError::internal(format!(
+                "verify sqlcipher key (wrong key or corrupted db): {e}"
+            ))
+        })?;
+    Ok(conn)
+}
+
+fn is_plaintext_sqlite(db_path: &Path) -> Result<bool, ConnectionError> {
+    // Open without a PRAGMA key. A plaintext SQLite header reads cleanly;
+    // an SQLCipher-encrypted file errors on the first SQL operation.
+    let conn = SqliteConnection::open(db_path)
+        .map_err(|e| ConnectionError::internal(format!("probe open {db_path:?}: {e}")))?;
+    Ok(conn
+        .query_row::<i64, _, _>("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))
+        .is_ok())
+}
+
+fn migrate_plaintext_to_encrypted(db_path: &Path, pragma_arg: &str) -> Result<(), ConnectionError> {
+    let parent = db_path.parent().unwrap_or(Path::new("."));
+    let stem = db_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "veesker".to_string());
+    let ts = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
+    let migrated_path = parent.join(format!("{stem}.migrated.{ts}.db"));
+    let legacy_backup = parent.join(format!("{stem}.legacy.{ts}.db"));
+
+    let plain = SqliteConnection::open(db_path)
+        .map_err(|e| ConnectionError::internal(format!("plaintext open: {e}")))?;
+
+    let migrated_path_str = migrated_path.to_string_lossy().replace('\'', "''");
+    let attach_sql = format!(
+        "ATTACH DATABASE '{migrated_path_str}' AS encrypted KEY {pragma_arg};\n\
+         SELECT sqlcipher_export('encrypted');\n\
+         DETACH DATABASE encrypted;"
+    );
+    if let Err(e) = plain.execute_batch(&attach_sql) {
+        let _ = std::fs::remove_file(&migrated_path);
+        return Err(ConnectionError::internal(format!(
+            "sqlcipher_export migration: {e}"
+        )));
+    }
+    drop(plain);
+
+    if let Err(e) = std::fs::rename(db_path, &legacy_backup) {
+        let _ = std::fs::remove_file(&migrated_path);
+        return Err(ConnectionError::internal(format!(
+            "rename plaintext to legacy backup: {e}"
+        )));
+    }
+    if let Err(e) = std::fs::rename(&migrated_path, db_path) {
+        // Best-effort restore so the user is not left with no DB at all.
+        let _ = std::fs::rename(&legacy_backup, db_path);
+        return Err(ConnectionError::internal(format!(
+            "rename encrypted into place: {e}"
+        )));
+    }
+
+    eprintln!(
+        "veesker: encrypted veesker.db. Plaintext backup retained at {} — delete after verifying the app starts correctly.",
+        legacy_backup.display()
+    );
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1033,5 +1170,132 @@ mod validation_tests {
     #[test]
     fn accepts_valid_connect_alias() {
         assert!(validate_connect_alias("mydb_high").is_ok());
+    }
+}
+
+#[cfg(test)]
+mod encryption_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn fixed_key_pragma() -> (Vec<u8>, String) {
+        let key: Vec<u8> = (0u8..32u8).collect();
+        let pragma = crate::crypto::db_key_as_sqlcipher_pragma_arg(&key);
+        (key, pragma)
+    }
+
+    fn write_plaintext_db_with_one_row(path: &Path) {
+        let conn = SqliteConnection::open(path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE t (id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
+             INSERT INTO t (id, payload) VALUES (1, 'survived migration');",
+        )
+        .unwrap();
+        drop(conn);
+    }
+
+    #[test]
+    fn is_plaintext_sqlite_detects_unencrypted() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("plain.db");
+        write_plaintext_db_with_one_row(&db);
+        assert!(is_plaintext_sqlite(&db).unwrap());
+    }
+
+    #[test]
+    fn open_with_pragma_key_round_trips_on_fresh_encrypted_db() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("fresh.db");
+        let (_, pragma) = fixed_key_pragma();
+        let conn = open_with_pragma_key(&db, &pragma).unwrap();
+        conn.execute_batch("CREATE TABLE t (k TEXT); INSERT INTO t VALUES ('hi');")
+            .unwrap();
+        drop(conn);
+
+        let conn2 = open_with_pragma_key(&db, &pragma).unwrap();
+        let v: String = conn2
+            .query_row("SELECT k FROM t", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, "hi");
+    }
+
+    #[test]
+    fn open_with_wrong_key_fails() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("encrypted.db");
+        let (_, good) = fixed_key_pragma();
+        {
+            let conn = open_with_pragma_key(&db, &good).unwrap();
+            conn.execute_batch("CREATE TABLE t (k TEXT); INSERT INTO t VALUES ('hi');")
+                .unwrap();
+        }
+        let bad_key: Vec<u8> = (32u8..64u8).collect();
+        let bad_pragma = crate::crypto::db_key_as_sqlcipher_pragma_arg(&bad_key);
+        assert!(open_with_pragma_key(&db, &bad_pragma).is_err());
+    }
+
+    #[test]
+    fn migrate_plaintext_to_encrypted_preserves_data_and_creates_legacy_backup() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("veesker.db");
+        write_plaintext_db_with_one_row(&db);
+        let (_, pragma) = fixed_key_pragma();
+
+        migrate_plaintext_to_encrypted(&db, &pragma).unwrap();
+
+        // Reopened with the right key, the row is still there.
+        let conn = open_with_pragma_key(&db, &pragma).unwrap();
+        let payload: String = conn
+            .query_row("SELECT payload FROM t WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(payload, "survived migration");
+
+        // A `<stem>.legacy.<ts>.db` backup exists so the user can recover.
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            entries
+                .iter()
+                .any(|n| n.starts_with("veesker.legacy.") && n.ends_with(".db")),
+            "expected a *.legacy.*.db backup to be present, got: {entries:?}"
+        );
+    }
+
+    #[test]
+    fn open_encrypted_or_migrate_handles_fresh_install() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("veesker.db");
+        let conn = open_encrypted_or_migrate(&db).unwrap();
+        conn.execute_batch("CREATE TABLE t (k TEXT); INSERT INTO t VALUES ('first run');")
+            .unwrap();
+        drop(conn);
+
+        let conn2 = open_encrypted_or_migrate(&db).unwrap();
+        let v: String = conn2
+            .query_row("SELECT k FROM t", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, "first run");
+    }
+
+    #[test]
+    fn open_encrypted_or_migrate_migrates_legacy_plaintext_db() {
+        let dir = TempDir::new().unwrap();
+        let db = dir.path().join("veesker.db");
+        write_plaintext_db_with_one_row(&db);
+        // Sanity: file is plaintext to start.
+        assert!(is_plaintext_sqlite(&db).unwrap());
+
+        let conn = open_encrypted_or_migrate(&db).unwrap();
+        let payload: String = conn
+            .query_row("SELECT payload FROM t WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(payload, "survived migration");
+        drop(conn);
+
+        // After migration, the file is no longer plaintext.
+        assert!(!is_plaintext_sqlite(&db).unwrap());
     }
 }
