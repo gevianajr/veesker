@@ -12,8 +12,15 @@
     ops: DestructiveOp[];
     onConfirm: () => void;
     onCancel: () => void;
+    env?: "dev" | "staging" | "prod";
+    onPreview?: () => Promise<{
+      estimatedRows: number | null;
+      timedOut: boolean;
+      warning?: string;
+      tableName?: string;
+    }>;
   };
-  let { sql, ops, onConfirm, onCancel }: Props = $props();
+  let { sql, ops, onConfirm, onCancel, env, onPreview }: Props = $props();
 
   const worstSeverity = $derived(
     ops.some((o) => o.severity === "critical")
@@ -28,6 +35,27 @@
     destructive: "DESTRUCTIVE",
     warning: "WARNING",
   };
+
+  let previewState: "idle" | "loading" | "done" | "error" = $state("idle");
+  let estimatedRows: number | null = $state(null);
+  let previewTimedOut = $state(false);
+  let previewWarning: string | undefined = $state(undefined);
+  let previewReady = $state(false);
+
+  $effect(() => {
+    if (!onPreview) { previewReady = true; return; }
+    previewState = "loading";
+    onPreview().then((result) => {
+      estimatedRows = result.estimatedRows;
+      previewTimedOut = result.timedOut;
+      previewWarning = result.warning;
+      previewState = "done";
+      previewReady = true;
+    }).catch(() => {
+      previewState = "error";
+      previewReady = true;
+    });
+  });
 </script>
 
 <dialog
@@ -61,11 +89,39 @@
       </div>
       <div class="sql-preview-label">SQL to be executed:</div>
       <pre class="sql-preview">{sql}</pre>
+      {#if onPreview}
+        <div class="dry-run-row">
+          {#if previewState === "loading"}
+            <span class="dry-run-spinner"></span>
+            <span class="dry-run-label">Checking affected rows...</span>
+          {:else if previewTimedOut}
+            <span class="dry-run-label">Could not estimate rows (timed out)</span>
+          {:else if previewWarning === "merge-not-analyzable"}
+            <span class="dry-run-label">MERGE — row estimate not available</span>
+          {:else if estimatedRows !== null}
+            <span class="dry-run-label">Estimated rows affected:</span>
+            <span
+              class="dry-run-count"
+              class:count-critical={estimatedRows > 10000}
+              class:count-warn={estimatedRows > 1000 && estimatedRows <= 10000}
+              class:count-ok={estimatedRows <= 1000}
+            >
+              {estimatedRows.toLocaleString()}
+            </span>
+          {/if}
+        </div>
+      {/if}
       <p class="commit-note">COMMIT and ROLLBACK are never applied automatically — only via explicit button or script command.</p>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick={onCancel}>Cancel</button>
-      <button class="btn-execute" onclick={onConfirm}>Execute Anyway</button>
+      <button
+        class="btn-execute"
+        onclick={onConfirm}
+        disabled={env === "prod" && !previewReady}
+      >
+        {env === "prod" && !previewReady ? "Checking..." : "Execute Anyway"}
+      </button>
     </div>
   </div>
 </dialog>
@@ -123,5 +179,22 @@
   }
   .btn-cancel { background: var(--bg-surface-alt); color: var(--text-primary); border: 1px solid var(--border); }
   .btn-execute { background: #b33e1f; color: #fff; font-weight: 600; }
-  .btn-execute:hover { background: #8c2f17; }
+  .btn-execute:hover:not(:disabled) { background: #8c2f17; }
+  .btn-execute:disabled { opacity: 0.6; cursor: default; }
+  .dry-run-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 4px;
+    background: var(--bg-surface-alt); border: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+  }
+  .dry-run-count { font-weight: 700; font-size: 13px; }
+  .count-critical { color: #b33e1f; }
+  .count-warn     { color: #d97706; }
+  .count-ok       { color: var(--text-muted); }
+  .dry-run-spinner {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--text-muted);
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

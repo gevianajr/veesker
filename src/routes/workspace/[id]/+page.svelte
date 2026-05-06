@@ -835,6 +835,8 @@
       onAnalyze={handleAnalyze}
       {completionSchema}
       {getColumns}
+      env={meta.env}
+      connectionName={meta.name}
     />
   </div>
   {#if showPalette}

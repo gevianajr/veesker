@@ -214,7 +214,7 @@
   /* Subtle env-tinted top stripe so PROD/STAGING is visible without being noisy */
   .bar.bar-prod::before, .bar.bar-staging::before {
     content: "";
-    position: absolute; left: 0; right: 0; top: 0; height: 2px;
+    position: absolute; left: 0; right: 0; top: 0; height: 3px;
     pointer-events: none;
   }
   .bar.bar-prod::before { background: #b33e1f; box-shadow: 0 0 8px rgba(179,62,31,0.5); }
@@ -228,7 +228,16 @@
     border-radius: 3px; padding: 1px 6px;
     flex-shrink: 0;
   }
-  .env-prod { color: #f5a08a; background: rgba(179,62,31,0.22); border: 1px solid rgba(179,62,31,0.5); }
+  .env-prod {
+    color: #fff;
+    background: #b33e1f;
+    border: 1px solid #8c2f17;
+    animation: prod-pulse 3s ease-in-out infinite;
+  }
+  @keyframes prod-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
   .env-staging { color: #e8c547; background: rgba(217,153,42,0.18); border: 1px solid rgba(217,153,42,0.4); }
   .env-dev { color: #4a9eda; background: rgba(74,158,218,0.18); border: 1px solid rgba(74,158,218,0.4); }
   .ro-badge {

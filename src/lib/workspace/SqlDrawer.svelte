@@ -7,6 +7,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { sqlEditor, COMPILE_REGEX, runExplain, setActiveResult } from "$lib/stores/sql-editor.svelte";
+  import { dmlPreviewRpc } from "$lib/workspace";
   import { formatSql } from "$lib/workspace/format-sql";
   import { createPerfAnalyzer } from "$lib/stores/perf-analyzer.svelte";
   import { flowTraceSql } from "$lib/workspace";
@@ -32,8 +33,10 @@
     onAnalyze?: () => void;
     completionSchema?: Record<string, string[]>;
     getColumns?: (table: string, owner: string | null) => Promise<string[]>;
+    env?: "dev" | "staging" | "prod";
+    connectionName?: string;
   };
-  let { onCancel, onExplainWithAI, onAnalyze, completionSchema, getColumns }: Props = $props();
+  let { onCancel, onExplainWithAI, onAnalyze, completionSchema, getColumns, env, connectionName }: Props = $props();
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   let drawerEl: HTMLDivElement | undefined = $state();
@@ -41,6 +44,20 @@
   let editorRef: SqlEditor | null = $state(null);
   let flowError = $state<string | null>(null);
   let flyoutOpen = $state(false);
+  let idleAlertVisible = $state(false);
+  let idleTxTimer: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => {
+    const isPending = sqlEditor.pendingTx;
+    const thresholdMs = env === "prod" ? 10 * 60 * 1000 : 60 * 60 * 1000;
+    if (isPending) {
+      idleTxTimer = setTimeout(() => { idleAlertVisible = true; }, thresholdMs);
+    } else {
+      if (idleTxTimer) { clearTimeout(idleTxTimer); idleTxTimer = null; }
+      idleAlertVisible = false;
+    }
+    return () => { if (idleTxTimer) clearTimeout(idleTxTimer); };
+  });
   let flyoutAnchorTop = $state(0);
   let flyoutAnchorRight = $state(0);
   let badgeAnchorEl = $state<HTMLDivElement | null>(null);
@@ -483,11 +500,22 @@
 
       <div class="main-area" class:main-row={terminalOpen && termDock === 'right'}>
         <div class="editor-grid-area">
+        {#if idleAlertVisible}
+          <div class="idle-tx-alert" class:idle-tx-alert-prod={env === "prod"}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3"/>
+              <line x1="7" y1="4" x2="7" y2="7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <circle cx="7" cy="9.5" r="0.7" fill="currentColor"/>
+            </svg>
+            Open transaction on {connectionName ?? "this connection"} — remember to COMMIT or ROLLBACK.
+            <button onclick={() => { idleAlertVisible = false; }} aria-label="Dismiss">×</button>
+          </div>
+        {/if}
         {#if sqlEditor.activeId === null}
           <div class="empty">Click + to open a new query.</div>
         {:else}
           {@const tab = sqlEditor.active}
-          <div bind:this={editorPaneEl} class="editor-pane" style="flex: 0 0 {sqlEditor.editorRatio * 100}%">
+          <div bind:this={editorPaneEl} class="editor-pane" class:editor-prod={env === "prod"} style="flex: 0 0 {sqlEditor.editorRatio * 100}%">
             {#if tab}
               {#if tab.packageSpec != null}
                 <div class="pkg-subtabs">
@@ -789,6 +817,12 @@
       ops={sqlEditor.pendingConfirm.ops}
       onConfirm={() => sqlEditor.confirmRun(true)}
       onCancel={() => sqlEditor.confirmRun(false)}
+      {env}
+      onPreview={async () => {
+        const r = await dmlPreviewRpc(sqlEditor.pendingConfirm!.sql);
+        if (r.ok) return r.data;
+        return { estimatedRows: null, timedOut: false };
+      }}
     />
   {/if}
   {#if sqlEditor.pendingUnsafeDml}
@@ -963,6 +997,21 @@
     overflow: hidden;
   }
 
+  .idle-tx-alert {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; font-size: 12px;
+    background: rgba(232,197,71,0.12); border-bottom: 1px solid rgba(232,197,71,0.3);
+    color: #b8962e;
+    flex-shrink: 0;
+  }
+  .idle-tx-alert-prod {
+    background: rgba(179,62,31,0.1); border-bottom-color: rgba(179,62,31,0.3);
+    color: #b33e1f;
+  }
+  .idle-tx-alert button {
+    margin-left: auto; background: none; border: none;
+    cursor: pointer; font-size: 16px; color: currentColor; padding: 0 4px;
+  }
   .empty {
     padding: 1.5rem;
     color: rgba(26, 22, 18, 0.5);
@@ -974,6 +1023,7 @@
     border-bottom: 1px solid rgba(26, 22, 18, 0.1);
     overflow: hidden;
   }
+  .editor-prod { border-top: 3px solid #b33e1f; }
 
   /* ── Floating dock ──────────────────────────────────────────────────────── */
   .dock {
