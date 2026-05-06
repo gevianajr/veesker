@@ -183,17 +183,34 @@ pub enum ConnectionInput {
     },
 }
 
-/// L1.2 (Sprint C): resolve the persisted `airgap_mode` value. When the input
-/// supplies an explicit `Some(bool)`, persistence honors it (so the user can
-/// flip the toggle off on a prod connection if they really want AI on it).
-/// When the input is `None` (e.g. legacy callers, or the form didn't render
-/// the toggle), default to `true` iff env is `prod`. This implements the
-/// brief's "default policy: ON for any connection auto-detected as PROD".
+/// L1.2 (Sprint C): resolve the persisted `airgap_mode` value.
+///
+/// Hard-lock policy when env=prod: airgap_mode is FORCED true regardless of
+/// explicit user override. The 4-layer enforcement is documented in
+/// `docs/superpowers/specs/2026-05-06-sprint-c-geraldo-trust-edition.md`.
+/// Layer 2 (this function) refuses to persist airgap_mode=false on a prod
+/// connection. To enable AI on a prod connection, the user must DELETE and
+/// recreate the connection with a non-prod env (F2 immutability rule).
+///
+/// When env != prod and explicit is provided, persistence honors it.
+/// When explicit is None, default to true iff env is prod.
 fn resolve_airgap_default(env: &Option<String>, explicit: Option<bool>) -> bool {
+    if matches!(env.as_deref(), Some("prod")) {
+        return true;
+    }
     if let Some(v) = explicit {
         return v;
     }
-    matches!(env.as_deref(), Some("prod"))
+    false
+}
+
+/// L2.1 (Sprint C) hard-lock: psdpm_mode is FORCED true on env=prod regardless
+/// of explicit override. Same rationale as `resolve_airgap_default`.
+pub(crate) fn resolve_psdpm_default(env: Option<&str>, explicit: Option<bool>) -> bool {
+    if matches!(env, Some("prod")) {
+        return true;
+    }
+    explicit.unwrap_or_else(|| default_psdpm_for_env(env))
 }
 
 fn validate_env(env: &Option<String>) -> Result<(), ConnectionError> {
@@ -623,11 +640,10 @@ impl ConnectionService {
         now: &str,
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
+        // Sprint C 4-layer hard-lock: env=prod forces airgap_mode AND psdpm_mode
+        // both ON regardless of explicit user override.
         let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
-        // L2.1: explicit psdpm_mode wins; otherwise default by env.
-        let psdpm_mode = safety
-            .psdpm_mode
-            .unwrap_or_else(|| default_psdpm_for_env(safety.env.as_deref()));
+        let psdpm_mode = resolve_psdpm_default(safety.env.as_deref(), safety.psdpm_mode);
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -656,6 +672,14 @@ impl ConnectionService {
                 if existing.auth_type != AuthType::Basic {
                     return Err(ConnectionError::invalid(
                         "cannot change auth type — delete and recreate the connection",
+                    ));
+                }
+                // F2 (Sprint C): env is immutable after save. To change env,
+                // delete and recreate the connection. Defense against trivial
+                // env-override that would bypass the prod hard-lock.
+                if existing.env != safety.env {
+                    return Err(ConnectionError::invalid(
+                        "env is immutable after save — delete and recreate the connection to change env",
                     ));
                 }
                 Ok(ConnectionRow {
@@ -690,11 +714,10 @@ impl ConnectionService {
         now: &str,
         safety: ConnectionSafetyInput,
     ) -> Result<ConnectionRow, ConnectionError> {
+        // Sprint C 4-layer hard-lock: env=prod forces airgap_mode AND psdpm_mode
+        // both ON regardless of explicit user override.
         let airgap_mode = resolve_airgap_default(&safety.env, safety.airgap_mode);
-        // L2.1: explicit psdpm_mode wins; otherwise default by env.
-        let psdpm_mode = safety
-            .psdpm_mode
-            .unwrap_or_else(|| default_psdpm_for_env(safety.env.as_deref()));
+        let psdpm_mode = resolve_psdpm_default(safety.env.as_deref(), safety.psdpm_mode);
         match id {
             None => Ok(ConnectionRow {
                 id: Uuid::new_v4().to_string(),
@@ -723,6 +746,12 @@ impl ConnectionService {
                 if existing.auth_type != AuthType::Wallet {
                     return Err(ConnectionError::invalid(
                         "cannot change auth type — delete and recreate the connection",
+                    ));
+                }
+                // F2 (Sprint C): env is immutable after save.
+                if existing.env != safety.env {
+                    return Err(ConnectionError::invalid(
+                        "env is immutable after save — delete and recreate the connection to change env",
                     ));
                 }
                 Ok(ConnectionRow {

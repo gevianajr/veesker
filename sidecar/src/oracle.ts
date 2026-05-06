@@ -980,7 +980,11 @@ async function executeSingleStatement(
  */
 export function enforcePsdpmForOrigin(origin: string | undefined): void {
   const safety = getSessionSafety();
-  if (safety?.psdpm !== true) return;
+  // 4-layer hard-lock Layer 4 (Sprint C): when env=prod, PSDPM is structurally
+  // forced ON regardless of the persisted psdpm_mode flag. Even if a tampered
+  // SQLite row or stale state leaked through, sidecar refuses non-user origins.
+  const envForcesPsdpm = safety?.env === "prod";
+  if (safety?.psdpm !== true && !envForcesPsdpm) return;
   const allowed = ["user_typed", "user_clicked"];
   const o = origin ?? "user_typed";
   if (!allowed.includes(o)) {

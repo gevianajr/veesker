@@ -339,13 +339,17 @@
       <div class="safety-row">
         <label class="safety-field">
           Environment
-          <select bind:value={env}>
+          <select bind:value={env} disabled={isEdit}>
             <option value="">— unspecified —</option>
             <option value="dev">dev</option>
             <option value="staging">staging</option>
             <option value="prod">prod (red badge)</option>
           </select>
-          <small>Tags the tab so you remember which env you're in.</small>
+          {#if isEdit}
+            <small><strong>Immutable after save.</strong> Delete and recreate to change env.</small>
+          {:else}
+            <small>Tags the tab so you remember which env you're in. <strong>Cannot be changed after save.</strong></small>
+          {/if}
         </label>
 
         <label class="safety-field">
@@ -384,28 +388,42 @@
         </span>
       </label>
 
+      <!-- 4-layer hard-lock Layer 1: when env=prod, BOTH toggles are forced ON
+           and disabled. To enable AI on prod, user must delete + recreate the
+           connection with a different env (F2 immutability rule). -->
       <!-- L1.2 air-gap toggle -->
       <label class="safety-check airgap-toggle">
         <input
           type="checkbox"
-          bind:checked={airgapMode}
-          onchange={() => { airgapTouched = true; }}
+          checked={env === "prod" ? true : airgapMode}
+          disabled={env === "prod"}
+          onchange={(e) => {
+            airgapMode = (e.currentTarget as HTMLInputElement).checked;
+            airgapTouched = true;
+          }}
         />
         <span>
           <strong>🔒 Air-gap mode</strong> — hard-disable AI, cloud sync, version remote,
           and any other outbound HTTPS while this connection is active. Recommended for
           client production engagements; defaults on for connections tagged <em>prod</em>.
+          {#if env === "prod"}<span class="muted hardlock-note">Hard-locked ON when env=prod. Override env first to disable.</span>{/if}
         </span>
       </label>
 
       <!-- L2.1 PSDPM toggle -->
       <label class="safety-check psdpm-toggle">
-        <input type="checkbox" bind:checked={psdpmMode} />
+        <input
+          type="checkbox"
+          checked={env === "prod" ? true : psdpmMode}
+          disabled={env === "prod"}
+          onchange={(e) => { psdpmMode = (e.currentTarget as HTMLInputElement).checked; }}
+        />
         <span>
           <strong>🔐 PL/SQL Developer Parity Mode</strong> — block AI tools, embed batches,
           schema pre-fetch, and any non-user-initiated SQL. Veesker behaves like PL/SQL Developer:
           nothing runs unless you click. Recommended for client production engagements.
           <span class="muted">Defaults on for prod / staging environments.</span>
+          {#if env === "prod"}<span class="muted hardlock-note">Hard-locked ON when env=prod. Override env first to disable.</span>{/if}
         </span>
       </label>
     </div>
@@ -556,10 +574,13 @@
   .badge-airgap { background: rgba(20, 24, 32, 0.85); color: #f6f1e8; border-color: rgba(20, 24, 32, 1); }
   .airgap-toggle strong { letter-spacing: 0.02em; }
   .badge-psdpm { background: rgba(122, 90, 248, 0.18); color: #a78bfa; border-color: rgba(122, 90, 248, 0.4); }
-  .psdpm-toggle .muted {
+  .psdpm-toggle .muted, .airgap-toggle .muted {
     display: block; margin-top: 0.2rem;
     color: var(--text-muted); font-size: 11.5px; font-weight: 400;
   }
+  /* 4-layer hard-lock visible note when env=prod forces a toggle. */
+  .hardlock-note { color: #b33e1f !important; font-weight: 500; }
+  .safety-check input[type="checkbox"]:disabled + span strong { opacity: 0.85; }
 
   .safety-panel {
     display: flex; flex-direction: column; gap: 0.85rem;

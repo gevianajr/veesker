@@ -374,14 +374,21 @@ pub async fn workspace_open(
         }
     };
 
+    // 4-layer hard-lock Layer 3 (Sprint C): when env=prod, force airgap_mode
+    // and psdpm_mode ON regardless of stored value. This catches the case
+    // where the SQLite row was hand-edited or migrated from before the
+    // hard-lock was wired.
+    let env_is_prod = conn_env.as_deref() == Some("prod");
+    let effective_airgap = env_is_prod || conn_airgap;
+    let effective_psdpm = env_is_prod || conn_psdpm;
     *app.state::<ActiveConnection>().0.lock().await = Some(conn_name);
     *app.state::<ActiveSessionEnv>().0.lock().await = conn_env;
     // L1.2 (Sprint C): activate air-gap immediately after the Oracle session
     // opens. Outbound HTTPS commands now short-circuit until workspace_close.
-    *app.state::<AirGapState>().0.lock().await = conn_airgap;
+    *app.state::<AirGapState>().0.lock().await = effective_airgap;
     // L2.1: mirror the connection's PSDPM flag to the per-session state so
     // status-bar / diagnostic queries can read it without re-loading the row.
-    *app.state::<PsdpmState>().0.lock().await = conn_psdpm;
+    *app.state::<PsdpmState>().0.lock().await = effective_psdpm;
     tray::update_tray(&app, TrayState::Connected).await;
 
     let server_version = res
