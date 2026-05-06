@@ -647,6 +647,7 @@
       onToggleTheme={() => theme.toggle()}
       env={meta.env}
       readOnly={meta.readOnly ?? false}
+      airgap={meta.airgapMode ?? false}
       onSignIn={() => { showLogin = true; }}
       onAuditLog={() => { showAuditLog = true; }}
       onSignOut={handleLogout}
