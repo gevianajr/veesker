@@ -66,9 +66,10 @@ export class CommandModeState {
 }
 
 export function computePromptLineNumber(partialBuffer: string): number {
+  if (partialBuffer === "") return 1;
   let count = 0;
   for (let i = 0; i < partialBuffer.length; i++) {
     if (partialBuffer.charCodeAt(i) === 10) count++;
   }
-  return 1 + count;
+  return 2 + count;
 }
