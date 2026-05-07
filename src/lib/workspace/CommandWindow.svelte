@@ -128,8 +128,14 @@
   }
 
   function flushTranscript(): void {
-    if (!cmdState) return;
+    if (!cmdState || !term) return;
     const total = cmdState.transcript.length;
+    if (total < lastTranscriptLen) {
+      term.clear();
+      suppressNextCr = true;
+      writeBanner();
+      lastTranscriptLen = 0;
+    }
     for (let i = lastTranscriptLen; i < total; i++) {
       writeTranscriptEntry(cmdState.transcript[i]);
     }
