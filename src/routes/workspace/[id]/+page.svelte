@@ -7,8 +7,9 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { onMount, getContext } from "svelte";
+  import { onMount, onDestroy, getContext } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import StatusBar from "$lib/workspace/StatusBar.svelte";
   import SchemaTree, { type SchemaNode } from "$lib/workspace/SchemaTree.svelte";
   import ObjectDetails from "$lib/workspace/ObjectDetails.svelte";
@@ -55,6 +56,10 @@
   import { ordsStore } from "$lib/stores/ords.svelte";
   import OrdsBootstrapModal from "$lib/workspace/OrdsBootstrapModal.svelte";
   import OAuthClientsPanel from "$lib/workspace/OAuthClientsPanel.svelte";
+  import AiApprovalModal from "$lib/workspace/AiApprovalModal.svelte";
+  import FetchProgressBar from "$lib/workspace/FetchProgressBar.svelte";
+  import { fetchProgress } from "$lib/stores/fetch-progress.svelte";
+  import { aiApproval } from "$lib/stores/ai-approval.svelte";
   import { objectVersionCapture } from "$lib/object-versions";
   import { logout } from "$lib/services/auth";
   import { FEATURES } from "$lib/services/features";
@@ -447,7 +452,15 @@
     }
     meta = metaRes.data.meta;
     const hostOrAlias = meta.authType === "basic" ? meta.host : meta.connectAlias;
-    sqlEditor.setConnectionContext(meta.id, meta.name, meta.username, hostOrAlias);
+    // L3.2 (Onda 3): forward autoExplainMode so runActive can decide whether
+    // to fire EXPLAIN PLAN in parallel with the user's statement.
+    sqlEditor.setConnectionContext(
+      meta.id,
+      meta.name,
+      meta.username,
+      hostOrAlias,
+      meta.autoExplainMode ?? "manual",
+    );
 
     const openRes = await workspaceOpen(id);
     if (!openRes.ok) {
@@ -653,15 +666,72 @@
     }
   }
 
+  let unlistenQueryProgress: UnlistenFn | null = null;
+  let unlistenAiApprovalReq: UnlistenFn | null = null;
+
   onMount(() => {
     void bootstrap();
     window.addEventListener("keydown", onKeydown);
+    // L3.1 (Onda 3): subscribe to streaming row-fetch progress emitted by the
+    // sidecar. Best-effort — if the listener fails to register the bar simply
+    // never animates; query execution itself is unaffected.
+    void (async () => {
+      try {
+        unlistenQueryProgress = await listen<{
+          requestId: string;
+          rowsFetched: number;
+          elapsedMs: number;
+          state: "running" | "complete" | "error" | "cancelled";
+        }>("query-progress", (e) => {
+          const p = e.payload;
+          if (p.state === "running") {
+            if (fetchProgress.activeRequestId !== p.requestId) {
+              fetchProgress.start(p.requestId);
+            }
+            fetchProgress.update({
+              requestId: p.requestId,
+              rowsFetched: p.rowsFetched,
+              elapsedMs: p.elapsedMs,
+            });
+          } else {
+            fetchProgress.stop();
+          }
+        });
+      } catch {
+        // best-effort: no progress bar without listener
+      }
+      // L3.4 (Onda 3): subscribe to AI tool-approval requests from the sidecar.
+      // Best-effort — if the listener fails the sidecar still enforces its
+      // 5-minute timeout default, which falls through to deny.
+      try {
+        unlistenAiApprovalReq = await listen<{
+          requestId: string;
+          tool: string;
+          input: Record<string, unknown>;
+        }>("ai-approval-request", (e) => {
+          aiApproval.enqueue({
+            requestId: e.payload.requestId,
+            tool: e.payload.tool,
+            input: e.payload.input,
+          });
+        });
+      } catch {
+        // best-effort: AI approvals fall back to sidecar 5-min timeout
+      }
+    })();
     return async () => {
       window.removeEventListener("keydown", onKeydown);
       sqlEditor.reset();
       if (debugStore.status !== 'idle') await debugStore.stop();
       await workspaceClose();
     };
+  });
+
+  onDestroy(() => {
+    if (unlistenQueryProgress) unlistenQueryProgress();
+    if (unlistenAiApprovalReq) unlistenAiApprovalReq();
+    fetchProgress.reset();
+    aiApproval.reset();
   });
 </script>
 
@@ -1003,6 +1073,8 @@
       <span class="ddl-msg">Loading DDL <code>{ddlLoading.owner}.{ddlLoading.name}</code>…</span>
     </div>
   {/if}
+  <FetchProgressBar />
+  <AiApprovalModal />
 {/if}
 
 <style>

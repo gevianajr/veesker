@@ -26,6 +26,9 @@
   import ObjectVersionFlyout from "./ObjectVersionFlyout.svelte";
   import PlsqlOutline from "./PlsqlOutline.svelte";
   import TerminalPanel from "./TerminalPanel.svelte";
+  import { resultPanel } from "$lib/stores/result-panel.svelte";
+  import PlanTab from "./PlanTab.svelte";
+  import OutputTab from "./OutputTab.svelte";
 
   type Props = {
     onCancel: () => void;
@@ -752,12 +755,43 @@
                   {onExplainWithAI}
                 />
               {:else}
-                <ResultGrid
-                  {tab}
-                  {onCancel}
-                  {onAnalyze}
-                  onFetchAll={() => void sqlEditor.fetchAllForActiveResult()}
-                />
+                <div class="result-tabs">
+                  <button
+                    class="result-tab"
+                    class:active={resultPanel.activeTab === 'results'}
+                    onclick={() => resultPanel.setTab('results')}
+                  >Results</button>
+                  <button
+                    class="result-tab"
+                    class:active={resultPanel.activeTab === 'plan'}
+                    onclick={() => resultPanel.setTab('plan')}
+                  >Plan</button>
+                  <button
+                    class="result-tab"
+                    class:active={resultPanel.activeTab === 'output'}
+                    onclick={() => resultPanel.setTab('output')}
+                  >Output{activeTabResult?.dbmsOutput && activeTabResult.dbmsOutput.length > 0 ? ` (${activeTabResult.dbmsOutput.length})` : ''}</button>
+                </div>
+                <div class="result-tab-body">
+                  {#if resultPanel.activeTab === 'results'}
+                    <ResultGrid
+                      {tab}
+                      {onCancel}
+                      {onAnalyze}
+                      onFetchAll={() => void sqlEditor.fetchAllForActiveResult()}
+                    />
+                  {:else if resultPanel.activeTab === 'plan'}
+                    <PlanTab
+                      state={
+                        activeTabResult?.explainNodes !== undefined && activeTabResult?.explainNodes !== null
+                          ? { kind: "ready", nodes: activeTabResult.explainNodes, onExplainWithAI }
+                          : { kind: "idle" }
+                      }
+                    />
+                  {:else}
+                    <OutputTab lines={activeTabResult?.dbmsOutput ?? []} />
+                  {/if}
+                </div>
               {/if}
             </div>
           </div>
@@ -1139,6 +1173,40 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+  .result-tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    background: var(--bg-page);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .result-tab {
+    background: none;
+    border: none;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid transparent;
+  }
+  .result-tab:hover {
+    color: var(--text-primary);
+  }
+  .result-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
+  }
+  .result-tab-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   .flow-error {
     padding: 4px 12px;

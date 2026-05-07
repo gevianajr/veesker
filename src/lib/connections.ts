@@ -29,18 +29,31 @@ export type ConnectionSafety = {
    * remains purely lazy. Defaults true for env=prod / env=staging at save.
    */
   psdpmMode?: boolean;
+  /**
+   * L3.2 (Onda 3) per-connection auto-EXPLAIN mode.
+   * "manual" — only when the user runs EXPLAIN PLAN explicitly (F9).
+   * "when_dml" — auto-EXPLAIN before every DML/SELECT (recommended for prod/staging).
+   * "always" — auto-EXPLAIN before every statement.
+   * Default at save time: dev / unspecified → "manual"; staging / prod → "when_dml".
+   */
+  autoExplainMode: "manual" | "always" | "when_dml";
 };
 
 /**
- * Save-time variant of {@link ConnectionSafety}. When `airgapMode` or
- * `psdpmMode` is left undefined the Rust persistence layer derives defaults
- * (`true` for prod airgap, `true` for prod/staging PSDPM, `false` otherwise).
- * The form sends a concrete `boolean` when the user has explicitly touched
- * the toggle or is editing an existing record.
+ * Save-time variant of {@link ConnectionSafety}. When `airgapMode`,
+ * `psdpmMode` or `autoExplainMode` is left undefined the Rust persistence
+ * layer derives the defaults from the connection env (`true` for prod
+ * airgap, `true` for prod/staging PSDPM, `when_dml` for prod/staging
+ * auto-EXPLAIN, `manual`/`false` otherwise). The form sends a concrete
+ * value when the user has explicitly touched the field.
  */
-export type ConnectionSafetyInput = Omit<ConnectionSafety, "airgapMode" | "psdpmMode"> & {
+export type ConnectionSafetyInput = Omit<
+  ConnectionSafety,
+  "airgapMode" | "psdpmMode" | "autoExplainMode"
+> & {
   airgapMode?: boolean;
   psdpmMode?: boolean;
+  autoExplainMode?: "manual" | "always" | "when_dml";
 };
 
 export const DEFAULT_SAFETY: ConnectionSafety = {
@@ -51,6 +64,7 @@ export const DEFAULT_SAFETY: ConnectionSafety = {
   autoPerfAnalysis: true,
   airgapMode: false,
   psdpmMode: false,
+  autoExplainMode: "manual",
 };
 
 type SafetyFields = ConnectionSafety;

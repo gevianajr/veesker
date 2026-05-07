@@ -372,6 +372,17 @@ export async function aiChat(
   }
 }
 
+export const aiApprovalResolve = (
+  requestId: string,
+  approved: boolean,
+  applyToTurn: boolean,
+) =>
+  call<unknown>("ai_approval_resolve", {
+    requestId,
+    approved,
+    applyToTurn,
+  });
+
 export async function aiKeySave(service: string, key: string): Promise<void> {
   await invoke("ai_key_save", { service, key });
 }
