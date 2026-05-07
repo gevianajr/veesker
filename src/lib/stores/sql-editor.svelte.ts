@@ -86,6 +86,28 @@ function extractCompilable(sql: string): { objectType: string; objectName: strin
   return { objectType, objectName };
 }
 
+/**
+ * Decide whether to fire a parallel EXPLAIN PLAN for this SQL given the
+ * connection's policy. NEVER explains COMMIT / ROLLBACK / SET / ALTER SESSION
+ * (sidecar would refuse anyway). NEVER explains PL/SQL anonymous blocks
+ * (EXPLAIN PLAN doesn't support them).
+ */
+export function shouldAutoExplain(sql: string, mode: "manual" | "always" | "when_dml"): boolean {
+  if (mode === "manual") return false;
+  const trimmed = sql.trim().replace(/^[\s\n]*--.*$/gm, "").trim();
+  // PL/SQL block — anything starting with BEGIN or DECLARE — skip.
+  if (/^(begin|declare)\b/i.test(trimmed)) return false;
+  // Match the leading keyword, ignoring leading WITH (CTE) clauses.
+  const leadingKwMatch = trimmed.match(/^([a-zA-Z_]+)/);
+  if (!leadingKwMatch) return false;
+  const kw = leadingKwMatch[1].toUpperCase();
+  if (mode === "always") {
+    return ["SELECT", "WITH", "INSERT", "UPDATE", "DELETE", "MERGE"].includes(kw);
+  }
+  // when_dml
+  return ["INSERT", "UPDATE", "DELETE", "MERGE"].includes(kw);
+}
+
 let _tabs = $state<SqlTab[]>([]);
 let _activeId = $state<string | null>(null);
 let _drawerOpen = $state(false);
@@ -94,6 +116,9 @@ let _connectionId: string | null = null;
 let _connectionName: string | null = null;
 let _connectionUsername: string | null = null;
 let _connectionHost: string | null = null;
+// L3.2 (Onda 3): per-connection auto-EXPLAIN policy. Drives runActive's
+// parallel EXPLAIN PLAN fetch after a successful SELECT/DML.
+let _autoExplainMode: "manual" | "always" | "when_dml" = "manual";
 type PendingConfirm = {
   sql: string;
   ops: DestructiveOp[];
@@ -286,11 +311,18 @@ export const sqlEditor = {
     return _activeId === null ? null : findTab(_activeId);
   },
   get connectionId() { return _connectionId; },
-  setConnectionContext(id: string | null, name: string | null, username: string | null, host: string | null): void {
+  setConnectionContext(
+    id: string | null,
+    name: string | null,
+    username: string | null,
+    host: string | null,
+    autoExplainMode: "manual" | "always" | "when_dml" = "manual",
+  ): void {
     _connectionId = id;
     _connectionName = name;
     _connectionUsername = username;
     _connectionHost = host;
+    _autoExplainMode = autoExplainMode;
   },
   get pendingConfirm(): PendingConfirm | null { return _pendingConfirm; },
   confirmRun(confirmed: boolean): void {
@@ -486,7 +518,7 @@ export const sqlEditor = {
         result: res.ok ? res.data : null,
         error: res.ok ? null : res.error,
         elapsedMs: res.ok ? res.data.elapsedMs : 0,
-        dbmsOutput: null,
+        dbmsOutput: res.ok ? (res.data.dbmsOutput ?? null) : null,
         compileErrors: null,
         explainNodes: null,
         fetchedAll: false,
@@ -494,6 +526,22 @@ export const sqlEditor = {
       tab.results = [tabResult];
       tab.activeResultId = resultId;
       pushHistory(sql, tabResult);
+      // L3.2 (Onda 3): fire parallel EXPLAIN if connection policy allows.
+      // EXPLAIN runs on a separate Oracle session, so it does not stall
+      // the user's reading of the result grid. On error, swallow silently
+      // — the Plan tab will show idle/error state.
+      if (tabResult.status === "ok" && shouldAutoExplain(sql, _autoExplainMode)) {
+        const tabIdRef = tab.id;
+        const resultIdRef = resultId;
+        explainPlanGet(sql).then((er) => {
+          const t = _tabs.find((x) => x.id === tabIdRef);
+          if (!t) return;
+          const r = t.results.find((x) => x.id === resultIdRef);
+          if (!r) return;
+          if (er.ok) r.explainNodes = er.data.nodes;
+          _tabs = [..._tabs];
+        });
+      }
       if (tabResult.status === "ok" && tabResult.result !== null && tabResult.result.columns.length === 0 && tabResult.result.rowCount > 0) {
         _pendingTx = true;
       }
@@ -593,6 +641,10 @@ export const sqlEditor = {
         return;
       }
 
+      // L3.2 (Onda 3): auto-EXPLAIN is intentionally NOT triggered for the
+      // multi-statement script path. Running EXPLAIN for every script statement
+      // can easily fire N concurrent EXPLAIN calls. Manual EXPLAIN via the
+      // existing runExplain() entrypoint remains available.
       const tabResults: TabResult[] = res.data.results.map((sr) => {
         const id = newId();
         const sqlPreview = makeSqlPreview(sr.sql);
@@ -1056,6 +1108,7 @@ export const sqlEditor = {
     _connectionName = null;
     _connectionUsername = null;
     _connectionHost = null;
+    _autoExplainMode = "manual";
     _pendingConfirm = null;
     _pendingTx = false;
     _editorExpanded = false;

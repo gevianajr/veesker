@@ -17,7 +17,7 @@ vi.mock("$lib/sql-splitter", async () => {
 });
 
 import { queryExecute, queryExecuteMulti, queryCancel } from "$lib/sql-query";
-import { sqlEditor, activeResult, type SqlTab } from "./sql-editor.svelte";
+import { sqlEditor, activeResult, shouldAutoExplain, type SqlTab } from "./sql-editor.svelte";
 
 const mockedQueryExecute = vi.mocked(queryExecute);
 const mockedQueryExecuteMulti = vi.mocked(queryExecuteMulti);
@@ -563,5 +563,51 @@ describe("sqlEditor.runActive — requestId lifecycle", () => {
 
     expect(sqlEditor.active?.runningRequestId).toBeNull();
     expect(capturedRequestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+});
+
+// ── shouldAutoExplain ─────────────────────────────────────────────────────────
+
+describe("shouldAutoExplain", () => {
+  it("manual mode always returns false", () => {
+    expect(shouldAutoExplain("SELECT * FROM t", "manual")).toBe(false);
+    expect(shouldAutoExplain("INSERT INTO t VALUES (1)", "manual")).toBe(false);
+    expect(shouldAutoExplain("BEGIN NULL; END;", "manual")).toBe(false);
+  });
+
+  it("always mode: SELECT returns true", () => {
+    expect(shouldAutoExplain("SELECT * FROM t", "always")).toBe(true);
+  });
+
+  it("always mode: INSERT returns true", () => {
+    expect(shouldAutoExplain("INSERT INTO t VALUES (1)", "always")).toBe(true);
+  });
+
+  it("always mode: BEGIN...END returns false (PL/SQL block)", () => {
+    expect(shouldAutoExplain("BEGIN\n  NULL;\nEND;", "always")).toBe(false);
+  });
+
+  it("always mode: DECLARE...BEGIN...END returns false (PL/SQL block)", () => {
+    expect(shouldAutoExplain("DECLARE v NUMBER; BEGIN NULL; END;", "always")).toBe(false);
+  });
+
+  it("always mode: WITH cte AS (...) SELECT returns true", () => {
+    expect(shouldAutoExplain("WITH cte AS (SELECT 1 FROM dual) SELECT * FROM cte", "always")).toBe(true);
+  });
+
+  it("when_dml mode: SELECT returns false", () => {
+    expect(shouldAutoExplain("SELECT * FROM t", "when_dml")).toBe(false);
+  });
+
+  it("when_dml mode: UPDATE returns true", () => {
+    expect(shouldAutoExplain("UPDATE t SET x=1", "when_dml")).toBe(true);
+  });
+
+  it("when_dml mode: BEGIN...END returns false (PL/SQL block)", () => {
+    expect(shouldAutoExplain("BEGIN NULL; END;", "when_dml")).toBe(false);
+  });
+
+  it("when_dml mode: comment-prefixed INSERT returns true (comments stripped)", () => {
+    expect(shouldAutoExplain("  -- set row\nINSERT INTO t VALUES (1)", "when_dml")).toBe(true);
   });
 });

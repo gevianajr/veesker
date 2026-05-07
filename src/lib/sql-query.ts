@@ -11,6 +11,9 @@ export type QueryResult = {
   rows: unknown[][];
   rowCount: number;
   elapsedMs: number;
+  /** L3.2 (Onda 3): DBMS_OUTPUT lines drained from the session after the
+   *  query executed. Always populated by current sidecar (may be empty). */
+  dbmsOutput?: string[];
 };
 
 // Server-side discriminated union for multi-statement results.
