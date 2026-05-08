@@ -252,6 +252,10 @@ fn add_safety_columns_if_missing(conn: &Connection) -> rusqlite::Result<()> {
     if env_check_needs_local_update(conn)? {
         migrate_env_add_local(conn)?;
     }
+    // Security item #2: flip warn_unsafe_dml=1 for all staging/prod connections.
+    // DEV/LOCAL stay at 0 — prod has runtime enforcement regardless, and frequent
+    // modals on dev lead to habituation and disabling the guard.
+    migrate_warn_unsafe_dml_for_prod_staging(conn)?;
     Ok(())
 }
 
@@ -312,6 +316,18 @@ fn migrate_env_add_local(conn: &Connection) -> rusqlite::Result<()> {
         CREATE UNIQUE INDEX connections_name_unique ON connections (LOWER(name));
         COMMIT;
     "#)
+}
+
+/// Security item #2: enable warn_unsafe_dml for all staging/prod connections.
+/// Idempotent — runs on every startup but only updates rows where the flag is
+/// still 0 and env is staging or prod. DEV/LOCAL are intentionally left alone.
+fn migrate_warn_unsafe_dml_for_prod_staging(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE connections SET warn_unsafe_dml = 1 \
+         WHERE env IN ('staging', 'prod') AND warn_unsafe_dml = 0",
+        [],
+    )?;
+    Ok(())
 }
 
 fn has_column(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {

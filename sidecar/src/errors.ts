@@ -41,6 +41,14 @@ export const APPROVAL_UNKNOWN_REQUEST_ID = -32036;
 // any Oracle session is allowed to open.
 export const ENV_REQUIRED = -32037;
 
+// Security item #2: env-calibrated unsafe-DML guards.
+// -32038: staging double-confirm required — frontend must re-submit with acknowledgeTable.
+// -32039: prod blocked — caller must call workspace.unlockUnsafeDml first.
+// -32040: TRUNCATE on prod — no bypass available.
+export const UNSAFE_DML_STAGING    = -32038;
+export const UNSAFE_DML_PROD_BLOCKED = -32039;
+export const TRUNCATE_PROD_BLOCKED   = -32040;
+
 export class RpcCodedError extends Error {
   code: number;
   data?: Record<string, unknown>;

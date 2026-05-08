@@ -41,6 +41,7 @@ import {
   dmlPreview,
   querySessionSelf,
   enableDbmsOutputForActiveSession,
+  unlockUnsafeDml,
 } from "./oracle";
 import { aiChat, aiSuggestEndpoint } from "./ai";
 import { resolveApproval } from "./ai-approval-state";
@@ -88,6 +89,7 @@ const handlers: HandlerMap = {
     return result;
   },
   "workspace.close": () => closeSession(),
+  "workspace.unlockUnsafeDml": (params) => unlockUnsafeDml(params as any),
   "oracle.session_dbms_output_enable": async () => {
     await enableDbmsOutputForActiveSession();
     return { ok: true };

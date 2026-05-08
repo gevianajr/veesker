@@ -493,13 +493,28 @@ import {
   ORACLE_ERR,
   READ_ONLY_BLOCKED,
   UNSAFE_DML_WARNING,
+  UNSAFE_DML_STAGING,
+  UNSAFE_DML_PROD_BLOCKED,
+  TRUNCATE_PROD_BLOCKED,
   AUTOCOMMIT_VIOLATION,
   PSDPM_BLOCKED,
   SESSION_SELF_PRIV_MISSING,
   SESSION_SELF_TRANSIENT,
   SESSION_SELF_NOT_FOUND,
 } from "./errors";
-import { classifySql, isReadOnlySafe, isUnsafeBulkDml } from "./sql-kind";
+import { classifySql, isReadOnlySafe, isUnsafeBulkDml, isMergeSql, isTruncateSql, extractTableFromSql } from "./sql-kind";
+
+/** Injectable clock — swap in tests to simulate time passing. */
+interface Clock { now(): number; }
+const wallClock: Clock = { now: () => Date.now() };
+let _clock: Clock = wallClock;
+/** Test-only — never call this in production code. */
+export function _testInjectClock(c: Clock): void { _clock = c; }
+export function _testResetClock(): void { _clock = wallClock; }
+
+type UnsafeDmlWindow = { table: string; expiresAt: number };
+let _unsafeDmlWindow: UnsafeDmlWindow | null = null;
+const UNSAFE_DML_WINDOW_TTL_MS = 15 * 60 * 1000;
 
 /**
  * Belt-and-suspenders runtime assertion that mirrors the global
@@ -584,6 +599,7 @@ export async function openSession(p: OpenSessionParams): Promise<OpenSessionResu
       }
       clearSession();
     }
+    _unsafeDmlWindow = null;
 
     const conn = await buildConnection(p);
     try {
@@ -1147,12 +1163,20 @@ export function enforcePsdpmForOrigin(origin: string | undefined): void {
  * Apply the read-only and unsafe-DML guards to a single statement.
  * Throws RpcCodedError on block, returns void on pass.
  *
- * - acknowledgeUnsafe=true bypasses the unsafe-DML warning (caller already saw it).
- * - Read-only is never bypassed — caller must edit the connection.
+ * Env-calibrated unsafe-DML rules (security item #2):
+ *   prod  — TRUNCATE: always blocked (-32040). MERGE/unsafe DML: requires an active
+ *            unlock window set via workspace.unlockUnsafeDml (-32039). Window is one-shot.
+ *   staging — MERGE/unsafe DML: double-confirm required; caller re-submits with
+ *             acknowledgeTable matching the target table name (-32038).
+ *   dev/local — original warnUnsafeDml flag: single confirm via acknowledgeUnsafe (-32031).
  */
-function enforceSafetyForStatement(sql: string, opts: { acknowledgeUnsafe?: boolean } = {}): void {
+function enforceSafetyForStatement(
+  sql: string,
+  opts: { acknowledgeUnsafe?: boolean; acknowledgeTable?: string } = {}
+): void {
   const safety = getSessionSafety();
   const kind = classifySql(sql);
+  const env = safety.env as string | undefined;
 
   if (safety.readOnly === true && !isReadOnlySafe(kind, sql)) {
     throw new RpcCodedError(
@@ -1162,13 +1186,71 @@ function enforceSafetyForStatement(sql: string, opts: { acknowledgeUnsafe?: bool
     );
   }
 
-  if (safety.warnUnsafeDml === true && !opts.acknowledgeUnsafe && isUnsafeBulkDml(sql)) {
-    throw new RpcCodedError(
-      UNSAFE_DML_WARNING,
-      "This UPDATE/DELETE has no WHERE clause and will affect ALL rows. " +
-        "Confirm you want to run it (the IDE will show a warning modal)."
-    );
+  if (env === "prod") {
+    if (isTruncateSql(sql)) {
+      throw new RpcCodedError(TRUNCATE_PROD_BLOCKED,
+        "TRUNCATE is permanently blocked on prod connections. No bypass is available.");
+    }
+    if (isMergeSql(sql) || isUnsafeBulkDml(sql)) {
+      const table = extractTableFromSql(sql);
+      const w = _unsafeDmlWindow;
+      const now = _clock.now();
+      if (w && now < w.expiresAt && w.table === table) {
+        _unsafeDmlWindow = null;
+        log.info(`[security] UNSAFE_DML_PROD_EXECUTED table=${table}`);
+        return;
+      }
+      throw new RpcCodedError(
+        UNSAFE_DML_PROD_BLOCKED,
+        `Statement blocked on prod. Call workspace.unlockUnsafeDml with table "${table || "the target table"}" to open a one-shot 15-minute window.`,
+        { table }
+      );
+    }
+  } else if (env === "staging") {
+    if (isMergeSql(sql) || isUnsafeBulkDml(sql)) {
+      const table = extractTableFromSql(sql);
+      if (!opts.acknowledgeTable) {
+        throw new RpcCodedError(
+          UNSAFE_DML_STAGING,
+          `This statement will affect all rows in ${table || "the target table"}. Type the table name to confirm.`,
+          { table }
+        );
+      }
+      if (opts.acknowledgeTable.toUpperCase() !== table) {
+        throw new RpcCodedError(
+          UNSAFE_DML_STAGING,
+          `Table name mismatch — expected "${table}", got "${opts.acknowledgeTable.toUpperCase()}".`,
+          { table }
+        );
+      }
+    }
+  } else {
+    if (safety.warnUnsafeDml === true && !opts.acknowledgeUnsafe && isUnsafeBulkDml(sql)) {
+      throw new RpcCodedError(
+        UNSAFE_DML_WARNING,
+        "This UPDATE/DELETE has no WHERE clause and will affect ALL rows. " +
+          "Confirm you want to run it (the IDE will show a warning modal)."
+      );
+    }
   }
+}
+
+/** Open a one-shot 15-minute unlock window for a specific table on prod. */
+export function unlockUnsafeDml(p: { table: string }): { ok: true; expiresAt: number } {
+  const safety = getSessionSafety();
+  if ((safety.env as string | undefined) !== "prod") {
+    throw new RpcCodedError(UNSAFE_DML_PROD_BLOCKED,
+      "workspace.unlockUnsafeDml is only available on prod connections.");
+  }
+  const table = (p.table ?? "").toUpperCase().trim();
+  if (!table) {
+    throw new RpcCodedError(UNSAFE_DML_PROD_BLOCKED,
+      "table is required — pass the fully-qualified target (e.g. HR.EMPLOYEES).");
+  }
+  const expiresAt = _clock.now() + UNSAFE_DML_WINDOW_TTL_MS;
+  _unsafeDmlWindow = { table, expiresAt };
+  log.info(`[security] UNSAFE_DML_UNLOCK table=${table} expiresAt=${new Date(expiresAt).toISOString()}`);
+  return { ok: true, expiresAt };
 }
 
 export async function queryExecute(p: {
@@ -1177,6 +1259,8 @@ export async function queryExecute(p: {
   splitMulti?: boolean;
   fetchAll?: boolean;
   acknowledgeUnsafe?: boolean;
+  /** Security item #2: staging double-confirm. The table name the user typed. */
+  acknowledgeTable?: string;
   /**
    * L2.1: caller-tagged provenance for the request. Allowed user origins:
    * "user_typed" | "user_clicked". When PSDPM is active any other origin (or
@@ -1211,7 +1295,7 @@ export async function queryExecute(p: {
       // Enforce read-only / unsafe-DML BEFORE we run anything: if the batch
       // contains a forbidden statement, bail out cleanly so we don't half-execute.
       for (const stmt of statements) {
-        enforceSafetyForStatement(stmt, { acknowledgeUnsafe: p.acknowledgeUnsafe });
+        enforceSafetyForStatement(stmt, { acknowledgeUnsafe: p.acknowledgeUnsafe, acknowledgeTable: p.acknowledgeTable });
       }
 
       const collected: ServerStatementResult[] = [];
@@ -1282,7 +1366,7 @@ export async function queryExecute(p: {
 
   // ── Single-statement path (default, back-compat) ──────────────────────────
   try {
-    enforceSafetyForStatement(p.sql, { acknowledgeUnsafe: p.acknowledgeUnsafe });
+    enforceSafetyForStatement(p.sql, { acknowledgeUnsafe: p.acknowledgeUnsafe, acknowledgeTable: p.acknowledgeTable });
     return await withActiveSession(async (conn) => {
       let dbmsOutput: string[] = [];
       try {

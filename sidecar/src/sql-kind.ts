@@ -83,8 +83,8 @@ export function isReadOnlySafe(kind: SqlKind, sql?: string): boolean {
  *     substring "where" inside it could fool the WHERE search. In practice
  *     this is rare in DELETE/UPDATE bodies — and the warning is only a
  *     heuristic, not a hard guard.
- *   - MERGE INTO ... is never flagged (its safety depends on the ON clause,
- *     which is harder to validate cheaply).
+ *   - MERGE is not checked here. isMergeSql() handles it separately; on prod
+ *     any MERGE enters the unlock flow regardless of ON clause complexity.
  *   - DML wrapped in PL/SQL blocks is filtered out earlier by classifySql().
  *
  * Examples flagged:
@@ -123,7 +123,43 @@ export function isUnsafeBulkDml(sql: string): boolean {
   if (trimmed === "1=1" || trimmed === "1 = 1" || trimmed === "TRUE" || trimmed === "(1=1)" || trimmed === "(TRUE)") {
     return true;
   }
+  // WHERE EXISTS (SELECT <anything> FROM DUAL) — non-correlated, always true.
+  if (/^EXISTS\s*\(\s*SELECT\s+.+\s+FROM\s+DUAL\s*\)/.test(trimmed)) {
+    return true;
+  }
   return false;
+}
+
+/** Returns true if the statement is a MERGE. In prod any MERGE requires an unlock window. */
+export function isMergeSql(sql: string): boolean {
+  return stripLeadingComments(sql).trimStart().toUpperCase().startsWith("MERGE ");
+}
+
+/** Returns true if the statement is a TRUNCATE. */
+export function isTruncateSql(sql: string): boolean {
+  return stripLeadingComments(sql).trimStart().toUpperCase().startsWith("TRUNCATE ");
+}
+
+/**
+ * Extract the primary target table from a DML statement as UPPERCASE "SCHEMA.TABLE" or "TABLE".
+ * Returns empty string when unparseable. Used by the unsafe-DML enforcement layer
+ * for staging confirmation prompts and prod unlock-window table matching.
+ */
+export function extractTableFromSql(sql: string): string {
+  const s = stripLeadingComments(sql).replace(/\s+/g, " ").trim().toUpperCase();
+  let tail: string;
+  if (s.startsWith("UPDATE "))            tail = s.slice(7);
+  else if (s.startsWith("DELETE FROM "))  tail = s.slice(12);
+  else if (s.startsWith("DELETE "))       tail = s.slice(7);
+  else if (s.startsWith("TRUNCATE TABLE ")) tail = s.slice(15);
+  else if (s.startsWith("TRUNCATE "))     tail = s.slice(9);
+  else if (s.startsWith("MERGE INTO "))   tail = s.slice(11);
+  else if (s.startsWith("MERGE "))        tail = s.slice(6);
+  else return "";
+  tail = tail.trimStart();
+  const m = tail.match(/^"?([\w$#]+)"?(?:\."?([\w$#]+)"?)?/);
+  if (!m) return "";
+  return m[2] ? `${m[1]}.${m[2]}` : m[1];
 }
 
 /** Find the index of the top-level WHERE keyword (not inside parens or quoted). */
