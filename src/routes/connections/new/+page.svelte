@@ -57,7 +57,7 @@
     -webkit-font-smoothing: antialiased;
   }
   main {
-    max-width: 480px;
+    max-width: 560px;
     margin: 0 auto;
     padding: 4rem 2rem;
     display: flex;

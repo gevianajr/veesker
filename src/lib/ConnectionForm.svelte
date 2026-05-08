@@ -614,7 +614,7 @@
   .sg-immutable { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: rgba(179,62,31,0.15); color: #f5a08a; border: 1px solid rgba(179,62,31,0.4); border-radius: 3px; padding: 1px 5px; }
   .sg-toggle-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; min-height: 28px; }
   .sg-row-locked { opacity: 0.65; }
-  .sg-toggle-label { flex: 1; font-family: "Inter", sans-serif; font-size: 12px; font-weight: 500; color: var(--text-primary); text-transform: none; letter-spacing: normal; }
+  .sg-toggle-label { flex: 1; font-family: "Inter", sans-serif; font-size: 12px; font-weight: 500; color: var(--text-primary); text-transform: none; letter-spacing: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .sg-lock-note { font-size: 10px; color: #f5a08a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 4px; }
   .sg-tog { width: 32px; height: 18px; border-radius: 9px; background: var(--bg-surface-raised); border: 1px solid var(--border-strong); position: relative; cursor: pointer; flex-shrink: 0; padding: 0; transition: background 0.15s, border-color 0.15s; }
   .sg-tog:disabled { cursor: default; }
