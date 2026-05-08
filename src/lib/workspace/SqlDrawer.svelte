@@ -37,7 +37,7 @@
     onAnalyze?: () => void;
     completionSchema?: Record<string, string[]>;
     getColumns?: (table: string, owner: string | null) => Promise<string[]>;
-    env?: "dev" | "staging" | "prod";
+    env?: "local" | "dev" | "staging" | "prod";
     connectionName?: string;
     connectionUser?: string | null;
     connectionService?: string | null;

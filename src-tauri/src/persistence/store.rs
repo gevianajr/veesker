@@ -246,6 +246,26 @@ fn add_safety_columns_if_missing(conn: &Connection) -> rusqlite::Result<()> {
                 ON command_history (connection_id, ts DESC);",
         )?;
     }
+    // Item #4 Phase C — keep_open marker for connections whose user chose
+    // "Manter aberto" in the close-window TX modal. Stores a promise to NOT
+    // auto-rollback for `expires_at - opened_at` ms. Phase D reads non-expired
+    // rows on app startup, calls connection.txState to confirm Oracle still
+    // agrees the TX is alive, and either restores keep_open or banners
+    // "session lost". Encrypted at rest by SQLCipher.
+    if !table_exists(conn, "pending_tx_keep_open")? {
+        conn.execute_batch(
+            "CREATE TABLE pending_tx_keep_open (\
+                connection_id TEXT NOT NULL PRIMARY KEY,\
+                opened_at     INTEGER NOT NULL,\
+                expires_at    INTEGER NOT NULL,\
+                last_tx_id    TEXT,\
+                env           TEXT NOT NULL \
+                                CHECK (env IN ('local','dev','staging','prod'))\
+            );\
+            CREATE INDEX idx_pending_tx_keep_open_expires \
+                ON pending_tx_keep_open (expires_at);",
+        )?;
+    }
     // Security item #1 (updated): env CHECK must include 'local'. Full table
     // rebuild required — SQLite cannot ALTER a CHECK constraint. Also converts
     // any existing 'sandbox' rows to 'local'.

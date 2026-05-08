@@ -10,7 +10,7 @@ use rusqlite::Connection as SqliteConnection;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{command_history, history, object_versions, secrets, store, tnsnames, wallet};
+use super::{command_history, history, keep_open, object_versions, secrets, store, tnsnames, wallet};
 use store::{AuthType, ConnectionRow, StoreError};
 
 #[derive(Debug, Clone, Serialize)]
@@ -397,6 +397,13 @@ fn map_command_history_err(e: command_history::CommandHistoryError) -> Connectio
         }
         command_history::CommandHistoryError::InvalidArg(m) => ConnectionError::invalid(m),
         command_history::CommandHistoryError::Crypto(m) => ConnectionError::internal(m),
+    }
+}
+
+fn map_keep_open_err(e: keep_open::KeepOpenError) -> ConnectionError {
+    match e {
+        keep_open::KeepOpenError::Sqlite(s) => ConnectionError::from(StoreError::from(s)),
+        keep_open::KeepOpenError::InvalidArg(m) => ConnectionError::invalid(m),
     }
 }
 
@@ -988,6 +995,39 @@ impl ConnectionService {
         let conn = self.lock()?;
         command_history::clear_inaccessible(&conn, self.command_history_key.as_deref())
             .map_err(map_command_history_err)
+    }
+
+    pub fn keep_open_record(
+        &self,
+        connection_id: &str,
+        env: &str,
+        last_tx_id: Option<&str>,
+        opened_at: i64,
+        expires_at: i64,
+    ) -> Result<keep_open::KeepOpenRecord, ConnectionError> {
+        let conn = self.lock()?;
+        keep_open::upsert(&conn, connection_id, env, last_tx_id, opened_at, expires_at)
+            .map_err(map_keep_open_err)
+    }
+
+    pub fn keep_open_clear(&self, connection_id: &str) -> Result<(), ConnectionError> {
+        let conn = self.lock()?;
+        keep_open::clear(&conn, connection_id).map_err(map_keep_open_err)
+    }
+
+    #[allow(dead_code)]
+    pub fn keep_open_list_active(
+        &self,
+        now_ms: i64,
+    ) -> Result<Vec<keep_open::KeepOpenRecord>, ConnectionError> {
+        let conn = self.lock()?;
+        keep_open::list_active(&conn, now_ms).map_err(map_keep_open_err)
+    }
+
+    #[allow(dead_code)]
+    pub fn keep_open_purge_expired(&self, now_ms: i64) -> Result<usize, ConnectionError> {
+        let conn = self.lock()?;
+        keep_open::purge_expired(&conn, now_ms).map_err(map_keep_open_err)
     }
 
     pub fn inspect_wallet(&self, zip_path: &str) -> Result<WalletInfo, ConnectionError> {

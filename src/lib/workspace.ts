@@ -300,6 +300,83 @@ export async function connectionTxState(): Promise<Result<TxStateView>> {
   }
 }
 
+// Item #4 Phase C — TX modal contract
+//
+// The audit `origin` records the user's *decision*; `triggered_by` records
+// what *interrupted* (window close, route navigate, etc.). This split lets
+// future analytics ask "how often does the user rollback in PROD when
+// closing the window?" vs "...when navigating tabs?".
+export type TxModalDecision =
+  | "tx_modal_commit"
+  | "tx_modal_rollback"
+  | "tx_modal_keep_open"
+  | "tx_modal_close_cancelled"
+  | "tx_modal_session_lost";
+
+export type TxModalTriggeredBy =
+  | "window_close"
+  | "tab_close"
+  | "route_navigate"
+  | "tray_quit"
+  | "session_lost"
+  | "manual_check";
+
+export type KeepOpenRecord = {
+  connectionId: string;
+  openedAt: number;
+  expiresAt: number;
+  lastTxId: string | null;
+  env: string;
+};
+
+export async function txKeepOpenRecord(input: {
+  connectionId: string;
+  env: string;
+  lastTxId: string | null;
+  openedAt: number;
+  expiresAt: number;
+}): Promise<Result<KeepOpenRecord>> {
+  try {
+    const data = await invoke<KeepOpenRecord>("tx_keep_open_record", {
+      connectionId: input.connectionId,
+      env: input.env,
+      lastTxId: input.lastTxId,
+      openedAt: input.openedAt,
+      expiresAt: input.expiresAt,
+    });
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err as WorkspaceError };
+  }
+}
+
+export async function txKeepOpenClear(connectionId: string): Promise<Result<void>> {
+  try {
+    await invoke("tx_keep_open_clear", { connectionId });
+    return { ok: true, data: undefined };
+  } catch (err) {
+    return { ok: false, error: err as WorkspaceError };
+  }
+}
+
+export type TxModalAuditInput = {
+  decision: TxModalDecision;
+  triggeredBy: TxModalTriggeredBy;
+  connectionId: string;
+  env: string | null;
+  pendingStatements: number;
+  lastTxId: string | null;
+};
+
+export async function txModalAudit(input: TxModalAuditInput): Promise<Result<void>> {
+  try {
+    await invoke("tx_modal_audit", { input });
+    return { ok: true, data: undefined };
+  } catch (err) {
+    return { ok: false, error: err as WorkspaceError };
+  }
+}
+
 export const driverMode = () =>
   call<{ mode: "thin" | "thick" }>("driver_mode");
 

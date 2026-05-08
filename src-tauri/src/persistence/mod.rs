@@ -6,6 +6,7 @@ pub mod command_history;
 pub mod connection_config;
 pub mod connections;
 pub mod history;
+pub mod keep_open;
 pub mod object_versions;
 pub mod secrets;
 pub mod store;

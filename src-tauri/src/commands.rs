@@ -141,6 +141,7 @@ use crate::persistence::connections::{
     ConnectionError, ConnectionFull, ConnectionInput, ConnectionMeta, ConnectionService, WalletInfo,
 };
 use crate::persistence::history::{HistoryEntry, HistorySaveInput};
+use crate::persistence::keep_open::KeepOpenRecord;
 
 pub struct ActiveSessionEnv(pub tokio::sync::Mutex<Option<String>>);
 
@@ -1089,6 +1090,94 @@ pub async fn connection_rollback(app: AppHandle) -> Result<(), ConnectionTestErr
 pub async fn connection_tx_state(app: AppHandle) -> Result<Value, ConnectionTestErr> {
     let res = call_sidecar(&app, "connection.txState", json!({})).await?;
     Ok(res)
+}
+
+#[tauri::command]
+pub async fn tx_keep_open_record(
+    app: AppHandle,
+    connection_id: String,
+    env: String,
+    last_tx_id: Option<String>,
+    opened_at: i64,
+    expires_at: i64,
+) -> Result<KeepOpenRecord, ConnectionError> {
+    let svc = app.state::<ConnectionService>();
+    svc.keep_open_record(
+        &connection_id,
+        &env,
+        last_tx_id.as_deref(),
+        opened_at,
+        expires_at,
+    )
+}
+
+#[tauri::command]
+pub async fn tx_keep_open_clear(
+    app: AppHandle,
+    connection_id: String,
+) -> Result<(), ConnectionError> {
+    let svc = app.state::<ConnectionService>();
+    svc.keep_open_clear(&connection_id)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxModalAuditInput {
+    pub decision: String,
+    pub triggered_by: String,
+    pub connection_id: String,
+    pub env: Option<String>,
+    pub pending_statements: i64,
+    pub last_tx_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn tx_modal_audit(
+    app: AppHandle,
+    input: TxModalAuditInput,
+) -> Result<(), ConnectionError> {
+    let data_dir = match app.path().app_data_dir() {
+        Ok(d) => d,
+        Err(_) => return Ok(()),
+    };
+    let svc = app.state::<ConnectionService>();
+    let (host, username) = match svc.get(&input.connection_id) {
+        Ok(full) => match full.meta {
+            ConnectionMeta::Basic {
+                host, username, ..
+            } => (host, username),
+            ConnectionMeta::Wallet {
+                connect_alias,
+                username,
+                ..
+            } => (connect_alias, username),
+        },
+        Err(_) => (String::new(), String::new()),
+    };
+    let origin_detail = json!({
+        "triggeredBy": input.triggered_by,
+        "pendingStatements": input.pending_statements,
+        "lastTxId": input.last_tx_id,
+    })
+    .to_string();
+    let synthetic_input = HistorySaveInput {
+        connection_id: input.connection_id.clone(),
+        sql: String::new(),
+        success: true,
+        row_count: None,
+        elapsed_ms: 0,
+        error_code: None,
+        error_message: None,
+        username: Some(username),
+        host: Some(host),
+        origin: Some(input.decision.clone()),
+        origin_detail: Some(origin_detail),
+    };
+    let entry = write_audit_entry(&data_dir, &synthetic_input, "user", input.env.as_deref());
+    if let Some(ref e) = entry {
+        let _ = app.emit("audit:append", e);
+    }
+    Ok(())
 }
 
 #[tauri::command]

@@ -13,7 +13,7 @@
     ops: DestructiveOp[];
     onConfirm: () => void;
     onCancel: () => void;
-    env?: "dev" | "staging" | "prod";
+    env?: "local" | "dev" | "staging" | "prod";
     onPreview?: () => Promise<{
       estimatedRows: number | null;
       timedOut: boolean;

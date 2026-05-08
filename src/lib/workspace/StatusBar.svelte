@@ -24,7 +24,7 @@
     onSwitchConnection: () => void;
     theme?: "light" | "dark";
     onToggleTheme?: () => void;
-    env?: "dev" | "staging" | "prod";
+    env?: "local" | "dev" | "staging" | "prod";
     readOnly?: boolean;
     /** L1.2 (Sprint C): when true, render the air-gap badge. */
     airgap?: boolean;
