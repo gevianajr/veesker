@@ -8,7 +8,7 @@ describe("oracle-shim type adapter — Oracle → DuckDB", () => {
   const cases: Array<[string, string]> = [
     ["NUMBER(10,2)", "DECIMAL(10,2)"],
     ["NUMBER(10)", "DECIMAL(10,0)"],
-    ["NUMBER", "DOUBLE"],
+    ["NUMBER", "DECIMAL(38,18)"],
     ["VARCHAR2(100)", "VARCHAR"],
     ["VARCHAR2(100 CHAR)", "VARCHAR"],
     ["NVARCHAR2(50)", "VARCHAR"],

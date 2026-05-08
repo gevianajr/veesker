@@ -60,7 +60,7 @@ export function mapOracleType(oracleType: string): string {
     const scale = Math.max(0, parseInt(rawScale, 10));
     return `DECIMAL(${precision},${scale})`;
   }
-  if (t === "NUMBER") return "DOUBLE";
+  if (t === "NUMBER") return "DECIMAL(38,18)";
 
   if (/^NVARCHAR2?\s*\(/.test(t)) return "VARCHAR";
   if (/^VARCHAR2\s*\(/.test(t)) return "VARCHAR";
@@ -76,6 +76,10 @@ export function mapOracleType(oracleType: string): string {
   if (t === "BINARY_FLOAT") return "FLOAT";
   if (t === "BINARY_DOUBLE") return "DOUBLE";
   if (t === "FLOAT" || /^FLOAT\s*\(/.test(t)) return "DOUBLE";
+
+  if (t === "LONG") return "VARCHAR";
+  if (/^LONG\s+RAW$/.test(t)) return "BLOB";
+  if (t.startsWith("INTERVAL")) return "VARCHAR";
 
   return "VARCHAR";
 }

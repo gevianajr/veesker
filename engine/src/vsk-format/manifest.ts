@@ -49,6 +49,13 @@ export interface VskSkippedObject {
   detail?: string;
 }
 
+export interface VskTypeWarning {
+  table: string;
+  column: string;
+  oracleType: string;
+  message: string;
+}
+
 export interface VskManifest {
   builtAt: string;
   sourceId: string;
@@ -69,6 +76,11 @@ export interface VskManifest {
   /** Objects discovered by the dependency walk but skipped during DDL
    *  extraction. v0.2.0+. */
   skippedObjects?: VskSkippedObject[];
+  /** Oracle column type mapping warnings emitted at build time. v0.3.0+.
+   *  Present only when one or more columns had imprecise type mappings
+   *  (e.g. bare NUMBER → DECIMAL(38,18), CLOB → VARCHAR). Fatal types
+   *  block the build entirely and never appear here. */
+  typeWarnings?: VskTypeWarning[];
 }
 
 export function writeManifest(m: VskManifest): Uint8Array {
@@ -105,8 +117,22 @@ function isManifest(x: unknown): x is VskManifest {
     if (!Array.isArray(m.skippedObjects)) return false;
     for (const s of m.skippedObjects) if (!isSkipped(s)) return false;
   }
+  if (m.typeWarnings !== undefined) {
+    if (!Array.isArray(m.typeWarnings)) return false;
+    for (const w of m.typeWarnings) if (!isTypeWarning(w)) return false;
+  }
   for (const t of m.tables) if (!isTable(t)) return false;
   for (const p of m.piiMasks) if (!isMask(p)) return false;
+  return true;
+}
+
+function isTypeWarning(x: unknown): x is VskTypeWarning {
+  if (typeof x !== "object" || x === null) return false;
+  const w = x as Record<string, unknown>;
+  if (typeof w.table !== "string") return false;
+  if (typeof w.column !== "string") return false;
+  if (typeof w.oracleType !== "string") return false;
+  if (typeof w.message !== "string") return false;
   return true;
 }
 

@@ -345,7 +345,7 @@ describe("vsk-format writer + reader", () => {
       const dst = await DuckDBHost.openInMemory();
       try {
         await readVsk(path, dst);
-        const rows = await dst.query('SELECT "COUNTRY_ID", "COUNTRY_NAME", "REGION_ID" FROM countries');
+        const rows = await dst.query('SELECT "COUNTRY_ID", "COUNTRY_NAME", CAST("REGION_ID" AS INTEGER) AS "REGION_ID" FROM countries');
         expect(rows).toEqual([{ COUNTRY_ID: "BR", COUNTRY_NAME: "Brazil", REGION_ID: 1 }]);
         const cols = await dst.query(
           "SELECT column_name, data_type FROM information_schema.columns WHERE table_name='countries' ORDER BY ordinal_position",
@@ -353,7 +353,7 @@ describe("vsk-format writer + reader", () => {
         expect(cols).toEqual([
           { column_name: "COUNTRY_ID", data_type: "VARCHAR" },
           { column_name: "COUNTRY_NAME", data_type: "VARCHAR" },
-          { column_name: "REGION_ID", data_type: "DOUBLE" },
+          { column_name: "REGION_ID", data_type: "DECIMAL(38,18)" },
         ]);
       } finally {
         await dst.close();
