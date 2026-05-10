@@ -7,13 +7,50 @@ import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test";
 // ── directoriesList + directoryDetails unit tests ─────────────────────────────
 // Both functions call withActiveSession → we mock the session module so tests
 // run without an Oracle connection.
+//
+// Real getSessionSafety / setSessionSafety are passed through the mock unchanged
+// so that ai.test.ts (which also imports from "./state") continues to see live
+// state updates via setSessionSafety even when this mock is the active one.
+// Without this, a fixed `getSessionSafety: () => ({env:"dev"})` would freeze the
+// value and cause ai.test.ts prod-guard assertions to fail on Linux/macOS CI
+// where all src/ test files can evaluate in parallel.
+
+import {
+  getSessionSafety,
+  setSessionSafety,
+  clearSession,
+  hasSession,
+  getCurrentSchema,
+  setSession,
+  setSessionParams,
+  getSessionParams,
+  withSessionLock,
+  getTxState,
+  resetTxState,
+  recordTxModifying,
+  setTxId,
+  SESSION_UUID,
+} from "./state";
 
 const mockExecute = mock(() => Promise.resolve({ rows: [] }));
 const mockConn = { execute: mockExecute } as any;
 
 mock.module("./state", () => ({
   getActiveSession: () => mockConn,
-  getSessionSafety: () => ({ env: "dev", readOnly: false, psdpm: false, warnUnsafeDml: false }),
+  getSessionSafety,
+  setSessionSafety,
+  clearSession,
+  hasSession,
+  getCurrentSchema,
+  setSession,
+  setSessionParams,
+  getSessionParams,
+  withSessionLock,
+  getTxState,
+  resetTxState,
+  recordTxModifying,
+  setTxId,
+  SESSION_UUID,
 }));
 
 afterAll(() => mock.restore());
