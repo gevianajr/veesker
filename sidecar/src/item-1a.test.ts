@@ -8,25 +8,60 @@ import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test";
 // The typeMap inside objectsList converts MATERIALIZED_VIEW → 'MATERIALIZED VIEW'
 // and passes all other kinds through unchanged. We verify this by calling
 // objectsList with a mocked connection and inspecting the bind params.
+//
+// Real getSessionSafety / setSessionSafety are passed through the mock so that
+// ai.test.ts (which runs after this file on Linux/macOS CI) continues to see live
+// state updates even if this mock is the active one when ai.ts is first loaded.
+
+import {
+  getSessionSafety,
+  setSessionSafety,
+  clearSession,
+  hasSession,
+  getCurrentSchema,
+  setSession,
+  setSessionParams,
+  getSessionParams,
+  withSessionLock,
+  getTxState,
+  resetTxState,
+  recordTxModifying,
+  setTxId,
+  SESSION_UUID,
+} from "./state";
 
 const mockExecute = mock(() => Promise.resolve({ rows: [] }));
 const mockConn = { execute: mockExecute } as any;
 
-let _mockEnv = "dev";
-
 mock.module("./state", () => ({
   getActiveSession: () => mockConn,
-  getSessionSafety: () => ({ env: _mockEnv, readOnly: false, psdpm: false, warnUnsafeDml: false }),
+  getSessionSafety,
+  setSessionSafety,
+  clearSession,
+  hasSession,
+  getCurrentSchema,
+  setSession,
+  setSessionParams,
+  getSessionParams,
+  withSessionLock,
+  getTxState,
+  resetTxState,
+  recordTxModifying,
+  setTxId,
+  SESSION_UUID,
 }));
 
-afterAll(() => mock.restore());
+afterAll(() => {
+  setSessionSafety({});
+  mock.restore();
+});
 
 import { objectsList } from "./oracle";
 
 beforeEach(() => {
   mockExecute.mockReset();
   mockExecute.mockResolvedValue({ rows: [] });
-  _mockEnv = "dev";
+  setSessionSafety({ env: "dev", readOnly: false, psdpm: false, warnUnsafeDml: false });
 });
 
 describe("objectsList — ObjectKind to ALL_OBJECTS type mapping", () => {
@@ -261,11 +296,10 @@ describe("mviewRefresh — bind variable safety and env guard", () => {
   beforeEach(() => {
     mockExecute.mockReset();
     mockExecute.mockResolvedValue({ rows: [] });
-    _mockEnv = "dev";
+    setSessionSafety({ env: "dev", readOnly: false, psdpm: false, warnUnsafeDml: false });
   });
 
   it("uses bind variables for mv_name and method (not string interpolation)", async () => {
-    _mockEnv = "dev";
     await mviewRefresh({ owner: "SCOTT", name: "EMP_MV", method: "FORCE" });
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
@@ -277,7 +311,7 @@ describe("mviewRefresh — bind variable safety and env guard", () => {
   });
 
   it("throws MVIEW_REFRESH_PROD_REQUIRES_CONFIRMATION when env=prod and confirmedProdRefresh is missing", async () => {
-    _mockEnv = "prod";
+    setSessionSafety({ env: "prod", readOnly: false, psdpm: false, warnUnsafeDml: false });
 
     let caught: unknown = null;
     try {
@@ -291,7 +325,7 @@ describe("mviewRefresh — bind variable safety and env guard", () => {
   });
 
   it("proceeds when env=prod and confirmedProdRefresh=true", async () => {
-    _mockEnv = "prod";
+    setSessionSafety({ env: "prod", readOnly: false, psdpm: false, warnUnsafeDml: false });
 
     let threw = false;
     try {
@@ -304,8 +338,6 @@ describe("mviewRefresh — bind variable safety and env guard", () => {
   });
 
   it("proceeds without confirmedProdRefresh when env=dev", async () => {
-    _mockEnv = "dev";
-
     let threw = false;
     try {
       await mviewRefresh({ owner: "SCOTT", name: "EMP_MV", method: "FORCE" });
