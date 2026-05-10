@@ -42,7 +42,7 @@ Veesker follows the **DBeaver model**: the Community Edition is a fully function
 | **AI — Query optimization + performance** | — | ✅ Cloud |
 | **AI — Charts via natural language** | — | ✅ Cloud |
 | **AI — Debugger analysis + suggestions** | — | ✅ Cloud |
-| **Vector Search Studio** | — | ✅ Cloud |
+| **Vector Search Studio** | ✅ CE | ✅ CL |
 | **Team features + shared queries** | — | ✅ Cloud |
 | **Usage dashboard + billing** | — | ✅ Cloud |
 | **VeeskerDB Sandbox — encrypted production data slices** | — | ✅ Cloud |
@@ -170,6 +170,30 @@ If you need warranty, SLA, or commercial support, that requires a separate signe
 - Not cloud or SaaS — credentials, query history, and database content stay on your machine
 - Works with Oracle 9i through 26ai — legacy databases are fully supported via Thick mode auto-discovery (no manual Instant Client setup)
 - Not a production-grade tool with warranty — see [terms & disclaimers](#license--disclaimer)
+
+---
+
+## Current State & Roadmap
+
+> **Advanced technical preview.** Veesker is under active development. Core features are stable
+> and production-tested by the author on real Oracle databases, but this is not yet a drop-in
+> replacement for Toad or PL-SQL Developer in feature breadth. Recommended: validate in a
+> non-production environment before use on critical databases.
+>
+> **Current known gaps:** schema browser missing Materialized Views, Synonyms, DB Links, Jobs
+> and Scheduler objects. Multi-connection requires one app instance per database today
+> (multi-connection workspaces are the next major release).
+
+| Release | Target | What ships |
+|---|---|---|
+| **Current** | May 2026 | SQL editor, PL/SQL debugger, AI assistant (BYOK), Vector Search Studio, ORDS builder, env-calibrated DML safety (DEV/STAGING/PROD tiers), AES-256-GCM audit log |
+| **v0.5-beta** | Q3 2026 | Schema browser complete (MV · synonyms · DB links · jobs · scheduler), DDL/DCL confirmation modal, multi-connection workspaces (one Oracle session per workspace) |
+| **v0.6** | Q4 2026 | Multiple independent SQL windows, edit-in-grid SELECT FOR UPDATE |
+| **v1.0** | Q1 2027 | Linux packaging (.deb/.AppImage), Windows code signing, macOS notarization, performance benchmarks |
+| post-v1.0 | Q1–Q2 2027 | TX close hooks across all workspace events (Item #4 Phase D) |
+| **Cloud Edition** | H2 2027 | Multi-user governance, SSO/SAML, centralized audit, schema-aware AI without BYOK |
+
+[→ Full technical roadmap](docs/superpowers/roadmap/2026-05-09-master-roadmap.md) (internal, updated each phase)
 
 ---
 
