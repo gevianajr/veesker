@@ -182,11 +182,11 @@ If you need warranty, SLA, or commercial support, that requires a separate signe
 
 | Release | Status | What ships |
 |---|---|---|
-| **v0.5.0-beta.1** | ✅ May 2026 | Schema browser complete (18 object kinds: MV · synonyms · DB links · directories · queues · scheduler · legacy jobs · DB users · privileges), DDL/DCL confirmation gate, Sessions monitor + KILL, HMAC-SHA256 tamper-evident audit chain, Verify Chain UI |
-| **v0.5.x** | 🔜 patch | Directory inspector detail panel fix (B1 partial — list works, detail panel pending), Scheduler Jobs cross-schema attribution |
-| **v0.6** | Q3 2026 | Multiple independent SQL windows, edit-in-grid SELECT FOR UPDATE |
-| **v1.0** | Q4 2026 | Linux packaging (.deb/.AppImage), Windows code signing, macOS notarization, performance benchmarks |
-| post-v1.0 | Q1 2027 | TX close hooks across all workspace events (Item #4 Phase D) |
+| **v0.5.0-beta.1** | ✅ Launched May 2026 | Phase 1: schema browser (18 object kinds), DDL/DCL safety gate, Sessions monitor + KILL, HMAC-SHA256 tamper-evident audit chain, Verify Chain UI |
+| **v0.5.x** | 🔜 patch | Bug B1 fix (directory detail panel), Dependabot cleanup, UX/UI improvements |
+| **v0.6.0** | 📋 planned | Phase 2: multi-connection, multiple independent SQL windows, edit-in-grid SELECT FOR UPDATE |
+| **v0.7.0** | 📋 planned | Phase 3: Item #4 Phase D TX close hooks, .vsk portable Oracle sandbox |
+| **v1.0.0** | 🎯 target | Stable release with Windows code signing, macOS notarization, Linux packaging, Veesker Cloud integration |
 | **Cloud Edition** | H1 2027 | Multi-user governance, SSO/SAML, centralized audit, schema-aware AI without BYOK |
 
 [→ Full technical roadmap](docs/superpowers/roadmap/2026-05-09-master-roadmap.md) (internal, updated each phase)
