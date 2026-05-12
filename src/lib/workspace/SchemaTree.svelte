@@ -6,6 +6,7 @@
 
 <script lang="ts">
   import type { ObjectKind, Loadable } from "$lib/workspace";
+  import { Table, Eye, Layers, Hash, Cog, SquareFunction, Package, Zap, FileType, Webhook, Link2, ExternalLink, Folder, ListOrdered, Clock, User, Shield } from "lucide-svelte";
 
   export type SchemaNode = {
     name: string;
@@ -32,6 +33,7 @@
 
   let search = $state("");
   let hiddenKinds = $state<Set<ObjectKind>>(new Set());
+  let density = $state<"compact" | "comfortable">("compact");
   let showSystemSchemas = $state(false);
   let contextMenu = $state<{ x: number; y: number; owner: string; name: string; kind: ObjectKind } | null>(null);
 
@@ -58,18 +60,6 @@
     PRIVILEGE: "Privileges",
   };
 
-  const KIND_SHORT: Record<ObjectKind, string> = {
-    TABLE: "Tbl", VIEW: "View", SEQUENCE: "Seq",
-    PROCEDURE: "Proc", FUNCTION: "Func",
-    PACKAGE: "Pkg", TRIGGER: "Trig", TYPE: "Type",
-    REST_MODULE: "API",
-    MATERIALIZED_VIEW: "MV", SYNONYM: "Syn", DB_LINK: "DBL",
-    DIRECTORY: "Dir",
-    QUEUE: "Q",
-    SCHEDULER_JOB: "JOB",
-    DB_USER: "USR",
-    PRIVILEGE: "PRIV",
-  };
 
   function toggleKind(kind: ObjectKind) {
     const next = new Set(hiddenKinds);
@@ -78,30 +68,27 @@
     hiddenKinds = next;
   }
 
-  const KIND_ORDER: ObjectKind[] = [
-    "TABLE", "VIEW", "MATERIALIZED_VIEW", "SYNONYM", "DB_LINK", "DIRECTORY", "QUEUE", "SCHEDULER_JOB", "DB_USER", "PRIVILEGE", "SEQUENCE",
-    "PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE",
-    "REST_MODULE",
+  const KIND_GROUPS: { label: string; kinds: ObjectKind[] }[] = [
+    { label: "Data",        kinds: ["TABLE", "VIEW", "MATERIALIZED_VIEW", "SEQUENCE"] },
+    { label: "Code",        kinds: ["PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE"] },
+    { label: "Integration", kinds: ["REST_MODULE", "DB_LINK", "SYNONYM", "DIRECTORY", "QUEUE", "SCHEDULER_JOB"] },
+    { label: "Security",    kinds: ["DB_USER", "PRIVILEGE"] },
   ];
 
+  const KIND_ORDER: ObjectKind[] = KIND_GROUPS.flatMap(g => g.kinds);
+
   const KIND_COLOR: Record<ObjectKind, string> = {
-    TABLE:             "#4a9eda",
-    VIEW:              "#27ae60",
-    SEQUENCE:          "#2ecc71",
-    PROCEDURE:         "#e67e22",
-    FUNCTION:          "#f39c12",
-    PACKAGE:           "#9b59b6",
-    TRIGGER:           "#e74c3c",
-    TYPE:              "#3498db",
-    REST_MODULE:       "#f5a08a",
-    MATERIALIZED_VIEW: "#1a9ca6",
-    SYNONYM:           "#7d5fa7",
-    DB_LINK:           "#d4770a",
-    DIRECTORY:         "hsl(45 90% 48%)",
-    QUEUE:             "hsl(260 55% 58%)",
-    SCHEDULER_JOB:     "hsl(200 70% 45%)",
-    DB_USER:           "hsl(220 65% 50%)",
-    PRIVILEGE:         "hsl(0 65% 50%)",
+    TABLE: "#4a9eda", VIEW: "#4a9eda", MATERIALIZED_VIEW: "#4a9eda", SEQUENCE: "#4a9eda",
+    PROCEDURE: "#e67e22", FUNCTION: "#e67e22", PACKAGE: "#e67e22", TRIGGER: "#e67e22", TYPE: "#e67e22",
+    REST_MODULE: "#1a9ca6", DB_LINK: "#1a9ca6", SYNONYM: "#1a9ca6", DIRECTORY: "#1a9ca6", QUEUE: "#1a9ca6", SCHEDULER_JOB: "#1a9ca6",
+    DB_USER: "#c0392b", PRIVILEGE: "#c0392b",
+  };
+
+  const KIND_ICON: Record<ObjectKind, any> = {
+    TABLE: Table, VIEW: Eye, MATERIALIZED_VIEW: Layers, SEQUENCE: Hash,
+    PROCEDURE: Cog, FUNCTION: SquareFunction, PACKAGE: Package, TRIGGER: Zap, TYPE: FileType,
+    REST_MODULE: Webhook, DB_LINK: Link2, SYNONYM: ExternalLink, DIRECTORY: Folder, QUEUE: ListOrdered, SCHEDULER_JOB: Clock,
+    DB_USER: User, PRIVILEGE: Shield,
   };
 
   function isSystemSchema(name: string): boolean {
@@ -154,9 +141,15 @@
     if (loadable.kind !== "ok") return null;
     return filtered.length;
   }
+
+  const activeSchema = $derived(
+    schemas.find(s => s.isCurrent && s.expanded) ??
+    schemas.find(s => s.expanded) ??
+    schemas.find(s => s.isCurrent)
+  );
 </script>
 
-<nav class="tree">
+<nav class="tree" class:comfortable={density === "comfortable"}>
   <!-- Search + Refresh -->
   <div class="search-wrap">
     <svg class="search-icon" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
@@ -180,6 +173,13 @@
       aria-pressed={showSystemSchemas}
       title={showSystemSchemas ? "Hide system schemas" : "Show system schemas"}
     >sys</button>
+    <button
+      class="density-btn"
+      class:active={density === "comfortable"}
+      onclick={() => density = density === "compact" ? "comfortable" : "compact"}
+      title={density === "compact" ? "Comfortable spacing" : "Compact spacing"}
+      aria-pressed={density === "comfortable"}
+    >⊞</button>
     {#if onRefresh}
       <button
         class="refresh-btn"
@@ -197,24 +197,37 @@
     {/if}
   </div>
 
-  <!-- Type filter pills -->
-  <div class="kind-pills">
-    {#each KIND_ORDER as kind}
-      <button
-        class="kind-pill"
-        class:off={hiddenKinds.has(kind)}
-        style="--kc:{KIND_COLOR[kind]}"
-        onclick={() => toggleKind(kind)}
-        title={KIND_LABELS[kind]}
-        aria-pressed={!hiddenKinds.has(kind)}
-      >
-        <span class="pill-dot" aria-hidden="true"></span>
-        {KIND_SHORT[kind]}
-      </button>
+  <!-- Kind icon toolbar -->
+  <div class="kind-toolbar">
+    <div class="toolbar-actions">
+      <button class="toolbar-text-btn" onclick={() => hiddenKinds = new Set()}>All</button>
+      <button class="toolbar-text-btn" onclick={() => hiddenKinds = new Set(KIND_ORDER)}>None</button>
+    </div>
+    {#each KIND_GROUPS as group}
+      <div class="toolbar-row">
+        <span class="toolbar-group-label">{group.label}</span>
+        <div class="toolbar-icons">
+          {#each group.kinds as kind}
+            {@const isOff = hiddenKinds.has(kind)}
+            {@const count = activeSchema?.kindCounts?.[kind]}
+            <button
+              class="kind-icon-btn"
+              class:off={isOff}
+              style="--gc:{KIND_COLOR[kind]}"
+              onclick={() => toggleKind(kind)}
+              title={KIND_LABELS[kind] + (count !== undefined ? ` · ${count}` : "")}
+              aria-label={"Filter: " + KIND_LABELS[kind] + (count !== undefined ? ` (${count})` : "") + (isOff ? ", disabled" : ", enabled")}
+              aria-pressed={!isOff}
+            >
+              <svelte:component this={KIND_ICON[kind]} size={16} />
+            </button>
+          {/each}
+        </div>
+      </div>
     {/each}
   </div>
 
-  {#each schemas as s (s.name)}
+  {#each schemas as s}
     {#if isVisible(s)}
     <div class="schema">
       <button
@@ -242,8 +255,8 @@
             {#if s.kinds[kind] !== undefined && !hiddenKinds.has(kind)}
               {@const loadable = s.kinds[kind]!}
               {@const filtered = loadable.kind === "ok" ? filteredObjects(loadable.value, passThrough) : []}
-              {#if kindVisible(loadable, passThrough)}
-              <details class="kind" open>
+              {#if kindVisible(loadable, passThrough) && !(loadable.kind === "ok" && filtered.length === 0)}
+              <details class="kind">
                 <summary class="kind-head" style="--kc:{KIND_COLOR[kind]}">
                   <span class="kind-dot" style="background:{KIND_COLOR[kind]}" aria-hidden="true"></span>
                   <span class="kind-label">{KIND_LABELS[kind]}</span>
@@ -264,7 +277,7 @@
                       <button class="retry-btn" onclick={() => onRetry(s.name, kind)}>retry</button>
                     </div>
                   {:else if loadable.kind === "ok"}
-                    {#each filtered as o (o.name)}
+                    {#each filtered as o}
                       <div class="obj-row">
                         <button
                           class="object"
@@ -442,6 +455,24 @@
     border-color: rgba(232,213,160,0.35);
     background: rgba(232,213,160,0.08);
   }
+  .density-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1;
+    padding: 1px 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .density-btn:hover { color: var(--text-secondary); border-color: var(--border-strong); }
+  .density-btn.active {
+    color: #7ec96a;
+    border-color: rgba(126,201,106,0.35);
+    background: rgba(126,201,106,0.08);
+  }
 
   .refresh-btn {
     background: transparent;
@@ -460,47 +491,19 @@
   .refresh-btn:disabled { opacity: 0.4; cursor: default; }
   .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
 
-  /* ── Kind filter pills ───────────────────────────────────── */
-  .kind-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 0 0.6rem 0.5rem;
-  }
-  .kind-pill {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid color-mix(in srgb, var(--kc) 40%, transparent);
-    background: color-mix(in srgb, var(--kc) 12%, transparent);
-    color: color-mix(in srgb, var(--kc) 75%, var(--text-secondary));
-    font-size: 10px;
-    font-family: "Inter", sans-serif;
-    cursor: pointer;
-    transition: opacity 0.12s, background 0.12s, border-color 0.12s;
-    user-select: none;
-    line-height: 1.4;
-  }
-  .kind-pill:hover {
-    background: color-mix(in srgb, var(--kc) 22%, transparent);
-    border-color: color-mix(in srgb, var(--kc) 60%, transparent);
-  }
-  .kind-pill.off {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--text-muted);
-  }
-  .kind-pill.off .pill-dot { background: var(--border-strong); }
-  .pill-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--kc);
-    flex-shrink: 0;
-    transition: background 0.12s;
-  }
+  /* ── Kind icon toolbar ───────────────────────────────────── */
+  .kind-toolbar { padding: 0 0.6rem 0.5rem; display: flex; flex-direction: column; gap: 3px; }
+  .toolbar-actions { display: flex; gap: 8px; margin-bottom: 1px; }
+  .toolbar-text-btn { background: none; border: none; color: var(--text-muted); font-size: 10px; font-family: "Inter", sans-serif; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.1s; }
+  .toolbar-text-btn:hover { color: var(--text-primary); text-decoration: underline; }
+  .toolbar-row { display: flex; align-items: center; gap: 4px; }
+  .toolbar-group-label { font-size: 9px; color: var(--text-muted); font-family: "Inter", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; width: 80px; flex-shrink: 0; }
+  .toolbar-icons { display: flex; align-items: center; gap: 6px; }
+  .kind-icon-btn { display: flex; align-items: center; justify-content: center; background: none; border: none; padding: 3px; border-radius: 3px; cursor: pointer; color: var(--gc); transition: background 0.1s, transform 0.08s, opacity 0.1s; outline: none; }
+  .kind-icon-btn:hover { background: rgba(255, 255, 255, 0.05); }
+  .kind-icon-btn:active { transform: scale(0.95); }
+  .kind-icon-btn:focus-visible { outline: 1px solid var(--gc); outline-offset: 1px; }
+  .kind-icon-btn.off { color: var(--text-muted); opacity: 0.3; }
 
   /* ── Schema row ───────────────────────────────────────────── */
   .schema { margin-bottom: 0.15rem; }
@@ -540,7 +543,8 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.25rem 0.7rem 0.25rem 1.4rem;
+    padding: 0.25rem 0.7rem 0.25rem calc(1.4rem - 2px);
+    border-left: 2px solid color-mix(in srgb, var(--kc) 35%, transparent);
     cursor: pointer;
     list-style: none;
     font-family: "Space Grotesk", sans-serif;
@@ -691,6 +695,13 @@
     padding: 6px 14px; text-align: left;
   }
   .ctx-item:hover { background: var(--row-hover); }
+
+  /* ── Density: comfortable ─────────────────────────────────── */
+  .tree.comfortable .schema-row { padding: 0.55rem 0.7rem; }
+  .tree.comfortable .kind-head { padding: 0.35rem 0.7rem 0.35rem calc(1.4rem - 2px); }
+  .tree.comfortable .object { padding: 0.28rem 0.7rem 0.28rem 1.8rem; }
+  .tree.comfortable .muted-row { padding: 0.18rem 0.7rem 0.18rem 1.8rem; }
+  .tree.comfortable .err-row { padding: 0.22rem 0.7rem 0.22rem 1.8rem; }
 
   /* ── Cloud tier overrides ─────────────────────────────────── */
   :global([data-tier="cloud"]) .search:focus {
