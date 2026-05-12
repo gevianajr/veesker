@@ -263,25 +263,25 @@
 </script>
 
 <div class="cw">
-  <div class="cw-output" bind:this={outputEl}>
+  <div class="cw-output" bind:this={outputEl} role="textbox" aria-label="Terminal" aria-multiline="true" tabindex="-1" onclick={() => inputEl?.focus()} onkeydown={() => inputEl?.focus()}>
     {#each displayLines as line}
       <div class="cw-line cw-{line.kind}">{line.text}</div>
     {/each}
-  </div>
-  <div class="cw-input-row">
-    <span class="cw-prompt">{currentPromptStr()}</span>
-    <input
-      bind:this={inputEl}
-      class="cw-input"
-      type="text"
-      autocomplete="off"
-      autocorrect="off"
-      spellcheck={false}
-      disabled={running}
-      bind:value={currentInput}
-      onkeydown={handleKeydown}
-      onpaste={handlePaste}
-    />
+    <div class="cw-input-row">
+      <span class="cw-prompt">{currentPromptStr()}</span>
+      <input
+        bind:this={inputEl}
+        class="cw-input"
+        type="text"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck={false}
+        disabled={running}
+        bind:value={currentInput}
+        onkeydown={handleKeydown}
+        onpaste={handlePaste}
+      />
+    </div>
   </div>
 </div>
 
@@ -302,7 +302,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px 12px 0;
+    padding: 8px 12px 8px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
@@ -323,7 +323,6 @@
   .cw-input-row {
     display: flex;
     align-items: baseline;
-    padding: 0 12px 8px;
   }
   .cw-prompt {
     color: #a0a0a0;
