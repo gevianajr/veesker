@@ -101,6 +101,13 @@
     objectType: string | null;
   } | null>(null);
   let refreshing = $state(false);
+
+  // ── Diagnostic instrumentation (chore/diagnostic-schema-toggle-logs) ────────
+  let _diagSpreads = 0;
+  let _bootExpandT0 = 0;
+  function _diagSpread(ctx: string): void {
+    console.log(`[spread #${++_diagSpreads}] ${ctx}`);
+  }
   let completionSchema = $state<Record<string, string[]>>({});
   let colCache = new Map<string, string[]>();
 
@@ -220,7 +227,10 @@
   }
 
   async function loadKind(node: SchemaNode, kind: ObjectKind): Promise<void> {
+    const _lkT0 = performance.now();
+    console.log(`[load:${kind}] START node=${node.name}`);
     node.kinds[kind] = { kind: "loading" };
+    _diagSpread(`loadKind:${kind}:loading:${node.name}`);
     schemas = [...schemas];
     if (kind === "REST_MODULE") {
       const res = await ordsModulesList(node.name);
@@ -300,7 +310,9 @@
         node.kinds[kind] = { kind: "err", message: res.error.message };
       }
     }
+    _diagSpread(`loadKind:${kind}:done:${node.name}`);
     schemas = [...schemas];
+    console.log(`[load:${kind}] END node=${node.name} ${(performance.now() - _lkT0).toFixed(0)}ms`);
   }
 
   function expandIfNeeded(node: SchemaNode): void {
@@ -309,12 +321,11 @@
       "PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE",
       "REST_MODULE",
     ];
-    void Promise.all(
-      kinds
-        .filter((k) => node.kinds[k]?.kind === "idle")
-        .map((k) => loadKind(node, k))
-    );
+    const idleKinds = kinds.filter((k) => node.kinds[k]?.kind === "idle");
+    console.log(`[expand] node=${node.name} idleKinds=${idleKinds.length}(${idleKinds.join(",")}) hasKindCounts=${!!node.kindCounts} hasVectorTables=${!!node.vectorTables}`);
+    void Promise.all(idleKinds.map((k) => loadKind(node, k)));
     if (!node.kindCounts) {
+      console.log(`[expand] ${node.name} → fetching kindCounts`);
       void schemaKindCounts(node.name).then((res) => {
         if (res.ok) {
           // ALL_OBJECTS uses 'MATERIALIZED VIEW' (with space); map to the ObjectKind key
@@ -324,15 +335,20 @@
             delete counts["MATERIALIZED VIEW"];
           }
           node.kindCounts = counts;
+          _diagSpread(`kindCounts:${node.name}`);
           schemas = [...schemas];
+          console.log(`[expand] ${node.name} kindCounts done spreads=${_diagSpreads}`);
         }
       });
     }
     if (!node.vectorTables) {
+      console.log(`[expand] ${node.name} → fetching vectorTables`);
       void vectorTablesInSchema(node.name).then((res) => {
         if (res.ok) {
           node.vectorTables = new Set(res.data.columns.map((c) => c.tableName));
+          _diagSpread(`vectorTables:${node.name}`);
           schemas = [...schemas];
+          console.log(`[expand] ${node.name} vectorTables done spreads=${_diagSpreads}`);
         }
       });
     }
@@ -344,7 +360,16 @@
       return s;
     });
     const node = schemas.find((s) => s.name === owner);
-    if (node?.expanded) expandIfNeeded(node);
+    if (node?.expanded) {
+      const _toggleT0 = performance.now();
+      console.log(`[toggle] ${owner} → EXPANDING hasKindCounts=${!!node.kindCounts} hasVectorTables=${!!node.vectorTables} spreads_so_far=${_diagSpreads}`);
+      requestAnimationFrame(() => {
+        console.log(`[re-expand] ${owner} visible after ${(performance.now() - _toggleT0).toFixed(0)}ms`);
+      });
+      expandIfNeeded(node);
+    } else {
+      console.log(`[toggle] ${owner} → COLLAPSED`);
+    }
   }
 
   function onRetryKind(owner: string, kind: ObjectKind): void {
@@ -562,7 +587,15 @@
     }
     schemas = schemaRes.data.map((s) => newSchemaNode(s.name, s.isCurrent));
     const current = schemas.find((s) => s.isCurrent);
-    if (current) expandIfNeeded(current);
+    if (current) {
+      _bootExpandT0 = performance.now();
+      _diagSpreads = 0;
+      console.log(`[boot-expand] START node=${current.name} schemas=${schemas.length}`);
+      expandIfNeeded(current);
+      requestAnimationFrame(() => {
+        console.log(`[boot-expand] first-rAF after=${(performance.now() - _bootExpandT0).toFixed(0)}ms spreads=${_diagSpreads}`);
+      });
+    }
     ordsStore.setConnectionId(meta.id);
     void ordsStore.refresh().then(() => {
       const s = ordsStore.state;
