@@ -56,9 +56,9 @@
     return formatPrompt({ lineNumber: lineNum, isContinuation: true });
   }
 
-  // DML/DQL keywords that are safe to auto-execute on Enter without explicit ";"
+  // Only applied for manual Enter — never for paste lines.
+  // Covers single-line DQL/DML/TCL that are clearly complete (no pending operator at end).
   const AUTO_EXEC_STARTS = /^\s*(SELECT|INSERT|UPDATE|DELETE|MERGE|TRUNCATE|COMMIT|ROLLBACK|SAVEPOINT|GRANT|REVOKE|DESCRIBE|DESC|CALL)\b/i;
-  // Line endings that signal the statement is clearly not complete yet
   const PENDING_ENDINGS = /([,=]|\bOR\b|\bAND\b|\bWHERE\b|\bFROM\b|\bJOIN\b|\bON\b|\bHAVING\b|\bSET\b|\bUNION\b|\bINTERSECT\b|\bMINUS\b)\s*$/i;
 
   function shouldAutoTerminate(line: string, partialBuffer: string): boolean {
@@ -107,7 +107,11 @@
     if (outputEl) outputEl.scrollTop = outputEl.scrollHeight;
   }
 
-  async function handleSubmit(): Promise<void> {
+  // skipAutoTerminate: true when processing pasted lines — bypasses the single-line
+  // heuristic that would break multi-line paste (e.g. SELECT col1, col2 on its own
+  // line looks "complete" but is just the first line of a multi-line query).
+  // skipHistory: true for paste lines — keeps ↑/↓ history clean.
+  async function handleSubmit(skipAutoTerminate = false, skipHistory = false): Promise<void> {
     if (!executor || !cmdState || running) return;
     const line = currentInput;
     const trimmed = line.trim().toLowerCase();
@@ -123,7 +127,7 @@
 
     displayLines.push({ text: `${currentPromptStr()}${line}`, kind: "echoed-input" });
 
-    if (line.trim()) {
+    if (line.trim() && !skipHistory) {
       historySnapshot = [line, ...historySnapshot.slice(0, 999)];
       histIdx = -1;
       savedInput = "";
@@ -131,13 +135,53 @@
 
     currentInput = "";
     running = true;
-    const lineToFeed = shouldAutoTerminate(line, cmdState.partialBuffer) ? `${line};` : line;
+    const lineToFeed = (!skipAutoTerminate && shouldAutoTerminate(line, cmdState.partialBuffer))
+      ? `${line};`
+      : line;
     try {
       await executor.feedLine(lineToFeed);
       flushTranscript();
     } finally {
       running = false;
     }
+    await scrollToBottom();
+    inputEl?.focus();
+  }
+
+  // Intercept paste to handle multi-line scripts line by line.
+  // Without this, <input type="text"> strips all \n and the entire
+  // script arrives as one concatenated string.
+  async function handlePaste(e: ClipboardEvent): Promise<void> {
+    e.preventDefault();
+    if (!cmdState || !executor) return;
+
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (!text) return;
+
+    const lines = text.split(/\r?\n/);
+
+    if (lines.length === 1) {
+      // Single-line paste: insert at cursor
+      const el = e.currentTarget as HTMLInputElement;
+      const start = el.selectionStart ?? currentInput.length;
+      const end = el.selectionEnd ?? currentInput.length;
+      currentInput = currentInput.slice(0, start) + lines[0] + currentInput.slice(end);
+      return;
+    }
+
+    // Multi-line paste: first line merges with whatever is already typed.
+    // Each line is fed as-is (skipAutoTerminate) so multi-line statements
+    // accumulate in the parser buffer correctly.
+    currentInput = currentInput + lines[0];
+    await handleSubmit(true, true);
+
+    for (let i = 1; i < lines.length - 1; i++) {
+      currentInput = lines[i];
+      await handleSubmit(true, true);
+    }
+
+    // Last fragment stays in the input field for the user to review/complete.
+    currentInput = lines[lines.length - 1];
     await scrollToBottom();
     inputEl?.focus();
   }
@@ -231,6 +275,7 @@
       disabled={running}
       bind:value={currentInput}
       onkeydown={handleKeydown}
+      onpaste={handlePaste}
     />
   </div>
 </div>
