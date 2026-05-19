@@ -250,7 +250,10 @@ describe("formatExpiresIn", () => {
   });
 
   it("returns 'expires in 1d' at exactly 24h", () => {
-    const oneDay = new Date(Date.now() + 24 * 3_600_000).toISOString();
+    // +1000ms cushion: formatExpiresIn calls Date.now() again internally, so a
+    // bare +24h budget loses a few ms in transit and drops below the 1d floor.
+    // Mirrors the +1000ms used by the multi-day test below.
+    const oneDay = new Date(Date.now() + 24 * 3_600_000 + 1000).toISOString();
     expect(formatExpiresIn(oneDay)).toBe("expires in 1d");
   });
 
